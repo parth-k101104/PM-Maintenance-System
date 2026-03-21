@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+
+  db:
+    image: postgres:15-alpine
+    container_name: pm_postgres_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: pm_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Spring Boot Application Service
+  app:
+    build: .
+    container_name: pm_backend_app
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=root
+    depends_on:
+      - db
+    restart: unless-stopped
+    # Spring Boot runs Flyway migrations automatically because spring-boot-starter-flyway is in pom.xml
+    # If a standalone Flyway container is strictly necessary, it can be added here. But standard Spring Boot apps execute their own flyway tasks during startup.
+
+volumes:
+  postgres_data:

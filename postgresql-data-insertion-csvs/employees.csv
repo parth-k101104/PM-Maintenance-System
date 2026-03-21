@@ -1,0 +1,25 @@
+﻿employee_id,email,password,full_name,role_id,plant_id,dept_id,shift,expertise,performance_score,availability_score,active,created_at,updated_at
+201,mm101@company.com,admin@123,Rajesh Patil,1,101,1002,General,Maintenance Planning,4.6,0.9,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+202,lm101@company.com,manager@123,Amit Sharma,2,101,1001,General,Production Mgmt,4.3,0.85,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+203,qc101@company.com,manager@123,Neha Kulkarni,9,101,1003,General,Quality Systems,4.5,0.92,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+204,store101@company.com,manager@123,Suresh Jadhav,8,101,1004,General,Inventory Control,4.1,0.88,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+205,util101@company.com,engineer@123,Prakash More,6,101,1005,General,Utilities Maintenance,4.2,0.87,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+206,hse101@company.com,manager@123,Kavita Deshmukh,10,101,1006,General,Industrial Safety,4.7,0.93,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+207,eng101@company.com,engineer@123,Rohit Singh,6,101,1002,General,Reliability Engineering,4.4,0.89,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+208,elec101a@company.com,engineer@123,Sunil Gupta,4,101,1002,Shift A,Electrical Systems,4.2,0.91,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+209,elec101b@company.com,engineer@123,Manoj Verma,4,101,1002,Shift B,Motors & Panels,4.1,0.88,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+210,fitter101a@company.com,engineer@123,Akshay Rao,5,101,1002,Shift A,Mechanical Repair,4.3,0.86,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+211,fitter101b@company.com,engineer@123,Imran Shaikh,5,101,1002,Shift B,Pumps & Gearbox,4,0.84,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+212,operator101a@company.com,engineer@123,Kunal Joshi,7,101,1001,Shift A,Machine Operation,4.1,0.87,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+213,operator101b@company.com,engineer@123,Arjun Kale,7,101,1001,Shift B,Packaging Line,4,0.85,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+214,sup101@company.com,supervisor@123,Deepak Shinde,3,101,1001,General,Shift Supervision,4.2,0.88,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+215,mm102@company.com,admin@123,Vijay Nair,1,102,1008,General,Maintenance Strategy,4.5,0.91,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+216,lm102@company.com,manager@123,Karan Mehta,2,102,1007,General,Line Planning,4.2,0.85,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+217,qa102@company.com,manager@123,Pooja Iyer,9,102,1009,General,QA Systems,4.6,0.9,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+218,store102@company.com,manager@123,Nitin Kulkarni,8,102,1010,General,Warehouse Mgmt,4.1,0.88,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+219,eng102@company.com,engineer@123,Harish Pillai,6,102,1011,General,Plant Engineering,4.3,0.87,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+220,admin102@company.com,engineer@123,Sneha Reddy,11,102,1012,General,System Admin,4.4,0.9,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+221,elec102a@company.com,engineer@123,Deepak Yadav,4,102,1008,Shift A,Electrical Maintenance,4.2,0.89,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+222,fitter102a@company.com,engineer@123,Sameer Khan,5,102,1008,Shift A,Mechanical Repair,4.1,0.86,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+223,operator102a@company.com,engineer@123,Rahul Das,7,102,1007,Shift A,Machine Operation,4,0.84,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00
+224,sup102@company.com,supervisor@123,Anil Kumar,3,102,1007,General,Shift Supervision,4.3,0.89,TRUE,2026-01-01 9:00:00,2026-01-01 9:00:00

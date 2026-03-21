@@ -1,0 +1,7 @@
+INSERT INTO plants (ID, Company_ID, Code, Name, Location, Timezone, Status, Created_At, Updated_At) VALUES ('101', '1', 'DET-01', 'Apex Detroit Main', 'Detroit, MI', 'EST', 'Active', '2024-01-05 8:00', '2024-02-18 10:00');
+INSERT INTO plants (ID, Company_ID, Code, Name, Location, Timezone, Status, Created_At, Updated_At) VALUES ('102', '1', 'PUE-02', 'Apex Mexico South', 'Puebla, MX', 'CST', 'Active', '2024-01-05 8:00', '2024-02-18 10:00');
+INSERT INTO plants (ID, Company_ID, Code, Name, Location, Timezone, Status, Created_At, Updated_At) VALUES ('103', '2', 'STU-01', 'Stuttgart Stamping', 'Stuttgart, DE', 'CET', 'Active', '2024-01-06 9:15', '2024-02-15 14:20');
+INSERT INTO plants (ID, Company_ID, Code, Name, Location, Timezone, Status, Created_At, Updated_At) VALUES ('104', '2', 'BER-02', 'Berlin Assembly', 'Berlin, DE', 'CET', 'Active', '2024-01-06 9:15', '2024-01-20 11:30');
+INSERT INTO plants (ID, Company_ID, Code, Name, Location, Timezone, Status, Created_At, Updated_At) VALUES ('105', '3', 'TOK-01', 'Tokyo Aerospace Hub', 'Chiba, JP', 'JST', 'Active', '2024-01-07 10:00', '2024-02-10 9:45');
+INSERT INTO plants (ID, Company_ID, Code, Name, Location, Timezone, Status, Created_At, Updated_At) VALUES ('106', '4', 'INC-01', 'Titan Heavy Seoul', 'Incheon, KR', 'KST', 'Active', '2024-01-08 8:30', '2024-02-12 16:15');
+INSERT INTO plants (ID, Company_ID, Code, Name, Location, Timezone, Status, Created_At, Updated_At) VALUES ('107', '5', 'SHA-01', 'Shanghai EV Mega', 'Shanghai, CN', 'CST', 'Active', '2024-01-09 11:00', '2024-02-18 12:00');

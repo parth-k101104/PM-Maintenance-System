@@ -1,0 +1,11 @@
+INSERT INTO roles (role_id, name, permissions, created_at) VALUES ('1', 'Maintenance Manager', '{"maintenance":"full","inventory":"full","reports":"full","users":"manage"}', '2026-01-01 9:00:00');
+INSERT INTO roles (role_id, name, permissions, created_at) VALUES ('2', 'Line Manager', '{"maintenance":["create_schedule","approve_execution"],"reports":["view"]}', '2026-01-01 9:00:00');
+INSERT INTO roles (role_id, name, permissions, created_at) VALUES ('3', 'Line Supervisor', '{"maintenance":["assign_tasks","update_status"]}', '2026-01-01 9:00:00');
+INSERT INTO roles (role_id, name, permissions, created_at) VALUES ('4', 'Electrician', '{"maintenance":["execute_tasks","update_readings"],"inventory":["consume_spares"]}', '2026-01-01 9:00:00');
+INSERT INTO roles (role_id, name, permissions, created_at) VALUES ('5', 'Fitter', '{"maintenance":["execute_tasks"],"inventory":["consume_spares"]}', '2026-01-01 9:00:00');
+INSERT INTO roles (role_id, name, permissions, created_at) VALUES ('6', 'Maintenance Engineer', '{"maintenance":["create_schedule","analyze_readings","view_reports"]}', '2026-01-01 9:00:00');
+INSERT INTO roles (role_id, name, permissions, created_at) VALUES ('7', 'Production Operator', '{"maintenance":["report_issue"]}', '2026-01-01 9:00:00');
+INSERT INTO roles (role_id, name, permissions, created_at) VALUES ('8', 'Store Incharge', '{"inventory":["add_spares","update_stock","view_stock"]}', '2026-01-01 9:00:00');
+INSERT INTO roles (role_id, name, permissions, created_at) VALUES ('9', 'Quality Engineer', '{"reports":["view"]}', '2026-01-01 9:00:00');
+INSERT INTO roles (role_id, name, permissions, created_at) VALUES ('10', 'HSE Officer', '{"safety":["audit_access"],"reports":["view"]}', '2026-01-01 9:00:00');
+INSERT INTO roles (role_id, name, permissions, created_at) VALUES ('11', 'Plant Admin', '{"system":"full"}', '2026-01-01 9:00:00');

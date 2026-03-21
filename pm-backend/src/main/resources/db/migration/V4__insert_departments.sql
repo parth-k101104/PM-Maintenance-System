@@ -1,0 +1,12 @@
+INSERT INTO departments (dept_id, plant_id, name, code, manager_user_id, created_at, updated_at) VALUES ('1001', '101', 'Production', 'PROD101', '201', '2026-01-01 9:00:00', '2026-01-01 9:00:00');
+INSERT INTO departments (dept_id, plant_id, name, code, manager_user_id, created_at, updated_at) VALUES ('1002', '101', 'Maintenance', 'MAINT101', '202', '2026-01-01 9:00:00', '2026-01-01 9:00:00');
+INSERT INTO departments (dept_id, plant_id, name, code, manager_user_id, created_at, updated_at) VALUES ('1003', '101', 'Quality Control', 'QC101', '203', '2026-01-01 9:00:00', '2026-01-01 9:00:00');
+INSERT INTO departments (dept_id, plant_id, name, code, manager_user_id, created_at, updated_at) VALUES ('1004', '101', 'Stores & Inventory', 'STORE101', '204', '2026-01-01 9:00:00', '2026-01-01 9:00:00');
+INSERT INTO departments (dept_id, plant_id, name, code, manager_user_id, created_at, updated_at) VALUES ('1005', '101', 'Utilities', 'UTIL101', '205', '2026-01-01 9:00:00', '2026-01-01 9:00:00');
+INSERT INTO departments (dept_id, plant_id, name, code, manager_user_id, created_at, updated_at) VALUES ('1006', '101', 'Health & Safety', 'HSE101', '206', '2026-01-01 9:00:00', '2026-01-01 9:00:00');
+INSERT INTO departments (dept_id, plant_id, name, code, manager_user_id, created_at, updated_at) VALUES ('1007', '102', 'Production', 'PROD102', '207', '2026-01-01 9:00:00', '2026-01-01 9:00:00');
+INSERT INTO departments (dept_id, plant_id, name, code, manager_user_id, created_at, updated_at) VALUES ('1008', '102', 'Maintenance', 'MAINT102', '208', '2026-01-01 9:00:00', '2026-01-01 9:00:00');
+INSERT INTO departments (dept_id, plant_id, name, code, manager_user_id, created_at, updated_at) VALUES ('1009', '102', 'Quality Assurance', 'QA102', '209', '2026-01-01 9:00:00', '2026-01-01 9:00:00');
+INSERT INTO departments (dept_id, plant_id, name, code, manager_user_id, created_at, updated_at) VALUES ('1010', '102', 'Stores & Inventory', 'STORE102', '210', '2026-01-01 9:00:00', '2026-01-01 9:00:00');
+INSERT INTO departments (dept_id, plant_id, name, code, manager_user_id, created_at, updated_at) VALUES ('1011', '102', 'Engineering', 'ENG102', '211', '2026-01-01 9:00:00', '2026-01-01 9:00:00');
+INSERT INTO departments (dept_id, plant_id, name, code, manager_user_id, created_at, updated_at) VALUES ('1012', '102', 'Administration', 'ADMIN102', '212', '2026-01-01 9:00:00', '2026-01-01 9:00:00');
