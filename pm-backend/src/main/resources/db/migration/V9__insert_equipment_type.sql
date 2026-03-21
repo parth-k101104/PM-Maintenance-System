@@ -1,0 +1,12 @@
+INSERT INTO equipment_type (equipment_type_id, name, description, created_at) VALUES ('701', 'Conveyor System', 'Used for material movement between stations in production lines', '2026-01-01 9:00:00');
+INSERT INTO equipment_type (equipment_type_id, name, description, created_at) VALUES ('702', 'Filling Machine', 'Automated liquid/product filling system for packaging lines', '2026-01-01 9:00:00');
+INSERT INTO equipment_type (equipment_type_id, name, description, created_at) VALUES ('703', 'Labeling Machine', 'Applies labels to finished products', '2026-01-01 9:00:00');
+INSERT INTO equipment_type (equipment_type_id, name, description, created_at) VALUES ('704', 'Industrial Motor', 'Drives mechanical components such as conveyors and pumps', '2026-01-01 9:00:00');
+INSERT INTO equipment_type (equipment_type_id, name, description, created_at) VALUES ('705', 'Gearbox', 'Speed and torque transmission system for machinery', '2026-01-01 9:00:00');
+INSERT INTO equipment_type (equipment_type_id, name, description, created_at) VALUES ('706', 'Centrifugal Pump', 'Used for liquid transfer in utilities and production', '2026-01-01 9:00:00');
+INSERT INTO equipment_type (equipment_type_id, name, description, created_at) VALUES ('707', 'Air Compressor', 'Supplies compressed air for pneumatic systems', '2026-01-01 9:00:00');
+INSERT INTO equipment_type (equipment_type_id, name, description, created_at) VALUES ('708', 'Electrical Control Panel', 'Houses electrical circuits and automation controllers', '2026-01-01 9:00:00');
+INSERT INTO equipment_type (equipment_type_id, name, description, created_at) VALUES ('709', 'Vision Inspection Camera', 'Automated product inspection system', '2026-01-01 9:00:00');
+INSERT INTO equipment_type (equipment_type_id, name, description, created_at) VALUES ('710', 'Industrial Weighing Scale', 'Measures product weight for quality compliance', '2026-01-01 9:00:00');
+INSERT INTO equipment_type (equipment_type_id, name, description, created_at) VALUES ('711', 'Boiler', 'Generates steam for production processes', '2026-01-01 9:00:00');
+INSERT INTO equipment_type (equipment_type_id, name, description, created_at) VALUES ('712', 'Cooling Tower', 'Maintains temperature control in utilities system', '2026-01-01 9:00:00');

@@ -1,0 +1,5 @@
+INSERT INTO companies (ID, Name, Code, Industry, Status, Address, Created_At, Updated_At) VALUES ('1', 'Apex Auto Components', 'AAC', 'Automotive', 'Active', '455 Miller Rd, Detroit, MI', '2023-01-10 8:00', '2024-01-05 14:20');
+INSERT INTO companies (ID, Name, Code, Industry, Status, Address, Created_At, Updated_At) VALUES ('2', 'Global Stamping Corp', 'GSC', 'Industrial', 'Active', 'Hauptstraße 12, Stuttgart, DE', '2023-01-12 9:15', '2023-11-20 10:30');
+INSERT INTO companies (ID, Name, Code, Industry, Status, Address, Created_At, Updated_At) VALUES ('3', 'Precision Metal Works', 'PMW', 'Aerospace', 'Active', '2-1-1 Nihonbashi, Tokyo, JP', '2023-02-01 11:00', '2024-02-15 9:00');
+INSERT INTO companies (ID, Name, Code, Industry, Status, Address, Created_At, Updated_At) VALUES ('4', 'Titan Heavy Industries', 'THI', 'Construction', 'Active', '123 Sejong-no, Seoul, KR', '2023-02-02 11:00', '2023-02-15 14:45');
+INSERT INTO companies (ID, Name, Code, Industry, Status, Address, Created_At, Updated_At) VALUES ('5', 'High Energy Vehicles', 'HEV', 'Electric Vehicles', 'Active', '88 Pudong Ave, Shanghai, CN', '2023-03-05 10:20', '2024-01-10 11:45');

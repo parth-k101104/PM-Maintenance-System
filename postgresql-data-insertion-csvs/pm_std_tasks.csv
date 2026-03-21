@@ -1,0 +1,41 @@
+﻿std_task_id,task_ref_no,element_id,part_id,task_criticality,maintenance_strategy,method,tool,assignee_role_id,estimated_req_time,mode,frequency,standard_value,tolerance_min,tolerance_max,uom,created_at,updated_at,last_updated_by
+71001,PM-10001-01,10001,30001,HIGH,Predictive,Measure shaft vibration,Vibration Meter,6,15,online,weekly,2.5,0,4,mm/s,1/1/2026,1/1/2026,201
+71002,PM-10001-02,10001,30001,HIGH,Preventive,Inspect shaft wear,Torch,5,20,offline,half yearly,,,,N/A,1/1/2026,1/1/2026,201
+71003,PM-10001-03,10001,30002,HIGH,Condition-Based,Measure bearing temperature,IR Thermometer,6,10,online,daily,65,0,80,°C,1/1/2026,1/1/2026,201
+71004,PM-10001-04,10001,30002,HIGH,Preventive,Lubricate bearing,Grease Gun,5,30,offline,monthly,,,,ml,1/1/2026,1/1/2026,201
+71005,PM-10001-05,10001,30003,MEDIUM,Preventive,Inspect coupling alignment,Alignment Tool,6,20,offline,monthly,,,,N/A,1/1/2026,1/1/2026,201
+71006,PM-10001-06,10001,30003,MEDIUM,Preventive,Tighten coupling bolts,Torque Wrench,5,15,offline,yearly,120,110,130,Nm,1/1/2026,1/1/2026,201
+71007,PM-10001-07,10001,30004,LOW,Preventive,Inspect mounting bolts,Spanner,5,10,online,weekly,,,,N/A,1/1/2026,1/1/2026,201
+71008,PM-10001-08,10001,30004,LOW,Preventive,Replace damaged bolts,Tool Kit,5,25,offline,yearly,,,,N/A,1/1/2026,1/1/2026,201
+71009,PM-10002-01,10002,30005,HIGH,Preventive,Inspect belt surface condition,Torch,5,15,online,daily,,,,N/A,1/1/2026,1/1/2026,201
+71010,PM-10002-02,10002,30005,HIGH,Preventive,Replace worn belt,Tool Kit,5,45,offline,yearly,,,,N/A,1/1/2026,1/1/2026,201
+71011,PM-10002-03,10002,30006,MEDIUM,Preventive,Check roller rotation smoothness,Manual Rotation,5,10,online,weekly,,,,N/A,1/1/2026,1/1/2026,201
+71012,PM-10002-04,10002,30006,MEDIUM,Preventive,Lubricate roller bearing,Grease Gun,5,20,offline,monthly,,,,ml,1/1/2026,1/1/2026,201
+71013,PM-10002-05,10002,30007,LOW,Condition-Based,Measure sensor voltage,Multimeter,4,15,online,weekly,24,22,26,V,1/1/2026,1/1/2026,201
+71014,PM-10002-06,10002,30007,LOW,Preventive,Clean sensor surface,Cleaning Kit,4,10,offline,monthly,,,,N/A,1/1/2026,1/1/2026,201
+71015,PM-10002-07,10002,30008,LOW,Preventive,Inspect frame structure,Visual,5,10,online,half yearly,,,,N/A,1/1/2026,1/1/2026,201
+71016,PM-10002-08,10002,30008,LOW,Preventive,Tighten support frame bolts,Spanner,5,15,offline,yearly,,,,N/A,1/1/2026,1/1/2026,201
+71017,PM-10004-01,10004,30013,HIGH,Preventive,Inspect contact wear,Screwdriver,4,20,offline,monthly,,,,N/A,1/1/2026,1/1/2026,201
+71018,PM-10004-02,10004,30013,HIGH,Condition-Based,Measure voltage drop,Multimeter,4,15,online,weekly,24,22,26,V,1/1/2026,1/1/2026,201
+71019,PM-10004-03,10004,30014,MEDIUM,Preventive,Inspect cable insulation,Visual,4,10,online,monthly,,,,N/A,1/1/2026,1/1/2026,201
+71020,PM-10004-04,10004,30014,MEDIUM,Preventive,Replace damaged cable,Tool Kit,4,30,offline,yearly,,,,N/A,1/1/2026,1/1/2026,201
+71021,PM-10004-05,10004,30015,HIGH,Preventive,Check fuse continuity,Multimeter,4,10,online,weekly,,,,Ohm,1/1/2026,1/1/2026,201
+71022,PM-10004-06,10004,30015,HIGH,Preventive,Replace fuse if faulty,Screwdriver,4,10,offline,yearly,,,,N/A,1/1/2026,1/1/2026,201
+71023,PM-10004-07,10004,30016,LOW,Preventive,Clean cooling fan,Air Blower,4,15,offline,monthly,,,,N/A,1/1/2026,1/1/2026,201
+71024,PM-10004-08,10004,30016,LOW,Preventive,Check fan rotation,Visual,4,10,online,weekly,,,,N/A,1/1/2026,1/1/2026,201
+71025,PM-10009-01,10009,30033,HIGH,Preventive,Inspect nozzle clogging,Visual,6,15,online,daily,,,,N/A,1/1/2026,1/1/2026,201
+71026,PM-10009-02,10009,30033,HIGH,Preventive,Clean nozzle,Cleaning Kit,6,30,offline,weekly,,,,N/A,1/1/2026,1/1/2026,201
+71027,PM-10009-03,10009,30034,HIGH,Condition-Based,Inspect seal leakage,Visual,5,10,online,daily,,,,N/A,1/1/2026,1/1/2026,201
+71028,PM-10009-04,10009,30034,HIGH,Preventive,Replace seal,Seal Kit,5,25,offline,yearly,,,,N/A,1/1/2026,1/1/2026,201
+71029,PM-10009-05,10009,30035,MEDIUM,Predictive,Measure flow rate,Flow Meter,6,20,online,weekly,100,90,110,L/min,1/1/2026,1/1/2026,201
+71030,PM-10009-06,10009,30035,MEDIUM,Preventive,Calibrate flow sensor,Laptop,4,40,offline,half yearly,100,95,105,L/min,1/1/2026,1/1/2026,201
+71031,PM-10009-07,10009,30036,LOW,Preventive,Inspect clamp tightness,Spanner,5,10,online,monthly,,,,N/A,1/1/2026,1/1/2026,201
+71032,PM-10009-08,10009,30036,LOW,Preventive,Replace damaged clamp,Tool Kit,5,20,offline,yearly,,,,N/A,1/1/2026,1/1/2026,201
+71033,PM-10012-01,10012,30045,HIGH,Condition-Based,Check PLC status LEDs,Visual,4,10,online,daily,,,,N/A,1/1/2026,1/1/2026,201
+71034,PM-10012-02,10012,30045,HIGH,Preventive,Backup PLC program,Laptop,4,30,offline,monthly,,,,N/A,1/1/2026,1/1/2026,201
+71035,PM-10012-03,10012,30046,MEDIUM,Condition-Based,Test I/O response,Laptop,4,20,online,weekly,,,,N/A,1/1/2026,1/1/2026,201
+71036,PM-10012-04,10012,30046,MEDIUM,Preventive,Replace faulty I/O module,Tool Kit,4,40,offline,yearly,,,,N/A,1/1/2026,1/1/2026,201
+71037,PM-10012-05,10012,30047,MEDIUM,Preventive,Inspect relay switching,Multimeter,4,15,online,weekly,,,,N/A,1/1/2026,1/1/2026,201
+71038,PM-10012-06,10012,30047,MEDIUM,Preventive,Replace faulty relay,Screwdriver,4,20,offline,yearly,,,,N/A,1/1/2026,1/1/2026,201
+71039,PM-10012-07,10012,30048,LOW,Preventive,Inspect mounting rail,Visual,5,10,online,half yearly,,,,N/A,1/1/2026,1/1/2026,201
+71040,PM-10012-08,10012,30048,LOW,Preventive,Tighten rail fasteners,Spanner,5,15,offline,yearly,,,,N/A,1/1/2026,1/1/2026,201
