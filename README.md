@@ -1,80 +1,134 @@
 # PM Maintenance System
 
-Welcome to the Preventive and Predictive Maintenance (PM) System! This project is a comprehensive solution designed to manage plants, departments, equipments, spare parts, and execution of maintenance tasks. 
+Welcome to the **Preventive and Predictive Maintenance (PM) System** — a comprehensive solution for managing plants, departments, equipment, spare parts, and maintenance task execution.
 
-Currently, the repository contains the **Backend** implementation. A **Frontend** section will be added in the future.
-
----
-
-## 🏗️ Architecture Overview
-
-- **Backend**: Built with Java 17 and Spring Boot 3.x.
-- **Database**: PostgreSQL handling various schemas for configuration, equipment tracking, and task scheduling.
-- **Database Migrations**: Managed automatically through Flyway (using SQL scripts located in `pm-backend/src/main/resources/db/migration`).
-- **Frontend**: *Coming Soon...*
+> **Note:** This repository currently contains only the **Backend**. The Frontend section will be added in the future.
 
 ---
 
-## ⚙️ Backend Guide
+## 📁 Repository Structure
 
-The backend project is located inside the `pm-backend` directory.
-
-### Prerequisites
-- **Java 17** installed and configured on your system.
-- **PostgreSQL Database** running (you can start it via Docker using the `docker-compose.yml` provided or a local Postgres instance).
-  - Ensure a database named `pm_db` exists, or modify your `application.properties` to match your local setup database.
-
-### How to Start the Backend
-1. **Open your terminal**.
-2. **Navigate** to the backend directory:
-   ```bash
-   cd pm-backend
-   ```
-3. **Run the application** using the Maven Wrapper:
-   - On Windows:
-     ```cmd
-     .\mvnw.cmd spring-boot:run
-     ```
-   - On macOS/Linux:
-     ```bash
-     ./mvnw spring-boot:run
-     ```
-4. The application will start locally on `http://localhost:8080`.
-   *(During the first startup, Flyway will automatically execute all the `V1__` through `V16__` SQL scripts to create your tables and insert the seed data).*
+```
+PM-Maintenance-System/
+├── pm-backend/          # Spring Boot backend (Java 17, PostgreSQL, Flyway)
+└── postgresql-data-insertion-csvs/  # CSV seed data used by Flyway migrations
+```
 
 ---
 
-## 🧪 Testing Guide
+## 🚀 Quickstart — Build & Run (Docker — Recommended)
 
-We write pure unit tests isolated from the database context to ensure rapid, predictable test execution.
+> **You only need [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed.** No Java, Maven, or local PostgreSQL required.
 
-### How to Run Tests
-1. Ensure you are in the `pm-backend` folder.
-2. Execute the Maven test task:
-   - On Windows:
-     ```cmd
-     .\mvnw.cmd clean test
-     ```
-   - On macOS/Linux:
-     ```bash
-     ./mvnw clean test
-     ```
-3. The command will compile the code and execute all the JUnit cases for the controllers and services.
+### Step 1: Build the Application
+
+Run this from inside the `pm-backend` directory whenever you change Java code, migration scripts, or `pom.xml`:
+
+```bash
+cd pm-backend
+docker-compose build
+```
+
+### Step 2: Start Everything
+
+```bash
+docker-compose up -d
+```
+
+This single command:
+- Starts a **PostgreSQL** container on port `5433`
+- Starts the **Spring Boot backend** and connects it to the database
+- Runs **Flyway migrations automatically** on first startup — creating all tables and inserting seed data
+
+The API is now available at: **`http://localhost:8080`**
+
+### Step 3: Stop Everything
+
+```bash
+docker-compose down
+```
 
 ---
 
-## 🛠️ Internal Services Overview
+## 🔁 Day-to-Day Workflow
 
-Currently implemented services in the backend:
-
-1. **Authentication / Login Service (AuthController & AuthService)**
-   - Exposes an endpoint: `POST /api/auth/login`
-   - Accepts a JSON `LoginRequest` payload (containing `email` and `password`).
-   - Retrieves the matching internal `Employee` based on the database email.
-   - Validates the password, verifies if the user is `active`, and returns a customized `LoginResponse` specifying the `employeeId`, `fullName`, and `roleId`.
-
-*(Additional services for equipments, parts, and standard tasks will be registered here as they are integrated into the REST layer!)*
+| Situation | Command |
+|---|---|
+| First time / after code changes | `docker-compose build` then `docker-compose up -d` |
+| Starting the app (no code changes) | `docker-compose up -d` |
+| Stopping the app | `docker-compose down` |
 
 ---
 
-*Once the frontend UI component is built, instructions for the node/React/framework environment will be appended to this guide.*
+## 🧪 Running Unit Tests
+
+Unit tests run fully isolated — **no database connection needed**.
+
+```bash
+cd pm-backend
+.\mvnw.cmd clean test -Dtest=AuthServiceTest,AuthControllerTest
+```
+
+> When running `.\mvnw.cmd clean test` without specifying tests, the default `PmBackendApplicationTests` will fail unless the database is running. Use `-Dtest=...` to run only unit tests.
+
+---
+
+## 🛠️ Services & API Endpoints
+
+### Authentication Service
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/auth/login` | Log in with email and password |
+
+**Request body:**
+```json
+{
+  "email": "employee@example.com",
+  "password": "yourpassword"
+}
+```
+
+**Success response (`200 OK`):**
+```json
+{
+  "message": "Login successful",
+  "employeeId": 1,
+  "fullName": "John Doe",
+  "roleId": 2,
+  "permissions": {
+    "can_create_task": true,
+    "can_approve": false
+  }
+}
+```
+
+---
+
+## 🗄️ Connecting to the Database (pgAdmin)
+
+The database is exposed on port **5433** (to avoid conflicts with a local PostgreSQL install).
+
+| Setting | Value |
+|---|---|
+| Host | `localhost` |
+| Port | `5433` |
+| Database | `pm_db` |
+| Username | `postgres` |
+| Password | `root` |
+
+---
+
+## 📋 Database Migrations
+
+Migrations are managed automatically by **Flyway** from scripts in:
+
+```
+pm-backend/src/main/resources/db/migration/
+```
+
+On every startup, Flyway runs any **new** migration scripts that haven't been applied yet. Tables are only created/altered as needed — not recreated from scratch each time.
+
+---
+
+*Frontend setup instructions will be added here once the UI is implemented.*
