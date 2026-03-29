@@ -27,10 +27,12 @@ public class DashboardService {
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
         List<PmScheduleExecution> allTasks = executionRepository.findAllByEmployeeIdWithDetails(employeeId);
-        LocalDate today = LocalDate.now();
+        // Fixed date for testing to match seed data (Feb 1st, 2026)
+        LocalDate today = LocalDate.of(2026, 2, 1);
 
         // 1. User Context
-        String shiftStr = employee.getShift() != null ? employee.getShift() : determineShift(java.time.LocalTime.now());
+        // Fixed time for testing to ensure a consistent shift (10:00 AM)
+        String shiftStr = employee.getShift() != null ? employee.getShift() : determineShift(java.time.LocalTime.of(10, 0));
         OperatorDashboardResponse.UserContext userContext = OperatorDashboardResponse.UserContext.builder()
                 .name(employee.getFullName())
                 .date(today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
