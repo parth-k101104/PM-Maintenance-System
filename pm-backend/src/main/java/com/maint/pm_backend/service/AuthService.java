@@ -12,12 +12,18 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 import java.util.Optional;
 
+import com.maint.pm_backend.security.CustomUserDetailsService;
+import com.maint.pm_backend.security.JwtUtils;
+import org.springframework.security.core.userdetails.UserDetails;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final EmployeeRepository employeeRepository;
     private final RoleRepository roleRepository;
+    private final JwtUtils jwtUtils;
+    private final CustomUserDetailsService userDetailsService;
 
     public LoginResponse login(LoginRequest request) {
         Optional<Employee> employeeOpt = employeeRepository.findByEmail(request.getEmail());
@@ -38,8 +44,12 @@ public class AuthService {
                     }
                 }
                 
+                UserDetails userDetails = userDetailsService.loadUserByUsername(employee.getEmail());
+                String token = jwtUtils.generateToken(userDetails, employee.getEmployeeId(), employee.getRoleId());
+                
                 return LoginResponse.builder()
                         .message("Login successful")
+                        .token(token)
                         .employeeId(employee.getEmployeeId())
                         .fullName(employee.getFullName())
                         .roleId(employee.getRoleId())
