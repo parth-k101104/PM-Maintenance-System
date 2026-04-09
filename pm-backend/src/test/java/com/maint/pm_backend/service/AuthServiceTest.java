@@ -14,6 +14,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.ArrayList;
+
+import com.maint.pm_backend.security.CustomUserDetailsService;
+import com.maint.pm_backend.security.JwtUtils;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -28,6 +34,12 @@ public class AuthServiceTest {
 
     @Mock
     private RoleRepository roleRepository;
+
+    @Mock
+    private CustomUserDetailsService userDetailsService;
+
+    @Mock
+    private JwtUtils jwtUtils;
 
     @InjectMocks
     private AuthService authService;
@@ -50,8 +62,11 @@ public class AuthServiceTest {
         role.setRoleId(1L);
         role.setPermissions(Map.of("admin", true));
 
+        UserDetails userDetails = new User("test@example.com", "password123", new ArrayList<>());
         when(employeeRepository.findByEmail(anyString())).thenReturn(Optional.of(employee));
         when(roleRepository.findById(anyLong())).thenReturn(Optional.of(role));
+        when(userDetailsService.loadUserByUsername(anyString())).thenReturn(userDetails);
+        when(jwtUtils.generateToken(any(UserDetails.class), eq(1L), eq(1L))).thenReturn("mocked-jwt-token");
 
         LoginResponse response = authService.login(request);
 
@@ -62,6 +77,7 @@ public class AuthServiceTest {
         assertEquals(1L, response.getRoleId());
         assertNotNull(response.getPermissions());
         assertEquals(true, response.getPermissions().get("admin"));
+        assertEquals("mocked-jwt-token", response.getToken());
     }
 
     @Test
