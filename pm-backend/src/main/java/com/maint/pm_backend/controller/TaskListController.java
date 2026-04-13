@@ -34,4 +34,19 @@ public class TaskListController {
         List<TaskDetailsProjection> tasks = taskListService.getTasksForToday(employee.getEmployeeId());
         return ResponseEntity.ok(tasks);
     }
+
+    @GetMapping("/completed")
+    public ResponseEntity<List<com.maint.pm_backend.dto.CompletedTaskProjection>> getCompletedTasks(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String email = principal.getName();
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
+
+        List<com.maint.pm_backend.dto.CompletedTaskProjection> tasks = taskListService.getCompletedTasks(employee.getEmployeeId());
+        return ResponseEntity.ok(tasks);
+    }
+
 }

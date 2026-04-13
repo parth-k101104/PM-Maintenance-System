@@ -37,10 +37,17 @@ public class AuthService {
                 }
                 
                 Map<String, Object> permissions = null;
+                String roleName = null;
+                String accessLevelName = null;
                 if (employee.getRoleId() != null) {
                     Optional<Role> roleOpt = roleRepository.findById(employee.getRoleId());
                     if (roleOpt.isPresent()) {
-                        permissions = roleOpt.get().getPermissions();
+                        Role role = roleOpt.get();
+                        roleName = role.getName();
+                        if (role.getAccessPermission() != null) {
+                            permissions = role.getAccessPermission().getPermissions();
+                            accessLevelName = role.getAccessPermission().getLevelName();
+                        }
                     }
                 }
                 
@@ -53,6 +60,8 @@ public class AuthService {
                         .employeeId(employee.getEmployeeId())
                         .fullName(employee.getFullName())
                         .roleId(employee.getRoleId())
+                        .roleName(roleName)
+                        .accessLevelName(accessLevelName)
                         .permissions(permissions)
                         .build();
             }
