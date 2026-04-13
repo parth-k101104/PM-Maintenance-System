@@ -26,4 +26,12 @@ public class TaskListService {
         
         return executionRepository.findTasksForTodayNative(employeeId, today);
     }
+
+    public List<com.maint.pm_backend.dto.CompletedTaskProjection> getCompletedTasks(Long employeeId) {
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new RuntimeException("Employee not found"));
+
+        return executionRepository.findCompletedTasksNative(employeeId);
+    }
+
 }

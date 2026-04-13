@@ -1,15 +1,15 @@
 package com.maint.pm_backend.dto;
 
-public interface TaskDetailsProjection {
+public interface CompletedTaskProjection {
     Long getScheduleExecutionId();
-    Long getStdTaskId();
-    String getTaskRefNo();
     String getTaskName();
-    Integer getTimeRequired();
     String getMachineName();
     String getMachineElementName();
     String getMachinePartName();
+    Integer getStdAmountOfTime();
+    Double getTimeTaken();
     String getZone();
     String getBlock();
-    String getLineName();
+    Long getLineId();
+    String getStatus();
 }

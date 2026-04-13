@@ -11,5 +11,7 @@ public class LoginResponse {
     private Long employeeId;
     private String fullName;
     private Long roleId;
+    private String roleName;
+    private String accessLevelName;
     private java.util.Map<String, Object> permissions;
 }
