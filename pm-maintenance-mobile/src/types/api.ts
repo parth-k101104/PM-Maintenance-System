@@ -45,3 +45,20 @@ export type OperatorDashboardResponse = {
 export type AuthSession = LoginResponse & {
   dashboard?: OperatorDashboardResponse;
 };
+
+export type TaskDetails = {
+  scheduleExecutionId: number;
+  stdTaskId: number;
+  taskRefNo: string;
+  taskName: string;
+  timeRequired: number;
+  machineName: string;
+  machineElementName: string;
+  machinePartName: string;
+  zone: string;
+  block: string;
+  lineName: string;
+  lineCode: string;
+  lineId: number;
+  taskCriticality: "HIGH" | "MEDIUM" | "LOW";
+};

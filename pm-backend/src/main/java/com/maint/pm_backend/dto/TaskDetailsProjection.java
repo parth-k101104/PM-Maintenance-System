@@ -12,4 +12,7 @@ public interface TaskDetailsProjection {
     String getZone();
     String getBlock();
     String getLineName();
+    String getLineCode();
+    Long getLineId();
+    String getTaskCriticality();
 }

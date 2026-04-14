@@ -3,10 +3,17 @@ import { ActivityIndicator, StatusBar, StyleSheet, View } from "react-native";
 import { SafeAreaView, SafeAreaProvider } from "react-native-safe-area-context";
 import { useFonts, Jost_400Regular, Jost_500Medium, Jost_600SemiBold } from "@expo-google-fonts/jost";
 
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
+import { TaskListScreen } from "./src/screens/TaskListScreen";
 import { colors } from "./src/theme/colors";
+import { RootStackParamList } from "./src/types/navigation";
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function RootNavigator() {
   const { authState } = useAuth();
@@ -20,7 +27,18 @@ function RootNavigator() {
     );
   }
 
-  return authState.session ? <DashboardScreen /> : <LoginScreen />;
+  if (!authState.session) {
+    return <LoginScreen />;
+  }
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Dashboard" component={DashboardScreen} />
+        <Stack.Screen name="TaskList" component={TaskListScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
 }
 
 export default function App() {
