@@ -9,6 +9,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
+import { TaskApprovalScreen } from "./src/screens/TaskApprovalScreen";
 import { TaskListScreen } from "./src/screens/TaskListScreen";
 import { colors } from "./src/theme/colors";
 import { RootStackParamList } from "./src/types/navigation";
@@ -36,6 +37,7 @@ function RootNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="TaskList" component={TaskListScreen} />
+        <Stack.Screen name="TaskApproval" component={TaskApprovalScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

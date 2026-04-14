@@ -11,5 +11,8 @@ public interface CompletedTaskProjection {
     String getZone();
     String getBlock();
     Long getLineId();
+    String getLineCode();
+    String getLineName();
     String getStatus();
+    String getTaskCriticality();
 }

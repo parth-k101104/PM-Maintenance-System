@@ -74,4 +74,13 @@ export async function fetchTasksForToday(token: string) {
   });
 }
 
+export async function fetchCompletedTasks(token: string) {
+  return request<import("../types/api").CompletedTask[]>("/api/v1/tasks/completed", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export { API_BASE_URL };
