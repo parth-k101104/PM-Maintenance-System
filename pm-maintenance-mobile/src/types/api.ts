@@ -62,3 +62,20 @@ export type TaskDetails = {
   lineId: number;
   taskCriticality: "HIGH" | "MEDIUM" | "LOW";
 };
+
+export type CompletedTask = {
+  scheduleExecutionId: number;
+  taskName: string;
+  machineName: string;
+  machineElementName: string;
+  machinePartName: string;
+  stdAmountOfTime: number;
+  timeTaken: number;
+  zone: string;
+  block: string;
+  lineId: number;
+  lineCode: string;
+  lineName: string;
+  status: string;
+  taskCriticality: "HIGH" | "MEDIUM" | "LOW";
+};

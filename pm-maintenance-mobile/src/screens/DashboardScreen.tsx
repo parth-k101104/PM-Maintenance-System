@@ -113,7 +113,10 @@ export function DashboardScreen() {
               </View>
 
               <View style={styles.cardsRow}>
-                <View style={[styles.card, styles.statusCard, styles.flexSmall]}>
+                <Pressable 
+                  style={[styles.card, styles.statusCard, styles.flexSmall]}
+                  onPress={() => navigation.navigate("TaskApproval")}
+                >
                   <Text style={styles.statusTitle}>Tasks status-</Text>
                   <Text style={styles.statusLine}>
                     Approved-<Text style={styles.approvedText}>{dashboard?.taskStatus.approved ?? 0}</Text>
@@ -124,8 +127,8 @@ export function DashboardScreen() {
                   <Text style={styles.statusLine}>
                     Denied-<Text style={styles.deniedText}>{dashboard?.taskStatus.denied ?? 0}</Text>
                   </Text>
-                  <Ionicons name="arrow-forward-outline" size={38} color="#111111" style={styles.statusArrow} />
-                </View>
+                  <Ionicons name="arrow-forward-outline" size={34} color="#111111" style={styles.statusArrow} />
+                </Pressable>
 
                 <View style={[styles.card, styles.otherTasksCard, styles.flexLarge]}>
                   <Text style={styles.cardTitle}>Other tasks-</Text>
@@ -235,24 +238,24 @@ const styles = StyleSheet.create({
   },
   greetingText: {
     fontFamily: "Jost_500Medium",
-    fontSize: 30,
-    lineHeight: 34,
+    fontSize: 26,
+    lineHeight: 30,
     color: "#111111",
-    marginBottom: 36,
-    paddingHorizontal: 42,
+    marginBottom: 28,
+    paddingHorizontal: 36,
   },
   greetingTextTablet: {
-    fontSize: 38,
-    lineHeight: 44,
+    fontSize: 34,
+    lineHeight: 38,
   },
   cardsWrapper: {
-    gap: 18,
-    marginBottom: 28,
+    gap: 16,
+    marginBottom: 24,
     width: "100%",
   },
   cardsRow: {
     flexDirection: "row",
-    gap: 18,
+    gap: 16,
     width: "100%",
   },
   flexLarge: {
@@ -296,22 +299,22 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontFamily: "Jost_500Medium",
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 20,
+    lineHeight: 26,
     color: "#111111",
-    marginBottom: 18,
+    marginBottom: 16,
   },
   cardTitleSmall: {
     fontFamily: "Jost_500Medium",
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 20,
     color: "#111111",
-    marginBottom: 22,
+    marginBottom: 20,
   },
   bigNumber: {
     fontFamily: "Jost_500Medium",
-    fontSize: 70,
-    lineHeight: 72,
+    fontSize: 60,
+    lineHeight: 62,
     color: "#000000",
   },
   mediumNumber: {
@@ -351,17 +354,17 @@ const styles = StyleSheet.create({
   },
   statusTitle: {
     fontFamily: "Jost_400Regular",
-    fontSize: 15,
+    fontSize: 14,
     lineHeight: 18,
     color: "#111111",
-    marginBottom: 22,
+    marginBottom: 18,
   },
   statusLine: {
     fontFamily: "Jost_400Regular",
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 20,
     color: "#111111",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   approvedText: {
     color: "#165A15",

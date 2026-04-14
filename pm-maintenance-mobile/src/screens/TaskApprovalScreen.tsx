@@ -12,10 +12,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
-import { fetchTasksForToday } from "../api/client";
+import { fetchCompletedTasks } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
-import { TaskDetails } from "../types/api";
+import { CompletedTask } from "../types/api";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -32,26 +32,28 @@ function getCriticalityColor(level: string | undefined) {
   }
 }
 
-export function TaskListScreen() {
+const TABS = [
+  { id: "Approved", label: "Approved", activeColor: "#16A34A" },
+  { id: "Under Review", label: "Under Review", activeColor: "#EAB308" },
+  { id: "Denied", label: "Denied", activeColor: "#DC2626", hasDot: true },
+];
+
+export function TaskApprovalScreen() {
   const navigation = useNavigation();
   const { authState } = useAuth();
-  const [tasks, setTasks] = useState<TaskDetails[]>([]);
+  const [tasks, setTasks] = useState<CompletedTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedZone, setSelectedZone] = useState<string | null>(null);
+  const [selectedTab, setSelectedTab] = useState<string>("Approved");
   const horizontalListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     async function loadTasks() {
       if (!authState.session) return;
       try {
-        const data = await fetchTasksForToday(authState.session.token);
+        const data = await fetchCompletedTasks(authState.session.token);
         setTasks(data);
-        if (data.length > 0) {
-          const uniqueZones = Array.from(new Set(data.map((t) => t.zone))).sort();
-          setSelectedZone(uniqueZones[0] ?? null);
-        }
       } catch (e) {
-        console.error("Failed to fetch tasks", e);
+        console.error("Failed to fetch completed tasks", e);
       } finally {
         setLoading(false);
       }
@@ -60,20 +62,16 @@ export function TaskListScreen() {
     loadTasks();
   }, [authState.session]);
 
-  const zones = useMemo(() => {
-    return Array.from(new Set(tasks.map((t) => t.zone))).sort();
-  }, [tasks]);
-
-  const handleTabPress = (zone: string, index: number) => {
-    setSelectedZone(zone);
+  const handleTabPress = (tabId: string, index: number) => {
+    setSelectedTab(tabId);
     horizontalListRef.current?.scrollToIndex({ index, animated: true });
   };
 
   const handleMomentumScrollEnd = (e: any) => {
     const offsetX = e.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / SCREEN_WIDTH);
-    if (zones[index]) {
-      setSelectedZone(zones[index]);
+    if (TABS[index]) {
+      setSelectedTab(TABS[index].id);
     }
   };
 
@@ -87,30 +85,51 @@ export function TaskListScreen() {
     );
   }
 
+  const getFilteredTasks = (tabId: string) => {
+    return tasks.filter((t) => {
+      const status = t.status.toUpperCase();
+      if (tabId === "Approved") return ["COMPLETED", "APPROVED"].includes(status);
+      if (tabId === "Under Review") return status === "APPROVAL_PENDING";
+      if (tabId === "Denied") return status === "REJECTED";
+      return false;
+    });
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Pressable hitSlop={12} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back-outline" size={28} color="#111111" />
         </Pressable>
-        <Text style={styles.headerTitle}>Today&apos;s Tasks</Text>
+        <Text style={styles.headerTitle}>Task approval status</Text>
         <Pressable hitSlop={12}>
           <Ionicons name="search-outline" size={28} color="#111111" />
         </Pressable>
       </View>
 
       <View style={styles.tabsContainer}>
-        {zones.map((zone, idx) => {
-          const isSelected = selectedZone === zone;
+        {TABS.map((tab, idx) => {
+          const isSelected = selectedTab === tab.id;
           return (
             <Pressable
-              key={zone}
-              style={[styles.tab, isSelected && styles.tabSelected]}
-              onPress={() => handleTabPress(zone, idx)}
+              key={tab.id}
+              style={[
+                styles.tab,
+                isSelected && { borderBottomColor: tab.activeColor },
+              ]}
+              onPress={() => handleTabPress(tab.id, idx)}
             >
-              <Text style={[styles.tabText, isSelected && styles.tabTextSelected]}>
-                {zone}
-              </Text>
+              <View style={styles.tabTextRow}>
+                <Text
+                  style={[
+                    styles.tabText,
+                    isSelected && { color: tab.activeColor },
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+                {tab.hasDot && <View style={styles.redDot} />}
+              </View>
             </Pressable>
           );
         })}
@@ -118,30 +137,29 @@ export function TaskListScreen() {
 
       <FlatList
         ref={horizontalListRef}
-        data={zones}
+        data={TABS}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item}
+        keyExtractor={(item) => item.id}
         onMomentumScrollEnd={handleMomentumScrollEnd}
-        // This stops FlatList from failing the scrollToIndex on mount
         getItemLayout={(data, index) => ({
           length: SCREEN_WIDTH,
           offset: SCREEN_WIDTH * index,
           index,
         })}
-        renderItem={({ item: zone }) => {
-          const zoneTasks = tasks.filter((t) => t.zone === zone);
+        renderItem={({ item: tab }) => {
+          const tabTasks = getFilteredTasks(tab.id);
 
           return (
             <View style={{ width: SCREEN_WIDTH }}>
               <FlatList
-                data={zoneTasks}
+                data={tabTasks}
                 keyExtractor={(item) => String(item.scheduleExecutionId)}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
-                  <Text style={styles.emptyText}>No tasks found for this zone.</Text>
+                  <Text style={styles.emptyText}>No tasks found for this status.</Text>
                 }
                 renderItem={({ item }) => {
                   const path = [item.machinePartName, item.machineElementName, item.machineName]
@@ -151,6 +169,9 @@ export function TaskListScreen() {
                   const lineDisplay = item.lineCode || item.lineName || (item.lineId ? `PL${item.lineId}` : "LINE");
                   const stripeColor = getCriticalityColor(item.taskCriticality);
                   const displayBlock = item.block;
+                  
+                  const isApproved = tab.id === "Approved";
+                  const isDenied = tab.id === "Denied";
 
                   return (
                     <View style={styles.card}>
@@ -171,9 +192,24 @@ export function TaskListScreen() {
                         </View>
                         
                         <Text style={styles.taskPath}>{path}</Text>
-                        <Text style={styles.timeRequired}>
-                          Time required- {item.timeRequired} mins
-                        </Text>
+                        
+                        <View style={styles.bottomRow}>
+                          {isApproved ? (
+                            <Text style={[styles.timeRequired, { color: "#16A34A" }]}>
+                              Time taken- {item.timeTaken ?? 0} mins
+                            </Text>
+                          ) : (
+                            <Text style={styles.timeRequired}>
+                              Time required- {item.stdAmountOfTime} mins
+                            </Text>
+                          )}
+
+                          {isDenied && (
+                            <Pressable style={styles.redoButton}>
+                              <Text style={styles.redoText}>REDO NOW</Text>
+                            </Pressable>
+                          )}
+                        </View>
                       </View>
                     </View>
                   );
@@ -183,10 +219,6 @@ export function TaskListScreen() {
           );
         }}
       />
-
-      <Pressable style={styles.fab}>
-        <Text style={styles.fabText}>Help?</Text>
-      </Pressable>
     </SafeAreaView>
   );
 }
@@ -220,44 +252,52 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     gap: 20,
-    paddingBottom: 14,
+    paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "transparent",
+    borderBottomColor: "#E5E7EB",
+    marginBottom: 8,
   },
   tab: {
-    paddingBottom: 6,
+    paddingBottom: 8,
     borderBottomWidth: 3,
     borderBottomColor: "transparent",
     paddingHorizontal: 4,
+    marginBottom: -1, 
   },
-  tabSelected: {
-    borderBottomColor: "#111111",
+  tabTextRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   tabText: {
     fontFamily: "Jost_500Medium",
-    fontSize: 18,
+    fontSize: 16,
     color: "#9CA3AF",
   },
-  tabTextSelected: {
-    color: "#111111",
+  redDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#DC2626",
+    marginLeft: 4,
+    marginTop: -8,
   },
   listContent: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 90,
+    paddingBottom: 50,
   },
   card: {
     flexDirection: "row",
-    backgroundColor: "#E2E2E8",
-    borderRadius: 20,
-    marginBottom: 14,
-    minHeight: 100,
+    backgroundColor: "#D6D6DF",
+    borderRadius: 16,
+    marginBottom: 16,
+    minHeight: 110,
     position: "relative",
   },
   leftStrip: {
     width: 28,
-    borderTopLeftRadius: 20,
-    borderBottomLeftRadius: 20,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -313,16 +353,34 @@ const styles = StyleSheet.create({
   },
   taskPath: {
     fontFamily: "Jost_400Regular",
-    fontSize: 12,
+    fontSize: 11,
     color: "#5E1E1E",
-    marginBottom: 6,
-    lineHeight: 16,
+    marginBottom: 8,
+    lineHeight: 15,
     paddingRight: 36,
+  },
+  bottomRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
   },
   timeRequired: {
     fontFamily: "Jost_400Regular",
-    fontSize: 13,
+    fontSize: 12,
     color: "#7A7A8D",
+  },
+  redoButton: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#111111",
+  },
+  redoText: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 13,
+    color: "#111111",
   },
   emptyText: {
     fontFamily: "Jost_400Regular",
@@ -330,27 +388,5 @@ const styles = StyleSheet.create({
     marginTop: 36,
     fontSize: 15,
     color: "#666",
-  },
-  fab: {
-    position: "absolute",
-    right: 20,
-    bottom: 20,
-    backgroundColor: "#2C346F",
-    borderRadius: 32,
-    width: 64,
-    height: 64,
-
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  fabText: {
-    fontFamily: "Jost_500Medium",
-    color: "#FFFFFF",
-    fontSize: 15,
   },
 });
