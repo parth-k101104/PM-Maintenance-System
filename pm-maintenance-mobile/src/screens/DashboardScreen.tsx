@@ -9,10 +9,13 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
+import { RootStackParamList } from "../types/navigation";
 
 const drawerItems = [
   "Dashboard",
@@ -60,6 +63,7 @@ export function DashboardScreen() {
   const horizontalPadding = isTablet ? 40 : 18;
   const contentMaxWidth = isTablet ? 920 : 560;
   const drawerWidth = Math.min(width * 0.78, 360);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -86,12 +90,15 @@ export function DashboardScreen() {
 
             <View style={styles.cardsWrapper}>
               <View style={styles.cardsRow}>
-                <View style={[styles.card, styles.todayCard, styles.flexLarge]}>
+                <Pressable 
+                  style={[styles.card, styles.todayCard, styles.flexLarge]}
+                  onPress={() => navigation.navigate("TaskList")}
+                >
                   <Text style={styles.cardTitle}>Tasks for today-</Text>
                   <Text style={styles.bigNumber}>{dashboard?.taskSummary.tasksToday ?? 0}</Text>
                   <Text style={styles.cardFootnote}>remaining</Text>
                   <Ionicons name="arrow-forward-outline" size={40} color="#111111" style={styles.cardArrow} />
-                </View>
+                </Pressable>
 
                 <View style={[styles.card, styles.backlogCard, styles.flexSmall]}>
                   <Text style={styles.cardTitleSmall}>Tasks on{"\n"}backlog-</Text>

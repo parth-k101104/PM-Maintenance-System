@@ -28,7 +28,10 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             "  ep.name AS machinePartName, " +
             "  l.zone AS zone, " +
             "  l.block AS block, " +
-            "  l.line_name AS lineName " +
+            "  l.line_name AS lineName, " +
+            "  l.line_code AS lineCode, " +
+            "  l.line_id AS lineId, " +
+            "  st.task_criticality AS taskCriticality " +
             "FROM pm_schedule_execution se " +
             "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
             "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
