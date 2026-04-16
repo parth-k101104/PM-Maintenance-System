@@ -21,10 +21,19 @@ public class TaskListService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
-        // Fixed date for testing to match seed data (Feb 1st, 2026)
-        LocalDate today = LocalDate.of(2026, 2, 1);
+        // Using a fixed static date due to database seed values mapping dynamically 
+        LocalDate mockToday = LocalDate.of(2026, 2, 1);
+        return executionRepository.findTasksForTodayNative(employeeId, mockToday);
+    }
+
+    public List<com.maint.pm_backend.dto.TaskDetailsProjection> getUpcomingTasks(Long employeeId) {
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new RuntimeException("Employee not found"));
+
+        LocalDate mockToday = LocalDate.of(2026, 2, 1);
+        LocalDate endOfMonth = mockToday.withDayOfMonth(mockToday.lengthOfMonth());
         
-        return executionRepository.findTasksForTodayNative(employeeId, today);
+        return executionRepository.findUpcomingTasksNative(employeeId, mockToday, endOfMonth);
     }
 
     public List<com.maint.pm_backend.dto.CompletedTaskProjection> getCompletedTasks(Long employeeId) {

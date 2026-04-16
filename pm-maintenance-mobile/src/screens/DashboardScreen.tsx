@@ -130,7 +130,10 @@ export function DashboardScreen() {
                   <Ionicons name="arrow-forward-outline" size={34} color="#111111" style={styles.statusArrow} />
                 </Pressable>
 
-                <View style={[styles.card, styles.otherTasksCard, styles.flexLarge]}>
+                <Pressable 
+                  style={[styles.card, styles.otherTasksCard, styles.flexLarge]}
+                  onPress={() => navigation.navigate("UpcomingTasks")}
+                >
                   <Text style={styles.cardTitle}>Other tasks-</Text>
                   <Text style={styles.bigNumber}>{dashboard?.taskSummary.remainingTasks ?? 0}</Text>
                   <Text style={styles.cardFootnoteAlt}>Till month end</Text>
@@ -140,7 +143,7 @@ export function DashboardScreen() {
                     color="#111111"
                     style={styles.otherCardArrow}
                   />
-                </View>
+                </Pressable>
               </View>
             </View>
 
@@ -158,7 +161,10 @@ export function DashboardScreen() {
               ))}
             </View>
 
-            <Pressable style={[styles.primaryButton, isTablet && styles.primaryButtonTablet]}>
+            <Pressable 
+              style={[styles.primaryButton, isTablet && styles.primaryButtonTablet]}
+              onPress={() => navigation.navigate("TaskList")}
+            >
               <Text style={styles.primaryButtonText}>Let&apos;s Start!</Text>
             </Pressable>
           </View>

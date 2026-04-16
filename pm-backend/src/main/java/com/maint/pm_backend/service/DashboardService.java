@@ -55,33 +55,39 @@ public class DashboardService {
             TaskExecutionStatus status = exec.getStatus() != null ? exec.getStatus() : TaskExecutionStatus.ASSIGNED;
 
             if (dueDate != null) {
-                if (dueDate.isEqual(today)) {
-                    tasksToday++;
-                } else if (dueDate.isBefore(today) && status != TaskExecutionStatus.COMPLETED) {
-                    backlogTasks++;
-                }
-            }
+                boolean isActive = (status == TaskExecutionStatus.ASSIGNED || status == TaskExecutionStatus.IN_PROGRESS);
+                boolean isToday = dueDate.isEqual(today);
+                boolean isThisMonth = (dueDate.getMonth() == today.getMonth() && dueDate.getYear() == today.getYear());
 
-            if (status != TaskExecutionStatus.COMPLETED) {
-                remainingTasks++;
-                
-                // Sum time
-                if (exec.getTaskSchedule() != null && exec.getTaskSchedule().getStdTask() != null) {
-                    Integer estTime = exec.getTaskSchedule().getStdTask().getEstimatedReqTime();
-                    if (estTime != null) {
-                        totalTimeMins += estTime;
-                    }
-                    
-                    // Aggregate tools
-                    List<String> tools = exec.getTaskSchedule().getStdTask().getTools();
-                    if (tools != null) {
-                        for (String t : tools) {
-                            if (t != null && !t.isBlank()) {
-                                String trimmedTool = t.trim();
-                                toolCounts.put(trimmedTool, toolCounts.getOrDefault(trimmedTool, 0) + 1);
+                if (isToday) {
+                    if (isActive) {
+                        tasksToday++;
+                        
+                        // Sum time only for today's active tasks
+                        if (exec.getTaskSchedule() != null && exec.getTaskSchedule().getStdTask() != null) {
+                            Integer estTime = exec.getTaskSchedule().getStdTask().getEstimatedReqTime();
+                            if (estTime != null) {
+                                totalTimeMins += estTime;
+                            }
+                            
+                            // Aggregate tools only for today's active tasks
+                            List<String> tools = exec.getTaskSchedule().getStdTask().getTools();
+                            if (tools != null) {
+                                for (String t : tools) {
+                                    if (t != null && !t.isBlank()) {
+                                        String trimmedTool = t.trim();
+                                        toolCounts.put(trimmedTool, toolCounts.getOrDefault(trimmedTool, 0) + 1);
+                                    }
+                                }
                             }
                         }
                     }
+                } else if (dueDate.isBefore(today) && status != TaskExecutionStatus.COMPLETED && status != TaskExecutionStatus.APPROVED && status != TaskExecutionStatus.REJECTED) {
+                    backlogTasks++;
+                }
+
+                if (isActive && isThisMonth && !isToday) {
+                    remainingTasks++;
                 }
             }
 
@@ -139,3 +145,4 @@ public class DashboardService {
         return mins + "m";
     }
 }
+
