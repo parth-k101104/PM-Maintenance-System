@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import { fetchTasksForToday } from "../api/client";
+import { fetchUpcomingTasks } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { TaskLegendModal } from "../components/TaskLegendModal";
 import { colors } from "../theme/colors";
@@ -35,7 +35,7 @@ function getCriticalityColor(level: string | undefined) {
   }
 }
 
-export function TaskListScreen() {
+export function UpcomingTasksScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { authState } = useAuth();
   const [tasks, setTasks] = useState<TaskDetails[]>([]);
@@ -48,14 +48,14 @@ export function TaskListScreen() {
     async function loadTasks() {
       if (!authState.session) return;
       try {
-        const data = await fetchTasksForToday(authState.session.token);
+        const data = await fetchUpcomingTasks(authState.session.token);
         setTasks(data);
         if (data.length > 0) {
           const uniqueZones = Array.from(new Set(data.map((t) => t.zone))).sort();
           setSelectedZone(uniqueZones[0] ?? null);
         }
       } catch (e) {
-        console.error("Failed to fetch tasks", e);
+        console.error("Failed to fetch upcoming tasks", e);
       } finally {
         setLoading(false);
       }
@@ -91,13 +91,19 @@ export function TaskListScreen() {
     );
   }
 
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "";
+    const [datePart] = dateString.split("T");
+    return ` | Due: ${datePart}`;
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Pressable hitSlop={12} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back-outline" size={28} color="#111111" />
         </Pressable>
-        <Text style={styles.headerTitle}>Today&apos;s Tasks</Text>
+        <Text style={styles.headerTitle}>Upcoming Tasks</Text>
         <Pressable hitSlop={12}>
           <Ionicons name="search-outline" size={28} color="#111111" />
         </Pressable>
@@ -135,7 +141,7 @@ export function TaskListScreen() {
           index,
         })}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>No tasks assigned for today.</Text>
+          <Text style={styles.emptyText}>No upcoming tasks scheduled.</Text>
         }
         renderItem={({ item: zone }) => {
           const zoneTasks = tasks.filter((t) => t.zone === zone);
@@ -148,7 +154,7 @@ export function TaskListScreen() {
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
-                  <Text style={styles.emptyText}>No tasks found for this zone.</Text>
+                  <Text style={styles.emptyText}>No upcoming tasks found for this zone.</Text>
                 }
                 renderItem={({ item }) => {
                   const path = [item.machineName, item.machineElementName, item.machinePartName]
@@ -182,7 +188,7 @@ export function TaskListScreen() {
                         
                         <Text style={styles.taskPath}>{path}</Text>
                         <Text style={styles.timeRequired}>
-                          Time required- {item.timeRequired} mins
+                          Time required- {item.timeRequired} mins{formatDate(item.dueDate)}
                         </Text>
                       </View>
                     </Pressable>

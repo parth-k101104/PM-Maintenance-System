@@ -1,7 +1,12 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 
-import { LoginRequest, LoginResponse, OperatorDashboardResponse } from "../types/api";
+import {
+  LoginRequest,
+  LoginResponse,
+  OperatorDashboardResponse,
+  TaskDocumentUrls,
+} from "../types/api";
 
 const expoBaseUrl = Constants.expoConfig?.extra?.apiBaseUrl as string | undefined;
 const envBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -76,6 +81,24 @@ export async function fetchTasksForToday(token: string) {
 
 export async function fetchCompletedTasks(token: string) {
   return request<import("../types/api").CompletedTask[]>("/api/v1/tasks/completed", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchUpcomingTasks(token: string) {
+  return request<import("../types/api").TaskDetails[]>("/api/v1/tasks/upcoming", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchTaskDocuments(token: string, scheduleExecutionId: number) {
+  return request<TaskDocumentUrls>(`/api/v1/documents/task/${scheduleExecutionId}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,

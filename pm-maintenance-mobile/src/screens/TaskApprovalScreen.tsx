@@ -162,7 +162,7 @@ export function TaskApprovalScreen() {
                   <Text style={styles.emptyText}>No tasks found for this status.</Text>
                 }
                 renderItem={({ item }) => {
-                  const path = [item.machinePartName, item.machineElementName, item.machineName]
+                  const path = [item.machineName, item.machineElementName, item.machinePartName]
                     .filter(Boolean)
                     .join(" > ");
                   
@@ -193,17 +193,17 @@ export function TaskApprovalScreen() {
                         
                         <Text style={styles.taskPath}>{path}</Text>
                         
+                        <View style={styles.infoRow}>
+                          <Text style={styles.supervisorName}>
+                            Approver: {item.supervisorName ?? "Unassigned"}
+                          </Text>
+                          <Text style={[styles.timeRequired, isApproved && { color: "#16A34A" }]}>
+                            Time taken: {item.timeTaken ?? 0} mins
+                          </Text>
+                        </View>
+                        
                         <View style={styles.bottomRow}>
-                          {isApproved ? (
-                            <Text style={[styles.timeRequired, { color: "#16A34A" }]}>
-                              Time taken- {item.timeTaken ?? 0} mins
-                            </Text>
-                          ) : (
-                            <Text style={styles.timeRequired}>
-                              Time required- {item.stdAmountOfTime} mins
-                            </Text>
-                          )}
-
+                          <View style={{flex: 1}} />
                           {isDenied && (
                             <Pressable style={styles.redoButton}>
                               <Text style={styles.redoText}>REDO NOW</Text>
@@ -363,6 +363,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-end",
+  },
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  supervisorName: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 12,
+    color: "#4A4A5A",
   },
   timeRequired: {
     fontFamily: "Jost_400Regular",

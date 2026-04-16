@@ -61,6 +61,7 @@ export type TaskDetails = {
   lineCode: string;
   lineId: number;
   taskCriticality: "HIGH" | "MEDIUM" | "LOW";
+  dueDate?: string;
 };
 
 export type CompletedTask = {
@@ -78,4 +79,12 @@ export type CompletedTask = {
   lineName: string;
   status: string;
   taskCriticality: "HIGH" | "MEDIUM" | "LOW";
+  supervisorName?: string;
+};
+
+export type TaskDocumentUrls = {
+  taskSopUrl?: string;
+  machineManualUrl?: string;
+  taskSopKey?: string;
+  machineManualKey?: string;
 };
