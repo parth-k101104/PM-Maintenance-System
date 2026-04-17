@@ -71,9 +71,9 @@ If using the `elec101a@company.com` login above, scanning this exact part maps s
 ```json
 {
   "equipmentId": 9001,       // Packaging Conveyor
-  "equipmentElementId": 10004, // Electrical Control Unit
-  "equipmentPartId": 30013,  // Contact Wear / Voltage Drop Check 
-  "scheduleExecutionId": 130046 // Specific assigned schedule execution ticket ID for this user
+  "equipmentElementId": 10002, // Electrical Control Unit
+  "equipmentPartId": 30007,  // Contact Wear / Voltage Drop Check 
+  "scheduleExecutionId": 130013 // Specific assigned schedule execution ticket ID for this user
 }
 ```
 **Expected Response (Success Route):**

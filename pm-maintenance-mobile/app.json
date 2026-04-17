@@ -14,6 +14,14 @@
     "ios": {
       "bundleIdentifier": "com.maint.pm.mobile"
     },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow PM Maintenance Mobile to scan equipment QR codes."
+        }
+      ]
+    ],
     "extra": {
       "apiBaseUrl": "http://localhost:8080"
     }

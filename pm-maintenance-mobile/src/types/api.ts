@@ -88,3 +88,47 @@ export type TaskDocumentUrls = {
   taskSopKey?: string;
   machineManualKey?: string;
 };
+
+export type QRScanRequest = {
+  equipmentId?: number;
+  equipmentElementId?: number;
+  equipmentPartId?: number;
+  scheduleExecutionId: number;
+};
+
+export type QRTask = {
+  scheduleExecutionId: number;
+  stdTaskId: number;
+  taskRefNo: string;
+  taskName: string;
+  timeRequired: number;
+  uom?: string;
+  machineName?: string;
+  machineElementName?: string;
+  machinePartName?: string;
+  zone?: string;
+  block?: string;
+  lineName?: string;
+  dueDate?: string;
+};
+
+export type QRScanResponse = {
+  status: "success" | "not_found" | string;
+  message: string;
+  uom?: string;
+  toleranceMin?: number;
+  toleranceMax?: number;
+  standardValue?: number;
+  observationUploadUrl?: string;
+  observationS3Key?: string;
+  uploadExpiresInMinutes?: number;
+  relatedPartTasks?: QRTask[];
+  relatedMachineTasks?: QRTask[];
+};
+
+export type ScannedEquipmentDetails = {
+  rawValue: string;
+  equipmentId?: number;
+  equipmentElementId?: number;
+  equipmentPartId?: number;
+};

@@ -15,6 +15,11 @@ public class TaskExecutionService {
 
     private final PmScheduleExecutionRepository executionRepository;
     private final EmployeeRepository employeeRepository;
+    private final com.maint.pm_backend.repository.PmScheduleApprovalRepository approvalRepository;
+    private final AwsS3Service awsS3Service;
+
+    @org.springframework.beans.factory.annotation.Value("${app.approval.due-date-offset-days:1}")
+    private long offsetDays;
 
     public com.maint.pm_backend.dto.QRScanResponse handleQRScan(com.maint.pm_backend.dto.QRScanRequest request, Long employeeId) {
         Employee employee = employeeRepository.findById(employeeId)
@@ -30,29 +35,104 @@ public class TaskExecutionService {
         // Let's assume roles 4 (Electrician), 5 (Fitter), 7 (Production Operator) align to Operator Level 1
         // Fallback: Just assume operator flow for now as requested.
 
-        if (request.getScheduleExecutionId() != null) {
-            List<String> uoms = executionRepository.checkActiveOperatorAssignment(employeeId, request.getScheduleExecutionId());
-            if (!uoms.isEmpty()) {
-                return com.maint.pm_backend.dto.QRScanResponse.builder()
-                        .status("success")
-                        .message("Task assigned and verified")
-                        .uom(uoms.get(0))
-                        .build();
+        if (request.getScheduleExecutionId() != null && request.getEquipmentId() != null) {
+            java.util.Optional<com.maint.pm_backend.dto.TaskValidationProjection> validation = executionRepository.validateAndFetchTaskMetadata(
+                    request.getScheduleExecutionId(), employeeId, request.getEquipmentId(), endOfMonth);
+            if (validation.isPresent()) {
+                com.maint.pm_backend.dto.TaskValidationProjection data = validation.get();
+
+                // Generate presigned PUT URL for observation image upload
+                com.maint.pm_backend.dto.QRScanResponse.QRScanResponseBuilder responseBuilder =
+                        com.maint.pm_backend.dto.QRScanResponse.builder()
+                                .status("success")
+                                .message("Task assigned and verified")
+                                .uom(data.getUom())
+                                .toleranceMin(data.getToleranceMin())
+                                .toleranceMax(data.getToleranceMax())
+                                .standardValue(data.getStandardValue());
+
+                executionRepository.findObservationPathDetails(request.getScheduleExecutionId(), employeeId)
+                        .ifPresent(obs -> {
+                            AwsS3Service.ObservationUploadResult uploadResult =
+                                    awsS3Service.generateObservationUploadUrl(
+                                            obs.getCompanyCode(), obs.getPlantCode(), obs.getMachineCode(),
+                                            obs.getElementId(), obs.getPartId(),
+                                            obs.getTaskScheduleId(), obs.getScheduleExecutionId(),
+                                            obs.getTaskRefNo());
+                            responseBuilder
+                                    .observationUploadUrl(uploadResult.presignedUploadUrl())
+                                    .observationS3Key(uploadResult.s3Key())
+                                    .uploadExpiresInMinutes(uploadResult.expiresInMinutes());
+                        });
+
+                return responseBuilder.build();
             }
         }
 
         // If not assigned or scheduleExecutionId is omitted
         List<com.maint.pm_backend.dto.QRTaskProjection> relatedPartTasks = executionRepository.findPendingOperatorTasksByPart(
-                employeeId, request.getEquipmentPartId(), today, endOfMonth);
+                employeeId, request.getEquipmentPartId(), endOfMonth);
 
         List<com.maint.pm_backend.dto.QRTaskProjection> relatedMachineTasks = executionRepository.findPendingOperatorTasksByEquipmentExcludingPart(
-                employeeId, request.getEquipmentId(), request.getEquipmentPartId(), today, endOfMonth);
+                employeeId, request.getEquipmentId(), request.getEquipmentPartId(), endOfMonth);
 
         return com.maint.pm_backend.dto.QRScanResponse.builder()
                 .status("not_found")
                 .message("Task not found or not assigned to you")
                 .relatedPartTasks(relatedPartTasks)
                 .relatedMachineTasks(relatedMachineTasks)
+                .build();
+    }
+
+    public com.maint.pm_backend.dto.TaskCompletionResponse completeTask(com.maint.pm_backend.dto.TaskCompletionRequest request, Long employeeId) {
+        com.maint.pm_backend.entity.PmScheduleExecution execution = executionRepository.findById(request.getScheduleExecutionId())
+                .orElseThrow(() -> new RuntimeException("Task Execution not found"));
+
+        if (!execution.getEmployee().getEmployeeId().equals(employeeId)) {
+            throw new RuntimeException("Not authorized to complete this task");
+        }
+
+        if (execution.getStatus() != com.maint.pm_backend.entity.enums.TaskExecutionStatus.ASSIGNED &&
+            execution.getStatus() != com.maint.pm_backend.entity.enums.TaskExecutionStatus.IN_PROGRESS) {
+            throw new RuntimeException("Task is not in a valid state for completion");
+        }
+
+        execution.setCompletedDttm(java.time.LocalDateTime.now());
+        execution.setTimeTaken(request.getTimeTaken());
+        execution.setActualValue(request.getActualValue());
+        execution.setNotes(request.getNotes());
+
+        // Check Deviation
+        boolean isDeviated = false;
+        if (request.getActualValue() != null) {
+            com.maint.pm_backend.entity.PmStdTask stdTask = execution.getTaskSchedule().getStdTask();
+            if (stdTask.getToleranceMin() != null && stdTask.getToleranceMax() != null) {
+                if (request.getActualValue().compareTo(stdTask.getToleranceMin()) < 0 ||
+                    request.getActualValue().compareTo(stdTask.getToleranceMax()) > 0) {
+                    isDeviated = true;
+                }
+            }
+        }
+        execution.setDeviationFlag(isDeviated);
+        execution.setStatus(com.maint.pm_backend.entity.enums.TaskExecutionStatus.UNDER_SUPERVISOR_REVIEW);
+
+        executionRepository.save(execution);
+
+        // Update Level 1 Approval
+        java.util.Optional<com.maint.pm_backend.entity.PmScheduleApproval> approvalOpt =
+                approvalRepository.findByScheduleExecution_ScheduleExecutionIdAndApprovalLevel(execution.getScheduleExecutionId(), 1);
+
+        if (approvalOpt.isPresent()) {
+            com.maint.pm_backend.entity.PmScheduleApproval approval = approvalOpt.get();
+            approval.setApprovalStatus(com.maint.pm_backend.entity.enums.TaskApprovalStatus.APPROVAL_REQUESTED);
+            // using configurable offset (default 1)
+            approval.setApprovalDueDate(java.time.LocalDateTime.now().plusDays(offsetDays));
+            approvalRepository.save(approval);
+        }
+
+        return com.maint.pm_backend.dto.TaskCompletionResponse.builder()
+                .status("success")
+                .message("Task completed and sent for review")
                 .build();
     }
 }

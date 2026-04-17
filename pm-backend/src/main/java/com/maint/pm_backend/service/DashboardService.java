@@ -96,7 +96,9 @@ public class DashboardService {
                 approved++;
             } else if (status == TaskExecutionStatus.REJECTED) {
                 denied++;
-            } else if (status == TaskExecutionStatus.APPROVAL_PENDING) {
+            } else if (status == TaskExecutionStatus.UNDER_SUPERVISOR_REVIEW || 
+                       status == TaskExecutionStatus.UNDER_LINE_MANAGER_REVIEW ||
+                       status == TaskExecutionStatus.UNDER_MAINT_MANAGER_REVIEW) {
                 pending++;
             }
         }

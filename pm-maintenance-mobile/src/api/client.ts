@@ -1,10 +1,12 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 
-import {
+import type {
   LoginRequest,
   LoginResponse,
   OperatorDashboardResponse,
+  QRScanRequest,
+  QRScanResponse,
   TaskDocumentUrls,
 } from "../types/api";
 
@@ -39,11 +41,11 @@ const API_BASE_URL = getDefaultBaseUrl().replace(/\/$/, "");
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
     },
-    ...init,
   });
 
   if (!response.ok) {
@@ -103,6 +105,16 @@ export async function fetchTaskDocuments(token: string, scheduleExecutionId: num
     headers: {
       Authorization: `Bearer ${token}`,
     },
+  });
+}
+
+export async function scanTaskQr(token: string, payload: QRScanRequest) {
+  return request<QRScanResponse>("/api/v1/task-execution/scan", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
   });
 }
 

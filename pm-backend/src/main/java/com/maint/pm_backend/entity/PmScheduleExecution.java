@@ -35,4 +35,19 @@ public class PmScheduleExecution {
 
     @Column(name = "completed_dttm")
     private LocalDateTime completedDttm;
+
+    @Column(name = "time_taken")
+    private java.math.BigDecimal timeTaken;
+
+    @Column(name = "actual_value")
+    private java.math.BigDecimal actualValue;
+
+    @Column(name = "deviation_flag")
+    private Boolean deviationFlag;
+
+    @Column(name = "reschedule_flag")
+    private Boolean rescheduleFlag;
+
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
 }

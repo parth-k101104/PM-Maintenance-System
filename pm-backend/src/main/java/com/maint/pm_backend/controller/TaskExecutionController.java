@@ -35,4 +35,20 @@ public class TaskExecutionController {
         com.maint.pm_backend.dto.QRScanResponse response = taskExecutionService.handleQRScan(request, employee.getEmployeeId());
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/complete")
+    public ResponseEntity<com.maint.pm_backend.dto.TaskCompletionResponse> completeTask(
+            @RequestBody com.maint.pm_backend.dto.TaskCompletionRequest request,
+            Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String email = principal.getName();
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
+
+        com.maint.pm_backend.dto.TaskCompletionResponse response = taskExecutionService.completeTask(request, employee.getEmployeeId());
+        return ResponseEntity.ok(response);
+    }
 }

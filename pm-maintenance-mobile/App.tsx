@@ -9,8 +9,10 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
+import { QRScannerScreen } from "./src/screens/QRScannerScreen";
 import { TaskApprovalScreen } from "./src/screens/TaskApprovalScreen";
 import { TaskDocumentsScreen } from "./src/screens/TaskDocumentsScreen";
+import { TaskExecutionScreen } from "./src/screens/TaskExecutionScreen";
 import { TaskListScreen } from "./src/screens/TaskListScreen";
 import { UpcomingTasksScreen } from "./src/screens/UpcomingTasksScreen";
 import { colors } from "./src/theme/colors";
@@ -42,6 +44,8 @@ function RootNavigator() {
         <Stack.Screen name="TaskApproval" component={TaskApprovalScreen} />
         <Stack.Screen name="UpcomingTasks" component={UpcomingTasksScreen} />
         <Stack.Screen name="TaskDocuments" component={TaskDocumentsScreen} />
+        <Stack.Screen name="QRScanner" component={QRScannerScreen} />
+        <Stack.Screen name="TaskExecution" component={TaskExecutionScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
