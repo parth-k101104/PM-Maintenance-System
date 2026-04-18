@@ -80,27 +80,35 @@ public class AwsS3Service {
      * directly to S3 without routing the bytes through the backend.
      *
      * Bucket: pm-tasks-observations
-     * Key pattern: {companyCode}/{plantCode}/{machineCode}/{elementId}/{partId}/{scheduleId}/{executionId}/{executionId}_{taskRefNo}.jpg
+     * Key pattern:
+     *   {companyCode}/{plantCode}/{equipmentCode}/{elementRefNo}/{partName}/{taskRefNo}_{scheduleId}/{executionId}/{executionId}_{taskRefNo}.jpg
      *
-     * @param companyCode  e.g. "AAC"
-     * @param plantCode    e.g. "DET-01"
-     * @param machineCode  e.g. "EQ-PKG-CONV-01"
-     * @param elementId    numeric element ID
-     * @param partId       numeric part ID (0 if absent)
-     * @param scheduleId   numeric task schedule ID
-     * @param executionId  numeric schedule execution ID
-     * @param taskRefNo    std task reference code e.g. "PM-CONV-001"
+     * @param companyCode   e.g. "AAC"
+     * @param plantCode     e.g. "DET-01"
+     * @param machineCode   e.g. "EQ-PKG-CONV-01"
+     * @param elementRefNo  element ref_no e.g. "CONV-BELT"
+     * @param partName      part name e.g. "Tracking Sensor" (spaces replaced with underscores)
+     * @param taskRefNo     std task reference code e.g. "PM-10002-05"
+     * @param scheduleId    numeric task schedule ID
+     * @param executionId   numeric schedule execution ID
      * @return presigned PUT URL + the resolved S3 key
      */
     public ObservationUploadResult generateObservationUploadUrl(
             String companyCode, String plantCode, String machineCode,
-            Long elementId, Long partId, Long scheduleId, Long executionId, String taskRefNo) {
+            String elementRefNo, String partName,
+            String taskRefNo, Long scheduleId, Long executionId) {
 
-        String filename = executionId + "_" + taskRefNo + ".jpg";
-        String key = String.format("%s/%s/%s/%d/%d/%d/%d/%s",
+        // Sanitise part name for use in S3 key (replace spaces/slashes with underscores)
+        String safePartName  = partName  != null ? partName.replaceAll("[^A-Za-z0-9._-]", "_") : "unknown";
+        String safeElementRef = elementRefNo != null ? elementRefNo.replaceAll("[^A-Za-z0-9._-]", "_") : "unknown";
+
+        String scheduleFolder = taskRefNo + "_" + scheduleId;
+        String filename       = executionId + "_" + taskRefNo + ".jpg";
+
+        String key = String.format("%s/%s/%s/%s/%s/%s/%d/%s",
                 companyCode, plantCode, machineCode,
-                elementId, partId != null ? partId : 0,
-                scheduleId, executionId,
+                safeElementRef, safePartName,
+                scheduleFolder, executionId,
                 filename);
 
         log.info("Generating presigned PUT URL for bucket={} key={}", observationsBucketName, key);

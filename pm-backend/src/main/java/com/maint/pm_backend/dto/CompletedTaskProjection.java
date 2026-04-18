@@ -16,4 +16,6 @@ public interface CompletedTaskProjection {
     String getStatus();
     String getTaskCriticality();
     String getSupervisorName();
+    String getReviewerName();
+    String getReviewType();
 }

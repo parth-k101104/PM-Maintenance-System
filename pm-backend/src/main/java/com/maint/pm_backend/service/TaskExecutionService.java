@@ -56,9 +56,9 @@ public class TaskExecutionService {
                             AwsS3Service.ObservationUploadResult uploadResult =
                                     awsS3Service.generateObservationUploadUrl(
                                             obs.getCompanyCode(), obs.getPlantCode(), obs.getMachineCode(),
-                                            obs.getElementId(), obs.getPartId(),
-                                            obs.getTaskScheduleId(), obs.getScheduleExecutionId(),
-                                            obs.getTaskRefNo());
+                                            obs.getElementRefNo(), obs.getPartName(),
+                                            obs.getTaskRefNo(), obs.getTaskScheduleId(),
+                                            obs.getScheduleExecutionId());
                             responseBuilder
                                     .observationUploadUrl(uploadResult.presignedUploadUrl())
                                     .observationS3Key(uploadResult.s3Key())

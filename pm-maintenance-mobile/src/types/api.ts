@@ -80,6 +80,10 @@ export type CompletedTask = {
   status: string;
   taskCriticality: "HIGH" | "MEDIUM" | "LOW";
   supervisorName?: string;
+  /** Name of the employee currently assigned to review this task */
+  reviewerName?: string;
+  /** Human-readable review stage label, e.g. "Supervisor Review" */
+  reviewType?: string;
 };
 
 export type TaskDocumentUrls = {
@@ -124,6 +128,18 @@ export type QRScanResponse = {
   uploadExpiresInMinutes?: number;
   relatedPartTasks?: QRTask[];
   relatedMachineTasks?: QRTask[];
+};
+
+export type TaskCompletionRequest = {
+  scheduleExecutionId: number;
+  timeTaken: number;
+  actualValue?: number | null;
+  notes?: string;
+};
+
+export type TaskCompletionResponse = {
+  status: string;
+  message: string;
 };
 
 export type ScannedEquipmentDetails = {

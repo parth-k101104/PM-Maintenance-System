@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 import { fetchCompletedTasks } from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -19,23 +19,34 @@ import { CompletedTask } from "../types/api";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
+const UNDER_REVIEW_STATUSES = new Set([
+  "UNDER_SUPERVISOR_REVIEW",
+  "UNDER_LINE_MANAGER_REVIEW",
+  "UNDER_MAINT_MANAGER_REVIEW",
+]);
+
 function getCriticalityColor(level: string | undefined) {
   switch (level?.toUpperCase()) {
-    case "HIGH":
-      return "#8B0000"; // Deep Red for High criticality
-    case "MEDIUM":
-      return "#B35900"; // Dark Orange/Copper for Medium criticality
-    case "LOW":
-      return "#1E6545"; // Dark Green for Low criticality
-    default:
-      return "#7B1005"; // Fallback
+    case "HIGH":   return "#8B0000";
+    case "MEDIUM": return "#B35900";
+    case "LOW":    return "#1E6545";
+    default:       return "#7B1005";
   }
 }
 
+/** Color of the review-type pill */
+function getReviewPillColor(reviewType?: string) {
+  if (!reviewType) return "#888";
+  if (reviewType.includes("Supervisor"))  return "#4B6FA8";
+  if (reviewType.includes("Line"))        return "#7B5EA7";
+  if (reviewType.includes("Maintenance")) return "#A0550E";
+  return "#555";
+}
+
 const TABS = [
-  { id: "Approved", label: "Approved", activeColor: "#16A34A" },
   { id: "Under Review", label: "Under Review", activeColor: "#EAB308" },
-  { id: "Denied", label: "Denied", activeColor: "#DC2626", hasDot: true },
+  { id: "Approved",     label: "Approved",     activeColor: "#16A34A" },
+  { id: "Denied",       label: "Denied",       activeColor: "#DC2626", hasDot: true },
 ];
 
 export function TaskApprovalScreen() {
@@ -43,24 +54,28 @@ export function TaskApprovalScreen() {
   const { authState } = useAuth();
   const [tasks, setTasks] = useState<CompletedTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState<string>("Approved");
+  const [selectedTab, setSelectedTab] = useState<string>("Under Review");
   const horizontalListRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    async function loadTasks() {
-      if (!authState.session) return;
-      try {
-        const data = await fetchCompletedTasks(authState.session.token);
-        setTasks(data);
-      } catch (e) {
-        console.error("Failed to fetch completed tasks", e);
-      } finally {
-        setLoading(false);
-      }
+  async function loadTasks() {
+    if (!authState.session) return;
+    try {
+      const data = await fetchCompletedTasks(authState.session.token);
+      setTasks(data);
+    } catch (e) {
+      console.error("Failed to fetch completed tasks", e);
+    } finally {
+      setLoading(false);
     }
+  }
 
-    loadTasks();
-  }, [authState.session]);
+  // Re-fetch every time screen comes into focus so it stays fresh
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      loadTasks();
+    }, [authState.session])
+  );
 
   const handleTabPress = (tabId: string, index: number) => {
     setSelectedTab(tabId);
@@ -70,9 +85,17 @@ export function TaskApprovalScreen() {
   const handleMomentumScrollEnd = (e: any) => {
     const offsetX = e.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / SCREEN_WIDTH);
-    if (TABS[index]) {
-      setSelectedTab(TABS[index].id);
-    }
+    if (TABS[index]) setSelectedTab(TABS[index].id);
+  };
+
+  const getFilteredTasks = (tabId: string) => {
+    return tasks.filter((t) => {
+      const status = t.status.toUpperCase();
+      if (tabId === "Under Review") return UNDER_REVIEW_STATUSES.has(status);
+      if (tabId === "Approved")     return ["COMPLETED", "APPROVED"].includes(status);
+      if (tabId === "Denied")       return status === "REJECTED";
+      return false;
+    });
   };
 
   if (loading) {
@@ -84,16 +107,6 @@ export function TaskApprovalScreen() {
       </SafeAreaView>
     );
   }
-
-  const getFilteredTasks = (tabId: string) => {
-    return tasks.filter((t) => {
-      const status = t.status.toUpperCase();
-      if (tabId === "Approved") return ["COMPLETED", "APPROVED"].includes(status);
-      if (tabId === "Under Review") return status === "APPROVAL_PENDING";
-      if (tabId === "Denied") return status === "REJECTED";
-      return false;
-    });
-  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -113,19 +126,11 @@ export function TaskApprovalScreen() {
           return (
             <Pressable
               key={tab.id}
-              style={[
-                styles.tab,
-                isSelected && { borderBottomColor: tab.activeColor },
-              ]}
+              style={[styles.tab, isSelected && { borderBottomColor: tab.activeColor }]}
               onPress={() => handleTabPress(tab.id, idx)}
             >
               <View style={styles.tabTextRow}>
-                <Text
-                  style={[
-                    styles.tabText,
-                    isSelected && { color: tab.activeColor },
-                  ]}
-                >
+                <Text style={[styles.tabText, isSelected && { color: tab.activeColor }]}>
                   {tab.label}
                 </Text>
                 {tab.hasDot && <View style={styles.redDot} />}
@@ -143,7 +148,7 @@ export function TaskApprovalScreen() {
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id}
         onMomentumScrollEnd={handleMomentumScrollEnd}
-        getItemLayout={(data, index) => ({
+        getItemLayout={(_, index) => ({
           length: SCREEN_WIDTH,
           offset: SCREEN_WIDTH * index,
           index,
@@ -165,13 +170,11 @@ export function TaskApprovalScreen() {
                   const path = [item.machineName, item.machineElementName, item.machinePartName]
                     .filter(Boolean)
                     .join(" > ");
-                  
                   const lineDisplay = item.lineCode || item.lineName || (item.lineId ? `PL${item.lineId}` : "LINE");
                   const stripeColor = getCriticalityColor(item.taskCriticality);
-                  const displayBlock = item.block;
-                  
                   const isApproved = tab.id === "Approved";
-                  const isDenied = tab.id === "Denied";
+                  const isDenied   = tab.id === "Denied";
+                  const isUnderReview = tab.id === "Under Review";
 
                   return (
                     <View style={styles.card}>
@@ -180,30 +183,46 @@ export function TaskApprovalScreen() {
                           <Text style={styles.stripText}>{lineDisplay}</Text>
                         </View>
                       </View>
-                      
+
                       <View style={styles.cardContent}>
                         <View style={styles.cardHeader}>
                           <Text style={styles.taskName}>{item.taskName}</Text>
-                          {!!displayBlock && (
+                          {!!item.block && (
                             <View style={styles.blockBadge}>
-                              <Text style={styles.blockTextLarge}>{displayBlock}</Text>
+                              <Text style={styles.blockTextLarge}>{item.block}</Text>
                             </View>
                           )}
                         </View>
-                        
+
                         <Text style={styles.taskPath}>{path}</Text>
-                        
+
+                        {/* Review type pill — only in Under Review tab */}
+                        {isUnderReview && !!item.reviewType && (
+                          <View style={[styles.reviewPill, { backgroundColor: getReviewPillColor(item.reviewType) + "22" }]}>
+                            <Ionicons
+                              name="hourglass-outline"
+                              size={12}
+                              color={getReviewPillColor(item.reviewType)}
+                            />
+                            <Text style={[styles.reviewPillText, { color: getReviewPillColor(item.reviewType) }]}>
+                              {item.reviewType}
+                            </Text>
+                          </View>
+                        )}
+
                         <View style={styles.infoRow}>
-                          <Text style={styles.supervisorName}>
-                            Approver: {item.supervisorName ?? "Unassigned"}
+                          <Text style={styles.supervisorLabel}>
+                            {isUnderReview
+                              ? `Reviewer: ${item.reviewerName ?? "Unassigned"}`
+                              : `Approver: ${item.supervisorName ?? "Unassigned"}`}
                           </Text>
                           <Text style={[styles.timeRequired, isApproved && { color: "#16A34A" }]}>
                             Time taken: {item.timeTaken ?? 0} mins
                           </Text>
                         </View>
-                        
+
                         <View style={styles.bottomRow}>
-                          <View style={{flex: 1}} />
+                          <View style={{ flex: 1 }} />
                           {isDenied && (
                             <Pressable style={styles.redoButton}>
                               <Text style={styles.redoText}>REDO NOW</Text>
@@ -224,15 +243,8 @@ export function TaskApprovalScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  safeArea: { flex: 1, backgroundColor: "#FFFFFF" },
+  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -262,17 +274,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderBottomColor: "transparent",
     paddingHorizontal: 4,
-    marginBottom: -1, 
+    marginBottom: -1,
   },
-  tabTextRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  tabText: {
-    fontFamily: "Jost_500Medium",
-    fontSize: 16,
-    color: "#9CA3AF",
-  },
+  tabTextRow: { flexDirection: "row", alignItems: "center" },
+  tabText: { fontFamily: "Jost_500Medium", fontSize: 16, color: "#9CA3AF" },
   redDot: {
     width: 6,
     height: 6,
@@ -281,11 +286,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     marginTop: -8,
   },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 50,
-  },
+  listContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 50 },
   card: {
     flexDirection: "row",
     backgroundColor: "#D6D6DF",
@@ -315,11 +316,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textAlign: "center",
   },
-  cardContent: {
-    flex: 1,
-    padding: 14,
-    paddingRight: 8,
-  },
+  cardContent: { flex: 1, padding: 14, paddingRight: 8 },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -355,14 +352,23 @@ const styles = StyleSheet.create({
     fontFamily: "Jost_400Regular",
     fontSize: 11,
     color: "#5E1E1E",
-    marginBottom: 8,
+    marginBottom: 6,
     lineHeight: 15,
     paddingRight: 36,
   },
-  bottomRow: {
+  reviewPill: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  reviewPillText: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 11,
   },
   infoRow: {
     flexDirection: "row",
@@ -370,15 +376,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  supervisorName: {
+  supervisorLabel: {
     fontFamily: "Jost_500Medium",
     fontSize: 12,
     color: "#4A4A5A",
+    flex: 1,
+    paddingRight: 8,
   },
   timeRequired: {
     fontFamily: "Jost_400Regular",
     fontSize: 12,
     color: "#7A7A8D",
+  },
+  bottomRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
   },
   redoButton: {
     backgroundColor: "#FFFFFF",

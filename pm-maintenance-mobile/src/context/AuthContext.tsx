@@ -81,24 +81,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshDashboard = useCallback(async () => {
-    setAuthState((current) => ({ ...current, bootstrapping: true }));
+    
+    setAuthState((current) => {
+      
+      if (!current.session) return current;
 
-    try {
-      const currentSession = authState.session;
-      if (!currentSession) {
-        setAuthState({ bootstrapping: false, session: null });
-        return;
-      }
+      
+      fetchOperatorDashboard(current.session.token)
+        .then((dashboard) => {
+          const nextSession = { ...current.session!, dashboard };
+          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession)).catch(() => {});
+          setAuthState({ bootstrapping: false, session: nextSession });
+        })
+        .catch(() => {
+          
+        });
 
-      const dashboard = await fetchOperatorDashboard(currentSession.token);
-      const nextSession = { ...currentSession, dashboard };
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
-      setAuthState({ bootstrapping: false, session: nextSession });
-    } catch {
-      await AsyncStorage.removeItem(STORAGE_KEY);
-      setAuthState({ bootstrapping: false, session: null });
-    }
-  }, [authState.session]);
+      return current;
+    });
+  }, []); 
 
   const value = useMemo(
     () => ({
