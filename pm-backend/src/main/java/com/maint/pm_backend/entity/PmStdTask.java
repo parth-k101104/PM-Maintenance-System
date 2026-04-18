@@ -27,6 +27,18 @@ public class PmStdTask {
     @Column(name = "estimated_req_time")
     private Integer estimatedReqTime;
 
+    @Column(name = "standard_value")
+    private java.math.BigDecimal standardValue;
+
+    @Column(name = "tolerance_min")
+    private java.math.BigDecimal toleranceMin;
+
+    @Column(name = "tolerance_max")
+    private java.math.BigDecimal toleranceMax;
+
+    @Column(name = "uom", length = 50)
+    private String uom;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 }

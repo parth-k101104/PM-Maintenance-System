@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -117,10 +116,7 @@ export function TaskDocumentsScreen({ navigation, route }: Props) {
   }
 
   function handleScanQrPress() {
-    Alert.alert(
-      "Scan QR",
-      "The QR scanning action can be connected in the next step. This screen is now gated by the Task SOP acknowledgment flow."
-    );
+    navigation.navigate("QRScanner", { task });
   }
 
   return (

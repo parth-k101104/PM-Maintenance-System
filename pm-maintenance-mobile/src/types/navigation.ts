@@ -1,4 +1,4 @@
-import type { TaskDetails } from "./api";
+import type { QRScanResponse, ScannedEquipmentDetails, TaskDetails } from "./api";
 
 export type RootStackParamList = {
   Dashboard: undefined;
@@ -7,5 +7,14 @@ export type RootStackParamList = {
   UpcomingTasks: undefined;
   TaskDocuments: {
     task: TaskDetails;
+  };
+  QRScanner: {
+    task: TaskDetails;
+  };
+  TaskExecution: {
+    task: TaskDetails;
+    scanResponse: QRScanResponse;
+    scannedEquipment: ScannedEquipmentDetails;
+    startedAt: number;
   };
 };

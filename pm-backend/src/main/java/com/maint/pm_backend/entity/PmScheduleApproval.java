@@ -29,4 +29,30 @@ public class PmScheduleApproval {
 
     @Column(name = "approved_dttm")
     private LocalDateTime approvedDttm;
+
+    @Column(name = "approval_level")
+    private Integer approvalLevel;
+
+    @Column(name = "approval_due_date")
+    private LocalDateTime approvalDueDate;
+
+    @Column(name = "remarks", columnDefinition = "TEXT")
+    private String remarks;
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

@@ -94,7 +94,14 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             "  l.line_name AS lineName, " +
             "  st.task_criticality AS taskCriticality, " +
             "  se.status AS status, " +
-            "  sup.full_name AS supervisorName " +
+            "  sup.full_name AS supervisorName, " +
+            "  curr_sup.full_name AS reviewerName, " +
+            "  CASE se.status " +
+            "    WHEN 'UNDER_SUPERVISOR_REVIEW' THEN 'Supervisor Review' " +
+            "    WHEN 'UNDER_LINE_MANAGER_REVIEW' THEN 'Line Manager Review' " +
+            "    WHEN 'UNDER_MAINT_MANAGER_REVIEW' THEN 'Maintenance Manager Review' " +
+            "    ELSE NULL " +
+            "  END AS reviewType " +
             "FROM pm_schedule_execution se " +
             "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
             "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
@@ -104,18 +111,34 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             "LEFT JOIN lines l ON eq.line_id = l.line_id " +
             "LEFT JOIN pm_schedule_approval sa ON se.schedule_execution_id = sa.schedule_execution_id AND sa.approval_level = 1 " +
             "LEFT JOIN employees sup ON sa.approver_id = sup.employee_id " +
+            "LEFT JOIN pm_schedule_approval curr_sa ON curr_sa.schedule_execution_id = se.schedule_execution_id " +
+            "    AND curr_sa.approval_status = 'APPROVAL_REQUESTED' " +
+            "LEFT JOIN employees curr_sup ON curr_sa.approver_id = curr_sup.employee_id " +
             "WHERE se.employee_id = :employeeId " +
-            "  AND se.status IN ('COMPLETED', 'APPROVAL_PENDING', 'APPROVED', 'REJECTED')", nativeQuery = true)
+            "  AND se.status IN ('COMPLETED', 'APPROVED', 'REJECTED', " +
+            "    'UNDER_SUPERVISOR_REVIEW', 'UNDER_LINE_MANAGER_REVIEW', 'UNDER_MAINT_MANAGER_REVIEW')", nativeQuery = true)
     List<com.maint.pm_backend.dto.CompletedTaskProjection> findCompletedTasksNative(
             @Param("employeeId") Long employeeId);
 
-    @Query(value = "SELECT st.uom FROM pm_schedule_execution se " +
+    @Query(value = "SELECT st.uom AS uom, " +
+            "st.tolerance_min AS toleranceMin, " +
+            "st.tolerance_max AS toleranceMax, " +
+            "st.standard_value AS standardValue " +
+            "FROM pm_schedule_execution se " +
             "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
             "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+            "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
+            "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
             "WHERE se.employee_id = :employeeId " +
             "  AND se.schedule_execution_id = :scheduleExecutionId " +
-            "  AND se.status IN ('ASSIGNED', 'IN-PROGRESS')", nativeQuery = true)
-    List<String> checkActiveOperatorAssignment(@Param("employeeId") Long employeeId, @Param("scheduleExecutionId") Long scheduleExecutionId);
+            "  AND se.status IN ('ASSIGNED', 'IN-PROGRESS') " +
+            "  AND CAST(se.due_date AS DATE) <= :endDate " +
+            "  AND eq.equipment_id = :equipmentId", nativeQuery = true)
+    java.util.Optional<com.maint.pm_backend.dto.TaskValidationProjection> validateAndFetchTaskMetadata(
+            @Param("scheduleExecutionId") Long scheduleExecutionId,
+            @Param("employeeId") Long employeeId,
+            @Param("equipmentId") Long equipmentId,
+            @Param("endDate") java.time.LocalDate endDate);
 
     @Query(value = "SELECT " +
             "  se.schedule_execution_id AS scheduleExecutionId, " +
@@ -141,12 +164,10 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             "WHERE se.employee_id = :employeeId " +
             "  AND st.part_id = :partId " +
             "  AND se.status IN ('ASSIGNED', 'IN-PROGRESS') " +
-            "  AND CAST(se.due_date AS DATE) >= :startDate " +
             "  AND CAST(se.due_date AS DATE) <= :endDate", nativeQuery = true)
     List<com.maint.pm_backend.dto.QRTaskProjection> findPendingOperatorTasksByPart(
             @Param("employeeId") Long employeeId, 
             @Param("partId") Long partId, 
-            @Param("startDate") java.time.LocalDate startDate, 
             @Param("endDate") java.time.LocalDate endDate);
 
     @Query(value = "SELECT " +
@@ -173,14 +194,12 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             "WHERE se.employee_id = :employeeId " +
             "  AND eq.equipment_id = :equipmentId " +
             "  AND st.part_id != :partId " +
-            "  AND se.status IN ('ASSIGNED', 'IN_PROGRESS') " +
-            "  AND CAST(se.due_date AS DATE) >= :startDate " +
+            "  AND se.status IN ('ASSIGNED', 'IN-PROGRESS') " +
             "  AND CAST(se.due_date AS DATE) <= :endDate", nativeQuery = true)
     List<com.maint.pm_backend.dto.QRTaskProjection> findPendingOperatorTasksByEquipmentExcludingPart(
             @Param("employeeId") Long employeeId, 
             @Param("equipmentId") Long equipmentId, 
             @Param("partId") Long partId, 
-            @Param("startDate") java.time.LocalDate startDate, 
             @Param("endDate") java.time.LocalDate endDate);
 
     /**
@@ -206,6 +225,34 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             "WHERE se.schedule_execution_id = :scheduleExecutionId " +
             "  AND se.employee_id = :employeeId", nativeQuery = true)
     java.util.Optional<com.maint.pm_backend.dto.DocumentPathProjection> findDocumentPathDetails(
+            @Param("scheduleExecutionId") Long scheduleExecutionId,
+            @Param("employeeId") Long employeeId);
+
+    /**
+     * Fetch all data required to compose the S3 observation image upload path.
+     *
+     * Path: pm-tasks-observations/{companyCode}/{plantCode}/{equipmentCode}/{elementRefNo}/{partName}/{taskRefNo}_{scheduleId}/{executionId}/{executionId}_{taskRefNo}.jpg
+     */
+    @Query(value = "SELECT " +
+            "  c.code AS companyCode, " +
+            "  p.code AS plantCode, " +
+            "  eq.code AS machineCode, " +
+            "  ee.ref_no AS elementRefNo, " +
+            "  ep.name AS partName, " +
+            "  se.task_schedule_id AS taskScheduleId, " +
+            "  se.schedule_execution_id AS scheduleExecutionId, " +
+            "  st.task_ref_no AS taskRefNo " +
+            "FROM pm_schedule_execution se " +
+            "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
+            "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+            "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
+            "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
+            "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
+            "LEFT JOIN plants p ON eq.plant_id = p.id " +
+            "LEFT JOIN companies c ON p.company_id = c.id " +
+            "WHERE se.schedule_execution_id = :scheduleExecutionId " +
+            "  AND se.employee_id = :employeeId", nativeQuery = true)
+    java.util.Optional<com.maint.pm_backend.dto.ObservationPathProjection> findObservationPathDetails(
             @Param("scheduleExecutionId") Long scheduleExecutionId,
             @Param("employeeId") Long employeeId);
 }

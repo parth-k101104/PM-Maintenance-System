@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -51,11 +51,23 @@ function formatItems(items?: { itemName: string; quantity: number }[]) {
 
 export function DashboardScreen() {
   const { width } = useWindowDimensions();
-  const { authState, signOut } = useAuth();
+  const { authState, signOut, refreshDashboard } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const session = authState.session;
   const dashboard = session?.dashboard;
 
+  // Stable ref so the useFocusEffect callback always calls the latest
+  // refreshDashboard without it being a reactive dependency.
+  const refreshRef = useRef(refreshDashboard);
+  refreshRef.current = refreshDashboard;
+
+  // Empty dependency array → runs exactly ONCE per screen focus event.
+  // No infinite loop because we never depend on the refreshDashboard identity.
+  useFocusEffect(
+    useCallback(() => {
+      refreshRef.current();
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const greeting = formatGreeting(dashboard?.userContext.shift);
   const userName = dashboard?.userContext.name || session?.fullName || "user";
   const items = useMemo(() => formatItems(dashboard?.requiredItems), [dashboard?.requiredItems]);
