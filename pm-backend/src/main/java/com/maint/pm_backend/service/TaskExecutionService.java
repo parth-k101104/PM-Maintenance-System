@@ -37,7 +37,11 @@ public class TaskExecutionService {
 
         if (request.getScheduleExecutionId() != null && request.getEquipmentId() != null) {
             java.util.Optional<com.maint.pm_backend.dto.TaskValidationProjection> validation = executionRepository.validateAndFetchTaskMetadata(
-                    request.getScheduleExecutionId(), employeeId, request.getEquipmentId(), endOfMonth);
+                    request.getScheduleExecutionId(), employeeId,
+                    request.getEquipmentId(),
+                    request.getEquipmentElementId(),
+                    request.getEquipmentPartId(),
+                    endOfMonth);
             if (validation.isPresent()) {
                 com.maint.pm_backend.dto.TaskValidationProjection data = validation.get();
 

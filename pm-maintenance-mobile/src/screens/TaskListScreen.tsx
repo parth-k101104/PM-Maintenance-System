@@ -162,7 +162,7 @@ export function TaskListScreen() {
                   return (
                     <Pressable
                       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-                      onPress={() => navigation.navigate("TaskDocuments", { task: item })}
+                      onPress={() => navigation.push("TaskDocuments", { task: item })}
                     >
                       <View style={[styles.leftStrip, { backgroundColor: stripeColor }]}>
                         <View style={styles.stripTextContainer}>
