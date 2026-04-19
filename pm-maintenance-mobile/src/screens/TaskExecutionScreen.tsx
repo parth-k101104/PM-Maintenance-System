@@ -125,6 +125,11 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
   // ─── Submit ────────────────────────────────────────────────────────────────
 
   async function handleSubmit() {
+    if (!photoUri) {
+      Alert.alert("Photo required", "Please take an observation photo before submitting.");
+      return;
+    }
+
     if (requiresValue) {
       const trimmed = actualValue.trim();
       if (!trimmed) {
@@ -344,19 +349,25 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
 
           {/* ── Submit button ────────────────────────────────────── */}
           <Pressable
-            style={[styles.submitBtn, isLoading && styles.submitBtnDisabled]}
+            style={[
+              styles.submitBtn,
+              (isLoading || !photoUri) && styles.submitBtnDisabled,
+            ]}
             onPress={handleSubmit}
-            disabled={isLoading}
+            disabled={isLoading || !photoUri}
           >
             {isLoading ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
               <>
-                <Ionicons name="checkmark-done-outline" size={22} color="#FFFFFF" />
-                <Text style={styles.submitBtnText}>Complete task</Text>
+                <Ionicons name="checkmark-done-outline" size={22} color={photoUri ? "#FFFFFF" : "#9296AA"} />
+                <Text style={[styles.submitBtnText, !photoUri && { color: "#9296AA" }]}>Complete task</Text>
               </>
             )}
           </Pressable>
+          {!photoUri && (
+            <Text style={styles.submitHint}>📷 Take an observation photo above to enable submission</Text>
+          )}
 
           {isUploading && (
             <Text style={styles.uploadingHint}>Uploading observation photo…</Text>
@@ -628,5 +639,12 @@ const styles = StyleSheet.create({
     color: "#626781",
     textAlign: "center",
     marginTop: -8,
+  },
+  submitHint: {
+    fontFamily: "Jost_400Regular",
+    fontSize: 13,
+    color: "#A0550E",
+    textAlign: "center",
+    marginTop: 10,
   },
 });

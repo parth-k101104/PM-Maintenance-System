@@ -129,15 +129,20 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
             "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
             "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
+            "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
             "WHERE se.employee_id = :employeeId " +
             "  AND se.schedule_execution_id = :scheduleExecutionId " +
             "  AND se.status IN ('ASSIGNED', 'IN-PROGRESS') " +
             "  AND CAST(se.due_date AS DATE) <= :endDate " +
-            "  AND eq.equipment_id = :equipmentId", nativeQuery = true)
+            "  AND eq.equipment_id = :equipmentId " +
+            "  AND ee.element_id = :elementId " +
+            "  AND (:partId IS NULL OR ep.part_id = :partId)", nativeQuery = true)
     java.util.Optional<com.maint.pm_backend.dto.TaskValidationProjection> validateAndFetchTaskMetadata(
             @Param("scheduleExecutionId") Long scheduleExecutionId,
             @Param("employeeId") Long employeeId,
             @Param("equipmentId") Long equipmentId,
+            @Param("elementId") Long elementId,
+            @Param("partId") Long partId,
             @Param("endDate") java.time.LocalDate endDate);
 
     @Query(value = "SELECT " +
