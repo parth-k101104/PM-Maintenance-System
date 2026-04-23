@@ -14,6 +14,7 @@ import { TaskApprovalScreen } from "./src/screens/TaskApprovalScreen";
 import { TaskDocumentsScreen } from "./src/screens/TaskDocumentsScreen";
 import { TaskExecutionScreen } from "./src/screens/TaskExecutionScreen";
 import { TaskListScreen } from "./src/screens/TaskListScreen";
+import { BacklogTasksScreen } from "./src/screens/BacklogTasksScreen";
 import { UpcomingTasksScreen } from "./src/screens/UpcomingTasksScreen";
 import { colors } from "./src/theme/colors";
 import { RootStackParamList } from "./src/types/navigation";
@@ -41,6 +42,7 @@ function RootNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="TaskList" component={TaskListScreen} />
+        <Stack.Screen name="BacklogTasks" component={BacklogTasksScreen} />
         <Stack.Screen name="TaskApproval" component={TaskApprovalScreen} />
         <Stack.Screen name="UpcomingTasks" component={UpcomingTasksScreen} />
         <Stack.Screen name="TaskDocuments" component={TaskDocumentsScreen} />

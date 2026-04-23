@@ -88,6 +88,13 @@ export async function fetchCompletedTasks(token: string) {
   });
 }
 
+export async function fetchBacklogTasks(token: string) {
+  return request<import("../types/api").TaskDetails[]>("/api/v1/tasks/backlog", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export async function fetchUpcomingTasks(token: string) {
   return request<import("../types/api").TaskDetails[]>("/api/v1/tasks/upcoming", {
     method: "GET",

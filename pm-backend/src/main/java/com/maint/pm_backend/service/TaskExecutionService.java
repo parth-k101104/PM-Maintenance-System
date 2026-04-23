@@ -73,18 +73,16 @@ public class TaskExecutionService {
             }
         }
 
-        // If not assigned or scheduleExecutionId is omitted
-        List<com.maint.pm_backend.dto.QRTaskProjection> relatedPartTasks = executionRepository.findPendingOperatorTasksByPart(
-                employeeId, request.getEquipmentPartId(), endOfMonth);
-
-        List<com.maint.pm_backend.dto.QRTaskProjection> relatedMachineTasks = executionRepository.findPendingOperatorTasksByEquipmentExcludingPart(
-                employeeId, request.getEquipmentId(), request.getEquipmentPartId(), endOfMonth);
+        // Fallback: return all tasks for this employee on the scanned equipment only
+        List<com.maint.pm_backend.dto.QRTaskProjection> assignedTasks =
+                executionRepository.findAssignedTasksForEquipment(
+                        employeeId, request.getEquipmentId(), endOfMonth);
 
         return com.maint.pm_backend.dto.QRScanResponse.builder()
                 .status("not_found")
-                .message("Task not found or not assigned to you")
-                .relatedPartTasks(relatedPartTasks)
-                .relatedMachineTasks(relatedMachineTasks)
+                .message("No matching task found. Select from the tasks assigned to you on this equipment.")
+                .relatedPartTasks(assignedTasks)
+                .relatedMachineTasks(java.util.Collections.emptyList())
                 .build();
     }
 

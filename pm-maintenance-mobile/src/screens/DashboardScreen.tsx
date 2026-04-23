@@ -112,7 +112,10 @@ export function DashboardScreen() {
                   <Ionicons name="arrow-forward-outline" size={40} color="#111111" style={styles.cardArrow} />
                 </Pressable>
 
-                <View style={[styles.card, styles.backlogCard, styles.flexSmall]}>
+                <Pressable 
+                  style={[styles.card, styles.backlogCard, styles.flexSmall]}
+                  onPress={() => navigation.navigate("BacklogTasks")}
+                >
                   <Text style={styles.cardTitleSmall}>Tasks on{"\n"}backlog-</Text>
                   <Text style={styles.mediumNumber}>{dashboard?.taskSummary.backlogTasks ?? 0}</Text>
                   <Ionicons
@@ -121,7 +124,7 @@ export function DashboardScreen() {
                     color="#111111"
                     style={styles.smallCardArrow}
                   />
-                </View>
+                </Pressable>
               </View>
 
               <View style={styles.cardsRow}>

@@ -3,6 +3,7 @@ import type { QRScanResponse, ScannedEquipmentDetails, TaskDetails } from "./api
 export type RootStackParamList = {
   Dashboard: undefined;
   TaskList: undefined;
+  BacklogTasks: undefined;
   TaskApproval: undefined;
   UpcomingTasks: undefined;
   TaskDocuments: {
