@@ -175,6 +175,61 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             @Param("partId") Long partId,
             @Param("endDate") java.time.LocalDate endDate);
 
+    @Query(value = "SELECT st.uom AS uom, " +
+            "st.tolerance_min AS toleranceMin, " +
+            "st.tolerance_max AS toleranceMax, " +
+            "st.standard_value AS standardValue, " +
+            "se.actual_value AS actualValue, " +
+            "se.deviation_flag AS deviationFlag, " +
+            "se.time_taken AS timeTaken, " +
+            "se.notes AS notes, " +
+            "st.estimated_req_time AS estimatedReqTime, " +
+            "st.std_task_id AS stdTaskId " +
+            "FROM pm_schedule_execution se " +
+            "JOIN pm_schedule_approval sa ON se.schedule_execution_id = sa.schedule_execution_id " +
+            "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
+            "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+            "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
+            "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
+            "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
+            "WHERE sa.approver_id = :supervisorId " +
+            "  AND sa.approval_level = 1 " +
+            "  AND sa.approval_status = 'APPROVAL_REQUESTED' " +
+            "  AND se.schedule_execution_id = :scheduleExecutionId " +
+            "  AND eq.equipment_id = :equipmentId " +
+            "  AND ee.element_id = :elementId " +
+            "  AND (:partId IS NULL OR ep.part_id = :partId)", nativeQuery = true)
+    java.util.Optional<com.maint.pm_backend.dto.SupervisorTaskValidationProjection> validateAndFetchSupervisorTaskMetadata(
+            @Param("scheduleExecutionId") Long scheduleExecutionId,
+            @Param("supervisorId") Long supervisorId,
+            @Param("equipmentId") Long equipmentId,
+            @Param("elementId") Long elementId,
+            @Param("partId") Long partId);
+
+    @Query(value = "SELECT " +
+            "  se.schedule_execution_id AS scheduleExecutionId, " +
+            "  st.method AS taskName, " +
+            "  se.actual_value AS actualValue, " +
+            "  se.deviation_flag AS deviationFlag, " +
+            "  se.time_taken AS timeTaken, " +
+            "  se.notes AS notes, " +
+            "  se.completed_dttm AS completedDate, " +
+            "  se.status AS status, " +
+            "  emp.full_name AS executedBy " +
+            "FROM pm_schedule_execution se " +
+            "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
+            "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+            "JOIN employees emp ON se.employee_id = emp.employee_id " +
+            "WHERE st.std_task_id = :stdTaskId " +
+            "  AND se.status IN ('COMPLETED', 'APPROVED', 'REJECTED', " +
+            "    'UNDER_SUPERVISOR_REVIEW', 'UNDER_LINE_MANAGER_REVIEW', 'UNDER_MAINT_MANAGER_REVIEW') " +
+            "  AND se.schedule_execution_id != :excludeExecutionId " +
+            "ORDER BY se.completed_dttm DESC " +
+            "LIMIT 5", nativeQuery = true)
+    List<com.maint.pm_backend.dto.HistoricalTaskProjection> findHistoricalExecutions(
+            @Param("stdTaskId") Long stdTaskId,
+            @Param("excludeExecutionId") Long excludeExecutionId);
+
     /**
      * Fallback for QR scan mismatch: returns ALL tasks assigned to the employee for the
      * given equipment that are still ASSIGNED or IN_PROGRESS, ordered by element then part.

@@ -137,4 +137,70 @@ public class TaskExecutionService {
                 .message("Task completed and sent for review")
                 .build();
     }
+
+    public com.maint.pm_backend.dto.SupervisorQRScanResponse handleSupervisorQRScan(com.maint.pm_backend.dto.QRScanRequest request, Long supervisorId) {
+        Employee supervisor = employeeRepository.findById(supervisorId)
+                .orElseThrow(() -> new RuntimeException("Supervisor not found"));
+
+        if (supervisor.getRoleId() == null || supervisor.getRoleId() != 3L) {
+            throw new RuntimeException("Access denied: only supervisors can access this");
+        }
+
+        if (request.getScheduleExecutionId() == null || request.getEquipmentId() == null) {
+            return com.maint.pm_backend.dto.SupervisorQRScanResponse.builder()
+                    .status("error")
+                    .message("Missing schedule execution ID or equipment ID in QR scan.")
+                    .build();
+        }
+
+        java.util.Optional<com.maint.pm_backend.dto.SupervisorTaskValidationProjection> validation = executionRepository.validateAndFetchSupervisorTaskMetadata(
+                request.getScheduleExecutionId(), supervisorId,
+                request.getEquipmentId(),
+                request.getEquipmentElementId(),
+                request.getEquipmentPartId());
+
+        if (validation.isPresent()) {
+            com.maint.pm_backend.dto.SupervisorTaskValidationProjection data = validation.get();
+
+            com.maint.pm_backend.dto.SupervisorQRScanResponse.SupervisorQRScanResponseBuilder responseBuilder =
+                    com.maint.pm_backend.dto.SupervisorQRScanResponse.builder()
+                            .status("success")
+                            .message("Task ready for review")
+                            .uom(data.getUom())
+                            .toleranceMin(data.getToleranceMin())
+                            .toleranceMax(data.getToleranceMax())
+                            .standardValue(data.getStandardValue())
+                            .actualValue(data.getActualValue())
+                            .deviationFlag(data.getDeviationFlag())
+                            .timeTaken(data.getTimeTaken())
+                            .notes(data.getNotes())
+                            .estimatedReqTime(data.getEstimatedReqTime());
+
+            // Get historical executions
+            List<com.maint.pm_backend.dto.HistoricalTaskProjection> historicalExecutions = executionRepository.findHistoricalExecutions(data.getStdTaskId(), request.getScheduleExecutionId());
+            responseBuilder.historicalData(historicalExecutions);
+
+            // Need to get operator's employeeId to resolve S3 path
+            com.maint.pm_backend.entity.PmScheduleExecution execution = executionRepository.findById(request.getScheduleExecutionId()).orElse(null);
+            if (execution != null) {
+                Long operatorId = execution.getEmployee().getEmployeeId();
+                executionRepository.findObservationPathDetails(request.getScheduleExecutionId(), operatorId)
+                        .ifPresent(obs -> {
+                            String url = awsS3Service.generateObservationGetUrl(
+                                    obs.getCompanyCode(), obs.getPlantCode(), obs.getMachineCode(),
+                                    obs.getElementRefNo(), obs.getPartName(),
+                                    obs.getTaskRefNo(), obs.getTaskScheduleId(),
+                                    obs.getScheduleExecutionId());
+                            responseBuilder.observationPhotoUrl(url);
+                        });
+            }
+
+            return responseBuilder.build();
+        }
+
+        return com.maint.pm_backend.dto.SupervisorQRScanResponse.builder()
+                .status("not_found")
+                .message("No matching pending approval task found for this equipment.")
+                .build();
+    }
 }
