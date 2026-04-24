@@ -19,7 +19,7 @@ import {
   useCameraPermissions,
 } from "expo-camera";
 
-import { scanTaskQr } from "../api/client";
+import { scanSupervisorTaskQr, scanTaskQr } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { QRScanResponse } from "../types/api";
@@ -69,6 +69,30 @@ export function QRScannerScreen({ navigation, route }: Props) {
     setIsSubmitting(true);
 
     try {
+      // Supervisors (roleId 3) use a different scan endpoint
+      if (authState.session.roleId === 3) {
+        const supResponse = await scanSupervisorTaskQr(authState.session.token, {
+          equipmentId: scannedEquipment.equipmentId,
+          equipmentElementId: scannedEquipment.equipmentElementId,
+          equipmentPartId: scannedEquipment.equipmentPartId,
+          scheduleExecutionId: task.scheduleExecutionId,
+        });
+
+        if (supResponse.status?.toLowerCase() === "success") {
+          navigation.replace("SupervisorTaskReview", {
+            task,
+            scanResponse: supResponse,
+            scannedEquipment,
+          });
+          return;
+        }
+
+        // On supervisor failure, show a simple alert (no related tasks returned)
+        Alert.alert("QR validation failed", supResponse.message || "This task is not assigned to you for approval.");
+        return;
+      }
+
+      // Operator scan
       const response = await scanTaskQr(authState.session.token, {
         equipmentId: scannedEquipment.equipmentId,
         equipmentElementId: scannedEquipment.equipmentElementId,

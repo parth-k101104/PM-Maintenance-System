@@ -42,8 +42,19 @@ export type OperatorDashboardResponse = {
   requiredItems: DashboardItem[];
 };
 
+export type SupervisorDashboardResponse = {
+  todaysDueApprovals: number;
+  openDeviations: number;
+  upcomingApprovalsThisMonth: number;
+  supervisedEmployeeCount: number;
+  tasksInPipeline: number;
+};
+
+export type DashboardKind = "operator" | "supervisor";
+
 export type AuthSession = LoginResponse & {
-  dashboard?: OperatorDashboardResponse;
+  dashboardKind?: DashboardKind;
+  dashboard?: OperatorDashboardResponse | SupervisorDashboardResponse;
 };
 
 export type TaskDetails = {
@@ -62,6 +73,10 @@ export type TaskDetails = {
   lineId: number;
   taskCriticality: "HIGH" | "MEDIUM" | "LOW";
   dueDate?: string;
+  /** Time actually taken by the employee (mins) — populated for approval lists */
+  timeTaken?: number;
+  /** Name of the employee who executed the task */
+  employeeName?: string;
 };
 
 export type CompletedTask = {
@@ -98,6 +113,42 @@ export type QRScanRequest = {
   equipmentElementId?: number;
   equipmentPartId?: number;
   scheduleExecutionId: number;
+};
+
+export type SupervisorQRScanRequest = {
+  equipmentId?: number;
+  equipmentElementId?: number;
+  equipmentPartId?: number;
+  scheduleExecutionId: number;
+};
+
+/** One historical execution data point returned by the supervisor QR scan */
+export type HistoricalDataPoint = {
+  scheduleExecutionId: number;
+  taskName: string;
+  actualValue?: number;
+  deviationFlag: boolean;
+  timeTaken?: number;
+  notes?: string;
+  completedDate?: string;
+  status: string;
+  executedBy?: string;
+};
+
+export type SupervisorQRScanResponse = {
+  status: string;
+  message: string;
+  uom?: string;
+  toleranceMin?: number;
+  toleranceMax?: number;
+  standardValue?: number;
+  actualValue?: number;
+  deviationFlag?: boolean;
+  timeTaken?: number;
+  notes?: string;
+  estimatedReqTime?: number;
+  observationPhotoUrl?: string;
+  historicalData?: HistoricalDataPoint[];
 };
 
 export type QRTask = {

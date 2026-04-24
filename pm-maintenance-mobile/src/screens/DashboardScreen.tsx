@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { RootStackParamList } from "../types/navigation";
+import type { DashboardItem, OperatorDashboardResponse, SupervisorDashboardResponse } from "../types/api";
 
 const drawerItems = [
   "Dashboard",
@@ -49,6 +50,187 @@ function formatItems(items?: { itemName: string; quantity: number }[]) {
   return items.map((item) => (item.quantity > 1 ? `${item.itemName} x${item.quantity}` : item.itemName));
 }
 
+type DashboardCard = {
+  title: string;
+  value: number | string;
+  footnote?: string;
+  variant: "today" | "backlog" | "status" | "other";
+  size: "large" | "small";
+  navigateTo?: DashboardRouteTarget;
+  statusLines?: {
+    label: string;
+    value: number | string;
+    tone: StatusTone;
+  }[];
+};
+
+type StatusTone = "approved" | "pending" | "denied";
+type DashboardRouteTarget = "TaskList" | "SupervisorDueApprovals" | "BacklogTasks" | "TaskApproval" | "UpcomingTasks";
+
+type DashboardViewModel = {
+  greetingShift?: string;
+  userName: string;
+  cards: DashboardCard[];
+  summaryTitle?: string;
+  summaryValue?: string;
+  itemsHeading?: string;
+  items?: string[];
+  ctaLabel: string;
+  ctaTarget?: DashboardRouteTarget;
+};
+
+function isOperatorDashboard(dashboard: unknown): dashboard is OperatorDashboardResponse {
+  return Boolean(
+    dashboard &&
+      typeof dashboard === "object" &&
+      "taskSummary" in dashboard &&
+      "taskStatus" in dashboard &&
+      "timeEstimate" in dashboard,
+  );
+}
+
+function isSupervisorDashboard(dashboard: unknown): dashboard is SupervisorDashboardResponse {
+  return Boolean(
+    dashboard &&
+      typeof dashboard === "object" &&
+      "todaysDueApprovals" in dashboard &&
+      "openDeviations" in dashboard,
+  );
+}
+
+function formatDashboardItems(items?: DashboardItem[]) {
+  return formatItems(items);
+}
+
+function buildOperatorDashboardViewModel(
+  dashboard: OperatorDashboardResponse | undefined,
+  fallbackName: string,
+): DashboardViewModel {
+  return {
+    greetingShift: dashboard?.userContext.shift,
+    userName: dashboard?.userContext.name || fallbackName,
+    cards: [
+      {
+        title: "Tasks for today-",
+        value: dashboard?.taskSummary.tasksToday ?? 0,
+        footnote: "remaining",
+        variant: "today",
+        size: "large",
+        navigateTo: "TaskList",
+      },
+      {
+        title: "Tasks on\nbacklog-",
+        value: dashboard?.taskSummary.backlogTasks ?? 0,
+        variant: "backlog",
+        size: "small",
+        navigateTo: "BacklogTasks",
+      },
+      {
+        title: "Tasks status-",
+        value: "",
+        variant: "status",
+        size: "small",
+        navigateTo: "TaskApproval",
+        statusLines: [
+          { label: "Approved-", value: dashboard?.taskStatus.approved ?? 0, tone: "approved" },
+          { label: "Pending-", value: dashboard?.taskStatus.pending ?? 0, tone: "pending" },
+          { label: "Denied-", value: dashboard?.taskStatus.denied ?? 0, tone: "denied" },
+        ],
+      },
+      {
+        title: "Other tasks-",
+        value: dashboard?.taskSummary.remainingTasks ?? 0,
+        footnote: "Till month end",
+        variant: "other",
+        size: "large",
+        navigateTo: "UpcomingTasks",
+      },
+    ],
+    summaryTitle: "Total time required to finish today's tasks-",
+    summaryValue: dashboard?.timeEstimate.formattedEstimate ?? "0 mins",
+    itemsHeading: "Items require to attend today's tasks-",
+    items: formatDashboardItems(dashboard?.requiredItems),
+    ctaLabel: "Let's Start!",
+    ctaTarget: "TaskList",
+  };
+}
+
+function buildSupervisorDashboardViewModel(
+  dashboard: SupervisorDashboardResponse | undefined,
+  fallbackName: string,
+): DashboardViewModel {
+  return {
+    userName: fallbackName,
+    cards: [
+      {
+        title: "Today's due approvals-",
+        value: dashboard?.todaysDueApprovals ?? 0,
+        footnote: "due today",
+        variant: "today",
+        size: "large",
+        navigateTo: "SupervisorDueApprovals",
+      },
+      {
+        title: "Deviation\nobserved-",
+        value: dashboard?.openDeviations ?? 0,
+        variant: "backlog",
+        size: "small",
+        navigateTo: "TaskApproval",
+      },
+      {
+        title: "Team status-",
+        value: "",
+        variant: "status",
+        size: "small",
+        navigateTo: "TaskApproval",
+        statusLines: [
+          { label: "Employees-", value: dashboard?.supervisedEmployeeCount ?? 0, tone: "approved" },
+          { label: "Pipeline-", value: dashboard?.tasksInPipeline ?? 0, tone: "denied" },
+          { label: "Upcoming-", value: dashboard?.upcomingApprovalsThisMonth ?? 0, tone: "pending" },
+        ],
+      },
+      {
+        title: "Upcoming approvals-",
+        value: dashboard?.upcomingApprovalsThisMonth ?? 0,
+        footnote: "coming month",
+        variant: "other",
+        size: "large",
+        navigateTo: "TaskApproval",
+      },
+    ],
+    ctaLabel: "Let's Start!",
+    ctaTarget: "TaskApproval",
+  };
+}
+
+function getCardStyle(variant: DashboardCard["variant"]) {
+  switch (variant) {
+    case "today":
+      return styles.todayCard;
+    case "backlog":
+      return styles.backlogCard;
+    case "status":
+      return styles.statusCard;
+    case "other":
+      return styles.otherTasksCard;
+    default:
+      return styles.todayCard;
+  }
+}
+
+function getStatusToneStyle(tone: StatusTone) {
+  switch (tone) {
+    case "approved":
+      return styles.approvedText;
+    case "pending":
+      return styles.pendingText;
+    case "denied":
+      return styles.deniedText;
+    default:
+      return styles.pendingText;
+  }
+}
+
 export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const { authState, signOut, refreshDashboard } = useAuth();
@@ -68,14 +250,50 @@ export function DashboardScreen() {
       refreshRef.current();
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const greeting = formatGreeting(dashboard?.userContext.shift);
-  const userName = dashboard?.userContext.name || session?.fullName || "user";
-  const items = useMemo(() => formatItems(dashboard?.requiredItems), [dashboard?.requiredItems]);
+  const fallbackName = session?.fullName || "user";
+  const dashboardView = useMemo(() => {
+    if (session?.dashboardKind === "supervisor" || isSupervisorDashboard(dashboard)) {
+      return buildSupervisorDashboardViewModel(
+        isSupervisorDashboard(dashboard) ? dashboard : undefined,
+        fallbackName,
+      );
+    }
+
+    return buildOperatorDashboardViewModel(isOperatorDashboard(dashboard) ? dashboard : undefined, fallbackName);
+  }, [dashboard, fallbackName, session?.dashboardKind]);
+  const greeting = formatGreeting(dashboardView.greetingShift);
+  const userName = dashboardView.userName;
   const isTablet = width >= 768;
   const horizontalPadding = isTablet ? 40 : 18;
   const contentMaxWidth = isTablet ? 920 : 560;
   const drawerWidth = Math.min(width * 0.78, 360);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  function navigateToDashboardTarget(target?: DashboardRouteTarget) {
+    if (!target) {
+      return;
+    }
+
+    switch (target) {
+      case "TaskList":
+        navigation.navigate("TaskList");
+        break;
+      case "SupervisorDueApprovals":
+        navigation.navigate("SupervisorDueApprovals");
+        break;
+      case "BacklogTasks":
+        navigation.navigate("BacklogTasks");
+        break;
+      case "TaskApproval":
+        navigation.navigate("TaskApproval");
+        break;
+      case "UpcomingTasks":
+        navigation.navigate("UpcomingTasks");
+        break;
+      default:
+        break;
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -101,86 +319,79 @@ export function DashboardScreen() {
             </Text>
 
             <View style={styles.cardsWrapper}>
-              <View style={styles.cardsRow}>
-                <Pressable 
-                  style={[styles.card, styles.todayCard, styles.flexLarge]}
-                  onPress={() => navigation.navigate("TaskList")}
-                >
-                  <Text style={styles.cardTitle}>Tasks for today-</Text>
-                  <Text style={styles.bigNumber}>{dashboard?.taskSummary.tasksToday ?? 0}</Text>
-                  <Text style={styles.cardFootnote}>remaining</Text>
-                  <Ionicons name="arrow-forward-outline" size={40} color="#111111" style={styles.cardArrow} />
-                </Pressable>
-
-                <Pressable 
-                  style={[styles.card, styles.backlogCard, styles.flexSmall]}
-                  onPress={() => navigation.navigate("BacklogTasks")}
-                >
-                  <Text style={styles.cardTitleSmall}>Tasks on{"\n"}backlog-</Text>
-                  <Text style={styles.mediumNumber}>{dashboard?.taskSummary.backlogTasks ?? 0}</Text>
-                  <Ionicons
-                    name="arrow-forward-outline"
-                    size={38}
-                    color="#111111"
-                    style={styles.smallCardArrow}
-                  />
-                </Pressable>
-              </View>
-
-              <View style={styles.cardsRow}>
-                <Pressable 
-                  style={[styles.card, styles.statusCard, styles.flexSmall]}
-                  onPress={() => navigation.navigate("TaskApproval")}
-                >
-                  <Text style={styles.statusTitle}>Tasks status-</Text>
-                  <Text style={styles.statusLine}>
-                    Approved-<Text style={styles.approvedText}>{dashboard?.taskStatus.approved ?? 0}</Text>
-                  </Text>
-                  <Text style={styles.statusLine}>
-                    Pending-<Text style={styles.pendingText}>{dashboard?.taskStatus.pending ?? 0}</Text>
-                  </Text>
-                  <Text style={styles.statusLine}>
-                    Denied-<Text style={styles.deniedText}>{dashboard?.taskStatus.denied ?? 0}</Text>
-                  </Text>
-                  <Ionicons name="arrow-forward-outline" size={34} color="#111111" style={styles.statusArrow} />
-                </Pressable>
-
-                <Pressable 
-                  style={[styles.card, styles.otherTasksCard, styles.flexLarge]}
-                  onPress={() => navigation.navigate("UpcomingTasks")}
-                >
-                  <Text style={styles.cardTitle}>Other tasks-</Text>
-                  <Text style={styles.bigNumber}>{dashboard?.taskSummary.remainingTasks ?? 0}</Text>
-                  <Text style={styles.cardFootnoteAlt}>Till month end</Text>
-                  <Ionicons
-                    name="arrow-forward-outline"
-                    size={40}
-                    color="#111111"
-                    style={styles.otherCardArrow}
-                  />
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.timeCard}>
-              <Text style={styles.timeCardTitle}>Total time required to finish today&apos;s tasks-</Text>
-              <Text style={styles.timeCardValue}>{dashboard?.timeEstimate.formattedEstimate ?? "0 mins"}</Text>
-            </View>
-
-            <View style={styles.itemsSection}>
-              <Text style={styles.itemsHeading}>Items require to attend today&apos;s tasks-</Text>
-              {items.map((item) => (
-                <Text key={item} style={styles.itemBullet}>
-                  .  {item}
-                </Text>
+              {[0, 2].map((startIndex) => (
+                <View key={startIndex} style={styles.cardsRow}>
+                  {dashboardView.cards.slice(startIndex, startIndex + 2).map((card) => (
+                    <Pressable
+                      key={card.title}
+                      style={[
+                        styles.card,
+                        getCardStyle(card.variant),
+                        card.size === "large" ? styles.flexLarge : styles.flexSmall,
+                      ]}
+                      onPress={() => navigateToDashboardTarget(card.navigateTo)}
+                    >
+                      {card.statusLines ? (
+                        <>
+                          <Text style={styles.statusTitle}>{card.title}</Text>
+                          {card.statusLines.map((line) => (
+                            <Text key={line.label} style={styles.statusLine}>
+                              {line.label}
+                              <Text style={getStatusToneStyle(line.tone)}>{line.value}</Text>
+                            </Text>
+                          ))}
+                          <Ionicons name="arrow-forward-outline" size={34} color="#111111" style={styles.statusArrow} />
+                        </>
+                      ) : (
+                        <>
+                          <Text style={card.size === "large" ? styles.cardTitle : styles.cardTitleSmall}>
+                            {card.title}
+                          </Text>
+                          <Text style={card.size === "large" ? styles.bigNumber : styles.mediumNumber}>
+                            {card.value}
+                          </Text>
+                          {card.footnote ? (
+                            <Text style={card.variant === "other" ? styles.cardFootnoteAlt : styles.cardFootnote}>
+                              {card.footnote}
+                            </Text>
+                          ) : null}
+                          <Ionicons
+                            name="arrow-forward-outline"
+                            size={card.size === "large" ? 40 : 38}
+                            color="#111111"
+                            style={card.size === "large" ? styles.cardArrow : styles.smallCardArrow}
+                          />
+                        </>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
               ))}
             </View>
 
+            {dashboardView.summaryTitle && dashboardView.summaryValue ? (
+              <View style={styles.timeCard}>
+                <Text style={styles.timeCardTitle}>{dashboardView.summaryTitle}</Text>
+                <Text style={styles.timeCardValue}>{dashboardView.summaryValue}</Text>
+              </View>
+            ) : null}
+
+            {dashboardView.itemsHeading && dashboardView.items?.length ? (
+              <View style={styles.itemsSection}>
+                <Text style={styles.itemsHeading}>{dashboardView.itemsHeading}</Text>
+                {dashboardView.items.map((item) => (
+                  <Text key={item} style={styles.itemBullet}>
+                    .  {item}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+
             <Pressable 
               style={[styles.primaryButton, isTablet && styles.primaryButtonTablet]}
-              onPress={() => navigation.navigate("TaskList")}
+              onPress={() => navigateToDashboardTarget(dashboardView.ctaTarget)}
             >
-              <Text style={styles.primaryButtonText}>Let&apos;s Start!</Text>
+              <Text style={styles.primaryButtonText}>{dashboardView.ctaLabel}</Text>
             </Pressable>
           </View>
         </ScrollView>
