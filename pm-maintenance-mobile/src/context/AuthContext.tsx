@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { fetchOperatorDashboard, login } from "../api/client";
-import { AuthSession } from "../types/api";
+import { fetchOperatorDashboard, fetchSupervisorDashboard, login } from "../api/client";
+import { AuthSession, DashboardKind, LoginResponse } from "../types/api";
 
 type AuthState = {
   bootstrapping: boolean;
@@ -26,6 +26,30 @@ const STORAGE_KEY = "pm-maintenance-mobile/session";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function getDashboardKind(session: LoginResponse): DashboardKind {
+  const roleName = session.roleName?.toLowerCase() ?? "";
+  const accessLevelName = session.accessLevelName?.toLowerCase() ?? "";
+
+  if (session.roleId === 3 || roleName.includes("supervisor") || accessLevelName.includes("supervisor")) {
+    return "supervisor";
+  }
+
+  return "operator";
+}
+
+async function fetchDashboardForSession(session: LoginResponse | AuthSession) {
+  const dashboardKind = getDashboardKind(session);
+  const dashboard =
+    dashboardKind === "supervisor"
+      ? await fetchSupervisorDashboard(session.token)
+      : await fetchOperatorDashboard(session.token);
+
+  return {
+    dashboardKind,
+    dashboard,
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>({
     bootstrapping: true,
@@ -46,8 +70,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (parsed.token) {
           try {
-            const dashboard = await fetchOperatorDashboard(parsed.token);
-            const nextSession = { ...parsed, dashboard };
+            const dashboardState = await fetchDashboardForSession(parsed);
+            const nextSession = { ...parsed, ...dashboardState };
             setAuthState({ bootstrapping: false, session: nextSession });
             await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
           } catch {
@@ -65,8 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(async (values: LoginFormValues) => {
     const session = await login(values);
-    const dashboard = await fetchOperatorDashboard(session.token);
-    const nextSession: AuthSession = { ...session, dashboard };
+    const dashboardState = await fetchDashboardForSession(session);
+    const nextSession: AuthSession = { ...session, ...dashboardState };
     if (values.rememberMe) {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
     } else {
@@ -87,9 +111,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!current.session) return current;
 
       
-      fetchOperatorDashboard(current.session.token)
-        .then((dashboard) => {
-          const nextSession = { ...current.session!, dashboard };
+      fetchDashboardForSession(current.session)
+        .then((dashboardState) => {
+          const nextSession = { ...current.session!, ...dashboardState };
           AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession)).catch(() => {});
           setAuthState({ bootstrapping: false, session: nextSession });
         })

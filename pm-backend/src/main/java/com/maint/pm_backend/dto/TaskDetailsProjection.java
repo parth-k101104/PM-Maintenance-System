@@ -16,4 +16,6 @@ public interface TaskDetailsProjection {
     Long getLineId();
     String getTaskCriticality();
     java.time.LocalDateTime getDueDate();
+    Double getTimeTaken();
+    String getEmployeeName();
 }

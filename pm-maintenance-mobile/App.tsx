@@ -14,6 +14,8 @@ import { TaskApprovalScreen } from "./src/screens/TaskApprovalScreen";
 import { TaskDocumentsScreen } from "./src/screens/TaskDocumentsScreen";
 import { TaskExecutionScreen } from "./src/screens/TaskExecutionScreen";
 import { TaskListScreen } from "./src/screens/TaskListScreen";
+import { SupervisorDueApprovalsScreen } from "./src/screens/SupervisorDueApprovalsScreen";
+import { SupervisorTaskReviewScreen } from "./src/screens/SupervisorTaskReviewScreen";
 import { BacklogTasksScreen } from "./src/screens/BacklogTasksScreen";
 import { UpcomingTasksScreen } from "./src/screens/UpcomingTasksScreen";
 import { colors } from "./src/theme/colors";
@@ -42,12 +44,14 @@ function RootNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="TaskList" component={TaskListScreen} />
+        <Stack.Screen name="SupervisorDueApprovals" component={SupervisorDueApprovalsScreen} />
         <Stack.Screen name="BacklogTasks" component={BacklogTasksScreen} />
         <Stack.Screen name="TaskApproval" component={TaskApprovalScreen} />
         <Stack.Screen name="UpcomingTasks" component={UpcomingTasksScreen} />
         <Stack.Screen name="TaskDocuments" component={TaskDocumentsScreen} />
         <Stack.Screen name="QRScanner" component={QRScannerScreen} />
         <Stack.Screen name="TaskExecution" component={TaskExecutionScreen} />
+        <Stack.Screen name="SupervisorTaskReview" component={SupervisorTaskReviewScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

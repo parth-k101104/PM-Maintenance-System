@@ -32,10 +32,13 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             "  l.line_code AS lineCode, " +
             "  l.line_id AS lineId, " +
             "  se.due_date AS dueDate, " +
-            "  st.task_criticality AS taskCriticality " +
+            "  st.task_criticality AS taskCriticality, " +
+            "  se.time_taken AS timeTaken, " +
+            "  emp.full_name AS employeeName " +
             "FROM pm_schedule_execution se " +
             "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
             "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+            "LEFT JOIN employees emp ON se.employee_id = emp.employee_id " +
             "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
             "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
             "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
@@ -62,10 +65,13 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             "  l.line_code AS lineCode, " +
             "  l.line_id AS lineId, " +
             "  se.due_date AS dueDate, " +
-            "  st.task_criticality AS taskCriticality " +
+            "  st.task_criticality AS taskCriticality, " +
+            "  se.time_taken AS timeTaken, " +
+            "  emp.full_name AS employeeName " +
             "FROM pm_schedule_execution se " +
             "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
             "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+            "LEFT JOIN employees emp ON se.employee_id = emp.employee_id " +
             "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
             "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
             "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
@@ -92,10 +98,13 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             "  l.line_code AS lineCode, " +
             "  l.line_id AS lineId, " +
             "  se.due_date AS dueDate, " +
-            "  st.task_criticality AS taskCriticality " +
+            "  st.task_criticality AS taskCriticality, " +
+            "  se.time_taken AS timeTaken, " +
+            "  emp.full_name AS employeeName " +
             "FROM pm_schedule_execution se " +
             "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
             "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+            "LEFT JOIN employees emp ON se.employee_id = emp.employee_id " +
             "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
             "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
             "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
