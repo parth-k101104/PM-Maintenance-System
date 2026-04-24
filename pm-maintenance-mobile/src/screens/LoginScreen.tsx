@@ -3,9 +3,9 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -57,8 +57,9 @@ export function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.screen}
+      keyboardVerticalOffset={0}
     >
       <View
         style={[
@@ -73,17 +74,9 @@ export function LoginScreen() {
         ]}
       />
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          {
-            paddingTop: topSpacing,
-            paddingBottom: 40,
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={[styles.container, { width: contentWidth }]}>
+      <Pressable style={{ flex: 1 }} onPress={Keyboard.dismiss}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <View style={[styles.container, { width: contentWidth }]}>
           <Image source={{ uri: LOGO_URL }} style={[styles.logo, isLargeScreen && styles.logoLarge]} resizeMode="contain" />
 
           <View style={styles.personIcon}>
@@ -162,8 +155,9 @@ export function LoginScreen() {
           </View>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          </View>
         </View>
-      </ScrollView>
+      </Pressable>
     </KeyboardAvoidingView>
   );
 }
@@ -178,18 +172,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft,
   },
   scrollContent: {
-    flexGrow: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    flex: 1,
   },
   container: {
     paddingHorizontal: 24,
   },
   logo: {
-    width: 125,
-    height: 125,
+    width: 155,
+    height: 155,
     alignSelf: "center",
-    marginBottom: 56,
+    marginBottom: 28,
   },
   logoLarge: {
     width: 148,
@@ -200,15 +192,15 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     justifyContent: "center",
     alignItems: "center",
-    width: 66,
-    height: 66,
+    width: 75,
+    height: 75,
     borderRadius: 33,
-    marginBottom: 14,
+    marginBottom: 10,
   },
   gearBadge: {
     position: "absolute",
-    right: 2,
-    bottom: 3,
+    right: 4,
+    bottom: 6,
   },
   title: {
     textAlign: "center",
@@ -217,7 +209,7 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     color: colors.text,
     letterSpacing: 0.8,
-    marginBottom: 58,
+    marginBottom: 50,
   },
   titleLarge: {
     fontSize: 24,
