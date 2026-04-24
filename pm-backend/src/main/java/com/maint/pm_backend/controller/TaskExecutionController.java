@@ -51,4 +51,27 @@ public class TaskExecutionController {
         com.maint.pm_backend.dto.TaskCompletionResponse response = taskExecutionService.completeTask(request, employee.getEmployeeId());
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/supervisor/scan")
+    public ResponseEntity<com.maint.pm_backend.dto.SupervisorQRScanResponse> handleSupervisorQRScan(
+            @RequestBody com.maint.pm_backend.dto.QRScanRequest request,
+            Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String email = principal.getName();
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
+
+        try {
+            com.maint.pm_backend.dto.SupervisorQRScanResponse response = taskExecutionService.handleSupervisorQRScan(request, employee.getEmployeeId());
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            if (e.getMessage().startsWith("Access denied")) {
+                return ResponseEntity.status(403).build();
+            }
+            throw e;
+        }
+    }
 }

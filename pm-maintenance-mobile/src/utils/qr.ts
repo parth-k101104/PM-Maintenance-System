@@ -99,7 +99,7 @@ export function parseEquipmentQr(rawValue: string): ScannedEquipmentDetails {
 
   return {
     rawValue,
-    equipmentId: readNumber(parsedObject, EQUIPMENT_ID_KEYS) ?? toNumber(trimmed),
+    equipmentId: readNumber(parsedObject, EQUIPMENT_ID_KEYS),
     equipmentElementId: readNumber(parsedObject, ELEMENT_ID_KEYS),
     equipmentPartId: readNumber(parsedObject, PART_ID_KEYS),
   };

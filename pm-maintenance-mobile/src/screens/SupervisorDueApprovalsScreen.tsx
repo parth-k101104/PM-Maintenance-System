@@ -5,29 +5,28 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import { fetchTasksForToday } from "../api/client";
-import { useAuth } from "../context/AuthContext";
-import { TaskLegendModal } from "../components/TaskLegendModal";
+import { fetchSupervisorTodaysApprovals } from "../api/client";
 import { TaskListView } from "../components/TaskListView";
+import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { TaskDetails } from "../types/api";
 import { RootStackParamList } from "../types/navigation";
 
-export function TaskListScreen() {
+export function SupervisorDueApprovalsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { authState } = useAuth();
   const [tasks, setTasks] = useState<TaskDetails[]>([]);
   const [loading, setLoading] = useState(true);
-  const [legendVisible, setLegendVisible] = useState(false);
 
   useEffect(() => {
     async function loadTasks() {
       if (!authState.session) return;
+
       try {
-        const data = await fetchTasksForToday(authState.session.token);
+        const data = await fetchSupervisorTodaysApprovals(authState.session.token);
         setTasks(data);
-      } catch (e) {
-        console.error("Failed to fetch tasks", e);
+      } catch (error) {
+        console.error("Failed to fetch supervisor due approvals", error);
       } finally {
         setLoading(false);
       }
@@ -52,7 +51,7 @@ export function TaskListScreen() {
         <Pressable hitSlop={12} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back-outline" size={28} color="#111111" />
         </Pressable>
-        <Text style={styles.headerTitle}>Today&apos;s Tasks</Text>
+        <Text style={styles.headerTitle}>Today&apos;s Due Approvals</Text>
         <Pressable hitSlop={12}>
           <Ionicons name="search-outline" size={28} color="#111111" />
         </Pressable>
@@ -60,17 +59,9 @@ export function TaskListScreen() {
 
       <TaskListView
         tasks={tasks}
-        emptyMessage="No tasks assigned for today."
-        onTaskPress={(task) => navigation.push("TaskDocuments", { task })}
-      />
-
-      <Pressable style={styles.fab} onPress={() => setLegendVisible(true)}>
-        <Text style={styles.fabText}>Help?</Text>
-      </Pressable>
-
-      <TaskLegendModal
-        visible={legendVisible}
-        onClose={() => setLegendVisible(false)}
+        emptyMessage="No approvals due for today."
+        showTabs={tasks.some((task) => Boolean(task.zone))}
+        onTaskPress={(task) => navigation.navigate("QRScanner", { task })}
       />
     </SafeAreaView>
   );
@@ -100,26 +91,5 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 16,
     color: "#111111",
-  },
-  fab: {
-    position: "absolute",
-    right: 20,
-    bottom: 20,
-    backgroundColor: "#2C346F",
-    borderRadius: 25,
-    width: 50,
-    height: 50,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  fabText: {
-    fontFamily: "Jost_500Medium",
-    color: "#FFFFFF",
-    fontSize: 13,
   },
 });

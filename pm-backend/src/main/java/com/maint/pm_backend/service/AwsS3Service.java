@@ -130,6 +130,44 @@ public class AwsS3Service {
         return new ObservationUploadResult(presignedUrl, key, uploadExpiryMinutes);
     }
 
+    /**
+     * Generates a presigned GET URL so the supervisor can view an observation image.
+     */
+    public String generateObservationGetUrl(
+            String companyCode, String plantCode, String machineCode,
+            String elementRefNo, String partName,
+            String taskRefNo, Long scheduleId, Long executionId) {
+
+        String safePartName  = partName  != null ? partName.replaceAll("[^A-Za-z0-9._-]", "_") : "unknown";
+        String safeElementRef = elementRefNo != null ? elementRefNo.replaceAll("[^A-Za-z0-9._-]", "_") : "unknown";
+
+        String scheduleFolder = taskRefNo + "_" + scheduleId;
+        String filename       = executionId + "_" + taskRefNo + ".jpg";
+
+        String key = String.format("%s/%s/%s/%s/%s/%s/%d/%s",
+                companyCode, plantCode, machineCode,
+                safeElementRef, safePartName,
+                scheduleFolder, executionId,
+                filename);
+
+        log.info("Generating presigned GET URL for bucket={} key={}", observationsBucketName, key);
+
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(observationsBucketName)
+                .key(key)
+                .build();
+
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(GET_URL_EXPIRY)
+                .getObjectRequest(getObjectRequest)
+                .build();
+
+        String presignedUrl = s3Presigner.presignGetObject(presignRequest).url().toString();
+        log.debug("Generated presigned GET URL for key={}", key);
+
+        return presignedUrl;
+    }
+
     // ──────────────────────────────────────────────────────────────
     // Inner record: bundles the PUT URL result
     // ──────────────────────────────────────────────────────────────

@@ -37,7 +37,11 @@ public class TaskExecutionService {
 
         if (request.getScheduleExecutionId() != null && request.getEquipmentId() != null) {
             java.util.Optional<com.maint.pm_backend.dto.TaskValidationProjection> validation = executionRepository.validateAndFetchTaskMetadata(
-                    request.getScheduleExecutionId(), employeeId, request.getEquipmentId(), endOfMonth);
+                    request.getScheduleExecutionId(), employeeId,
+                    request.getEquipmentId(),
+                    request.getEquipmentElementId(),
+                    request.getEquipmentPartId(),
+                    endOfMonth);
             if (validation.isPresent()) {
                 com.maint.pm_backend.dto.TaskValidationProjection data = validation.get();
 
@@ -69,18 +73,16 @@ public class TaskExecutionService {
             }
         }
 
-        // If not assigned or scheduleExecutionId is omitted
-        List<com.maint.pm_backend.dto.QRTaskProjection> relatedPartTasks = executionRepository.findPendingOperatorTasksByPart(
-                employeeId, request.getEquipmentPartId(), endOfMonth);
-
-        List<com.maint.pm_backend.dto.QRTaskProjection> relatedMachineTasks = executionRepository.findPendingOperatorTasksByEquipmentExcludingPart(
-                employeeId, request.getEquipmentId(), request.getEquipmentPartId(), endOfMonth);
+        // Fallback: return all tasks for this employee on the scanned equipment only
+        List<com.maint.pm_backend.dto.QRTaskProjection> assignedTasks =
+                executionRepository.findAssignedTasksForEquipment(
+                        employeeId, request.getEquipmentId(), endOfMonth);
 
         return com.maint.pm_backend.dto.QRScanResponse.builder()
                 .status("not_found")
-                .message("Task not found or not assigned to you")
-                .relatedPartTasks(relatedPartTasks)
-                .relatedMachineTasks(relatedMachineTasks)
+                .message("No matching task found. Select from the tasks assigned to you on this equipment.")
+                .relatedPartTasks(assignedTasks)
+                .relatedMachineTasks(java.util.Collections.emptyList())
                 .build();
     }
 
@@ -133,6 +135,72 @@ public class TaskExecutionService {
         return com.maint.pm_backend.dto.TaskCompletionResponse.builder()
                 .status("success")
                 .message("Task completed and sent for review")
+                .build();
+    }
+
+    public com.maint.pm_backend.dto.SupervisorQRScanResponse handleSupervisorQRScan(com.maint.pm_backend.dto.QRScanRequest request, Long supervisorId) {
+        Employee supervisor = employeeRepository.findById(supervisorId)
+                .orElseThrow(() -> new RuntimeException("Supervisor not found"));
+
+        if (supervisor.getRoleId() == null || supervisor.getRoleId() != 3L) {
+            throw new RuntimeException("Access denied: only supervisors can access this");
+        }
+
+        if (request.getScheduleExecutionId() == null || request.getEquipmentId() == null) {
+            return com.maint.pm_backend.dto.SupervisorQRScanResponse.builder()
+                    .status("error")
+                    .message("Missing schedule execution ID or equipment ID in QR scan.")
+                    .build();
+        }
+
+        java.util.Optional<com.maint.pm_backend.dto.SupervisorTaskValidationProjection> validation = executionRepository.validateAndFetchSupervisorTaskMetadata(
+                request.getScheduleExecutionId(), supervisorId,
+                request.getEquipmentId(),
+                request.getEquipmentElementId(),
+                request.getEquipmentPartId());
+
+        if (validation.isPresent()) {
+            com.maint.pm_backend.dto.SupervisorTaskValidationProjection data = validation.get();
+
+            com.maint.pm_backend.dto.SupervisorQRScanResponse.SupervisorQRScanResponseBuilder responseBuilder =
+                    com.maint.pm_backend.dto.SupervisorQRScanResponse.builder()
+                            .status("success")
+                            .message("Task ready for review")
+                            .uom(data.getUom())
+                            .toleranceMin(data.getToleranceMin())
+                            .toleranceMax(data.getToleranceMax())
+                            .standardValue(data.getStandardValue())
+                            .actualValue(data.getActualValue())
+                            .deviationFlag(data.getDeviationFlag())
+                            .timeTaken(data.getTimeTaken())
+                            .notes(data.getNotes())
+                            .estimatedReqTime(data.getEstimatedReqTime());
+
+            // Get historical executions
+            List<com.maint.pm_backend.dto.HistoricalTaskProjection> historicalExecutions = executionRepository.findHistoricalExecutions(data.getStdTaskId(), request.getScheduleExecutionId());
+            responseBuilder.historicalData(historicalExecutions);
+
+            // Need to get operator's employeeId to resolve S3 path
+            com.maint.pm_backend.entity.PmScheduleExecution execution = executionRepository.findById(request.getScheduleExecutionId()).orElse(null);
+            if (execution != null) {
+                Long operatorId = execution.getEmployee().getEmployeeId();
+                executionRepository.findObservationPathDetails(request.getScheduleExecutionId(), operatorId)
+                        .ifPresent(obs -> {
+                            String url = awsS3Service.generateObservationGetUrl(
+                                    obs.getCompanyCode(), obs.getPlantCode(), obs.getMachineCode(),
+                                    obs.getElementRefNo(), obs.getPartName(),
+                                    obs.getTaskRefNo(), obs.getTaskScheduleId(),
+                                    obs.getScheduleExecutionId());
+                            responseBuilder.observationPhotoUrl(url);
+                        });
+            }
+
+            return responseBuilder.build();
+        }
+
+        return com.maint.pm_backend.dto.SupervisorQRScanResponse.builder()
+                .status("not_found")
+                .message("No matching pending approval task found for this equipment.")
                 .build();
     }
 }

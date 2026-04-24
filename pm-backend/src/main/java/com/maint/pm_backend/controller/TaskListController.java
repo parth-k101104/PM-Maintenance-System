@@ -49,6 +49,41 @@ public class TaskListController {
         return ResponseEntity.ok(tasks);
     }
 
+    @GetMapping("/backlog")
+    public ResponseEntity<List<TaskDetailsProjection>> getBacklogTasks(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String email = principal.getName();
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
+
+        List<TaskDetailsProjection> tasks = taskListService.getBacklogTasks(employee.getEmployeeId());
+        return ResponseEntity.ok(tasks);
+    }
+
+    @GetMapping("/supervisor/approvals/today")
+    public ResponseEntity<List<TaskDetailsProjection>> getSupervisorTodaysApprovals(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String email = principal.getName();
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
+
+        try {
+            List<TaskDetailsProjection> tasks = taskListService.getSupervisorTodaysApprovals(employee.getEmployeeId());
+            return ResponseEntity.ok(tasks);
+        } catch (RuntimeException e) {
+            if (e.getMessage().startsWith("Access denied")) {
+                return ResponseEntity.status(403).build();
+            }
+            throw e;
+        }
+    }
+
     @GetMapping("/completed")
     public ResponseEntity<List<com.maint.pm_backend.dto.CompletedTaskProjection>> getCompletedTasks(Principal principal) {
         if (principal == null) {

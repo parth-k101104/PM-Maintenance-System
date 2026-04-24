@@ -4,6 +4,9 @@ import type {
   OperatorDashboardResponse,
   QRScanRequest,
   QRScanResponse,
+  SupervisorDashboardResponse,
+  SupervisorQRScanRequest,
+  SupervisorQRScanResponse,
   TaskCompletionRequest,
   TaskCompletionResponse,
   TaskDocumentUrls,
@@ -70,6 +73,13 @@ export async function fetchOperatorDashboard(token: string) {
   });
 }
 
+export async function fetchSupervisorDashboard(token: string) {
+  return request<SupervisorDashboardResponse>("/api/v1/dashboard/supervisor", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Task lists
 // ─────────────────────────────────────────────────────────────────────────────
@@ -81,8 +91,22 @@ export async function fetchTasksForToday(token: string) {
   });
 }
 
+export async function fetchSupervisorTodaysApprovals(token: string) {
+  return request<import("../types/api").TaskDetails[]>("/api/v1/tasks/supervisor/approvals/today", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export async function fetchCompletedTasks(token: string) {
   return request<import("../types/api").CompletedTask[]>("/api/v1/tasks/completed", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchBacklogTasks(token: string) {
+  return request<import("../types/api").TaskDetails[]>("/api/v1/tasks/backlog", {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -112,6 +136,14 @@ export async function fetchTaskDocuments(token: string, scheduleExecutionId: num
 
 export async function scanTaskQr(token: string, payload: QRScanRequest) {
   return request<QRScanResponse>("/api/v1/task-execution/scan", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function scanSupervisorTaskQr(token: string, payload: SupervisorQRScanRequest) {
+  return request<SupervisorQRScanResponse>("/api/v1/task-execution/supervisor/scan", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
