@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -19,6 +19,8 @@ export function TaskListScreen() {
   const [tasks, setTasks] = useState<TaskDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [legendVisible, setLegendVisible] = useState(false);
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     async function loadTasks() {
@@ -46,20 +48,54 @@ export function TaskListScreen() {
     );
   }
 
+  const filteredTasks = tasks.filter((task) => {
+    const query = searchQuery.toLowerCase();
+
+    return Object.values(task)
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+  });
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Pressable hitSlop={12} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back-outline" size={28} color="#111111" />
         </Pressable>
-        <Text style={styles.headerTitle}>Today&apos;s Tasks</Text>
-        <Pressable hitSlop={12}>
-          <Ionicons name="search-outline" size={28} color="#111111" />
+
+        {searchActive ? (
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search tasks..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+            placeholderTextColor="#999"
+          />
+        ) : (
+          <Text style={styles.headerTitle}>Today&apos;s Tasks</Text>
+        )}
+
+        <Pressable
+          hitSlop={12}
+          onPress={() => {
+            if (searchActive) {
+              setSearchQuery("");
+            }
+            setSearchActive((prev) => !prev);
+          }}
+        >
+          <Ionicons
+            name={searchActive ? "close-outline" : "search-outline"}
+            size={28}
+            color="#111111"
+          />
         </Pressable>
       </View>
 
       <TaskListView
-        tasks={tasks}
+        tasks={searchActive ? filteredTasks : tasks}
         emptyMessage="No tasks assigned for today."
         onTaskPress={(task) => navigation.push("TaskDocuments", { task })}
       />
@@ -99,6 +135,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     flex: 1,
     marginLeft: 16,
+    color: "#111111",
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 16,
+    fontFamily: "Jost_400Regular",
+    fontSize: 18,
     color: "#111111",
   },
   fab: {

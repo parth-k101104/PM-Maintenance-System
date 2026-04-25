@@ -1,5 +1,6 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -235,6 +236,7 @@ export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const { authState, signOut, refreshDashboard } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const translateX = useRef(new Animated.Value(-300)).current;
   const session = authState.session;
   const dashboard = session?.dashboard;
 
@@ -268,6 +270,14 @@ export function DashboardScreen() {
   const contentMaxWidth = isTablet ? 920 : 560;
   const drawerWidth = Math.min(width * 0.78, 360);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  useEffect(() => {
+    Animated.timing(translateX, {
+      toValue: menuOpen ? 0 : -(drawerWidth + 20),
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [menuOpen, drawerWidth]);
 
   function navigateToDashboardTarget(target?: DashboardRouteTarget) {
     if (!target) {
@@ -388,7 +398,7 @@ export function DashboardScreen() {
               </View>
             ) : null}
 
-            <Pressable 
+            <Pressable
               style={[styles.primaryButton, isTablet && styles.primaryButtonTablet]}
               onPress={() => navigateToDashboardTarget(dashboardView.ctaTarget)}
             >
@@ -397,35 +407,36 @@ export function DashboardScreen() {
           </View>
         </ScrollView>
 
-        <Modal animationType="fade" transparent visible={menuOpen} onRequestClose={() => setMenuOpen(false)}>
-          <View style={styles.modalRoot}>
-            <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)} />
+        {menuOpen && (
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setMenuOpen(false)}
+            pointerEvents={menuOpen ? "auto" : "none"}
+          />
+        )}
+        <Animated.View style={[styles.drawer, { width: drawerWidth, transform: [{ translateX }] }]}>
+          <Pressable style={styles.drawerHeader} onPress={() => setMenuOpen(false)}>
+            <Ionicons style={styles.drawerHeaderArrow} name="arrow-back-outline" size={34} color="#111111" />
+            <Text style={styles.drawerHeaderText}>Menu</Text>
+          </Pressable>
 
-            <View style={[styles.drawer, { width: drawerWidth }]}>
-              <Pressable style={styles.drawerHeader} onPress={() => setMenuOpen(false)}>
-                <Ionicons name="arrow-back-outline" size={34} color="#111111" />
-                <Text style={styles.drawerHeaderText}>Menu</Text>
-              </Pressable>
-
-              <View style={styles.drawerItems}>
-                {drawerItems.map((item) => (
-                  <Text key={item} style={styles.drawerItemText}>
-                    {item}
-                  </Text>
-                ))}
-              </View>
-
-              <View style={styles.drawerFooter}>
-                <Pressable
-                  onPress={signOut}
-                  style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutButtonPressed]}
-                >
-                  <Text style={styles.logoutText}>Log out</Text>
-                </Pressable>
-              </View>
-            </View>
+          <View style={styles.drawerItems}>
+            {drawerItems.map((item) => (
+              <Text key={item} style={styles.drawerItemText}>
+                {item}
+              </Text>
+            ))}
           </View>
-        </Modal>
+
+          <View style={styles.drawerFooter}>
+            <Pressable
+              onPress={signOut}
+              style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutButtonPressed]}
+            >
+              <Text style={styles.logoutText}>Log out</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
@@ -697,18 +708,22 @@ const styles = StyleSheet.create({
   drawer: {
     position: "absolute",
     left: 0,
-    top: 0,
-    bottom: 0,
+    top: -60,
+    bottom: -40,
+    width: "100%",
     backgroundColor: "#C7C9E8",
-    borderTopRightRadius: 60,
-    borderBottomRightRadius: 60,
-    paddingTop: 72,
+    borderTopRightRadius: 80,
+    borderBottomRightRadius: 80,
+    overflow: "hidden",
+    paddingTop: 100,
+    paddingBottom: 40,
     paddingHorizontal: 28,
     shadowColor: "#000000",
     shadowOpacity: 0.22,
     shadowRadius: 18,
     shadowOffset: { width: 4, height: 0 },
     elevation: 10,
+    zIndex: 100,
   },
   drawerHeader: {
     flexDirection: "row",
@@ -718,9 +733,12 @@ const styles = StyleSheet.create({
   drawerHeaderText: {
     marginLeft: 18,
     fontFamily: "Jost_500Medium",
-    fontSize: 26,
+    fontSize: 28,
     lineHeight: 30,
     color: "#111111",
+  },
+  drawerHeaderArrow: {
+    marginBottom: 6,
   },
   drawerItems: {
     paddingLeft: 20,
@@ -728,15 +746,16 @@ const styles = StyleSheet.create({
   },
   drawerItemText: {
     fontFamily: "Jost_400Regular",
-    fontSize: 22,
-    lineHeight: 26,
+    fontSize: 20,
+    lineHeight: 20,
+    paddingTop: 2,
     color: "#2F2F2F",
   },
   drawerFooter: {
     flex: 1,
     justifyContent: "flex-end",
     alignItems: "center",
-    marginBottom: 80,
+    marginBottom: 140,
     width: "100%",
   },
   logoutButton: {
