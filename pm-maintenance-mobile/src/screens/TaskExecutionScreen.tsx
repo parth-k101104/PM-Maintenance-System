@@ -168,7 +168,16 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
       Alert.alert(
         "Task completed",
         "Your task has been submitted successfully and sent for review.",
-        [{ text: "OK", onPress: () => navigation.navigate("Dashboard") }]
+        [
+          {
+            text: "OK",
+            onPress: () =>
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Dashboard" }],
+              }),
+          },
+        ]
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Something went wrong. Please try again.";
@@ -201,17 +210,6 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Success banner ─────────────────────────────────── */}
-          <View style={styles.successCard}>
-            <View style={styles.successIcon}>
-              <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
-            </View>
-            <Text style={styles.successTitle}>QR verified successfully</Text>
-            <Text style={styles.successText}>
-              The scanned equipment is assigned to you for this selected task.
-            </Text>
-          </View>
-
           {/* ── Timer ──────────────────────────────────────────── */}
           <View style={styles.timerCard}>
             <Text style={styles.cardLabel}>Time elapsed</Text>
@@ -260,10 +258,12 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
                   </Text>
                 </View>
               </View>
-              <Text style={styles.toleranceText}>
-                Tolerance: {formatValue(scanResponse.toleranceMin)} to{" "}
-                {formatValue(scanResponse.toleranceMax)}
-              </Text>
+              <View style={styles.toleranceRange}>
+                <Text style={styles.toleranceRangeLabel}>Tolerance Range</Text>
+                <Text style={styles.toleranceRangeValue}>
+                  {formatValue(scanResponse.toleranceMin)} – {formatValue(scanResponse.toleranceMax)}
+                </Text>
+              </View>
 
               <View style={styles.inputWrap}>
                 <Text style={styles.inputLabel}>
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     backgroundColor: "#E8E9F4",
     paddingHorizontal: 18,
-    paddingVertical: 20,
+    paddingVertical: 8,
     alignItems: "center",
   },
   cardLabel: {
@@ -439,16 +439,16 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1,
     color: "#626781",
-    marginBottom: 10,
+    marginBottom: 0,
   },
   timerValue: {
     fontFamily: "Jost_600SemiBold",
-    fontSize: 58,
+    fontSize: 50,
     lineHeight: 64,
     color: "#111111",
   },
   timerValueLate: { color: "#B42318" },
-  timerHint: { fontFamily: "Jost_400Regular", fontSize: 14, color: "#53586F", marginTop: 8 },
+  timerHint: { fontFamily: "Jost_400Regular", fontSize: 14, color: "#53586F", marginTop: -10 },
 
   // Info card
   infoCard: {
@@ -509,11 +509,26 @@ const styles = StyleSheet.create({
     color: "#111111",
     marginTop: 4,
   },
-  toleranceText: {
-    fontFamily: "Jost_500Medium",
-    fontSize: 14,
-    color: "#55452E",
-    marginTop: 14,
+  toleranceRange: {
+    marginTop: 16,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+
+  toleranceRangeLabel: {
+    fontFamily: "Jost_400Regular",
+    fontSize: 12,
+    color: "#6D5C42",
+  },
+
+  toleranceRangeValue: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 18,
+    color: "#111111",
+    marginTop: 4,
   },
   inputWrap: { marginTop: 18 },
   inputLabel: { fontFamily: "Jost_500Medium", fontSize: 15, color: "#111111", marginBottom: 8 },

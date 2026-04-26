@@ -296,7 +296,10 @@ export function TaskDocumentsScreen({ navigation, route }: Props) {
                   styles.acknowledgeButton,
                   hasAcknowledgedTaskSop && styles.acknowledgeButtonActive,
                 ]}
-                onPress={() => setHasAcknowledgedTaskSop(true)}
+                onPress={() => {
+                  setHasAcknowledgedTaskSop(true);
+                  setDrawerVisible(false);
+                }}
               >
                 <Ionicons
                   name={hasAcknowledgedTaskSop ? "checkmark-circle" : "checkmark-circle-outline"}

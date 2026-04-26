@@ -1,5 +1,6 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -132,9 +133,9 @@ function buildOperatorDashboardViewModel(
         size: "small",
         navigateTo: "TaskApproval",
         statusLines: [
-          { label: "Approved-", value: dashboard?.taskStatus.approved ?? 0, tone: "approved" },
-          { label: "Pending-", value: dashboard?.taskStatus.pending ?? 0, tone: "pending" },
-          { label: "Denied-", value: dashboard?.taskStatus.denied ?? 0, tone: "denied" },
+          { label: "Approved - ", value: dashboard?.taskStatus.approved ?? 0, tone: "approved" },
+          { label: "Pending - ", value: dashboard?.taskStatus.pending ?? 0, tone: "pending" },
+          { label: "Denied - ", value: dashboard?.taskStatus.denied ?? 0, tone: "denied" },
         ],
       },
       {
@@ -235,6 +236,7 @@ export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const { authState, signOut, refreshDashboard } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const translateX = useRef(new Animated.Value(-300)).current;
   const session = authState.session;
   const dashboard = session?.dashboard;
 
@@ -268,6 +270,14 @@ export function DashboardScreen() {
   const contentMaxWidth = isTablet ? 920 : 560;
   const drawerWidth = Math.min(width * 0.78, 360);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  useEffect(() => {
+    Animated.timing(translateX, {
+      toValue: menuOpen ? 0 : -(drawerWidth + 20),
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [menuOpen, drawerWidth]);
 
   function navigateToDashboardTarget(target?: DashboardRouteTarget) {
     if (!target) {
@@ -340,7 +350,7 @@ export function DashboardScreen() {
                               <Text style={getStatusToneStyle(line.tone)}>{line.value}</Text>
                             </Text>
                           ))}
-                          <Ionicons name="arrow-forward-outline" size={34} color="#111111" style={styles.statusArrow} />
+                          <Ionicons name="arrow-forward-outline" size={28} color="#111111" style={styles.statusArrow} />
                         </>
                       ) : (
                         <>
@@ -357,7 +367,7 @@ export function DashboardScreen() {
                           ) : null}
                           <Ionicons
                             name="arrow-forward-outline"
-                            size={card.size === "large" ? 40 : 38}
+                            size={card.size === "large" ? 32 : 30}
                             color="#111111"
                             style={card.size === "large" ? styles.cardArrow : styles.smallCardArrow}
                           />
@@ -380,14 +390,15 @@ export function DashboardScreen() {
               <View style={styles.itemsSection}>
                 <Text style={styles.itemsHeading}>{dashboardView.itemsHeading}</Text>
                 {dashboardView.items.map((item) => (
-                  <Text key={item} style={styles.itemBullet}>
-                    .  {item}
-                  </Text>
+                  <View key={item} style={styles.itemRow}>
+                    <Text style={styles.bullet}>•</Text>
+                    <Text style={styles.itemText}>{item}</Text>
+                  </View>
                 ))}
               </View>
             ) : null}
 
-            <Pressable 
+            <Pressable
               style={[styles.primaryButton, isTablet && styles.primaryButtonTablet]}
               onPress={() => navigateToDashboardTarget(dashboardView.ctaTarget)}
             >
@@ -396,35 +407,36 @@ export function DashboardScreen() {
           </View>
         </ScrollView>
 
-        <Modal animationType="fade" transparent visible={menuOpen} onRequestClose={() => setMenuOpen(false)}>
-          <View style={styles.modalRoot}>
-            <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)} />
+        {menuOpen && (
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setMenuOpen(false)}
+            pointerEvents={menuOpen ? "auto" : "none"}
+          />
+        )}
+        <Animated.View style={[styles.drawer, { width: drawerWidth, transform: [{ translateX }] }]}>
+          <Pressable style={styles.drawerHeader} onPress={() => setMenuOpen(false)}>
+            <Ionicons style={styles.drawerHeaderArrow} name="arrow-back-outline" size={34} color="#111111" />
+            <Text style={styles.drawerHeaderText}>Menu</Text>
+          </Pressable>
 
-            <View style={[styles.drawer, { width: drawerWidth }]}>
-              <Pressable style={styles.drawerHeader} onPress={() => setMenuOpen(false)}>
-                <Ionicons name="arrow-back-outline" size={34} color="#111111" />
-                <Text style={styles.drawerHeaderText}>Menu</Text>
-              </Pressable>
-
-              <View style={styles.drawerItems}>
-                {drawerItems.map((item) => (
-                  <Text key={item} style={styles.drawerItemText}>
-                    {item}
-                  </Text>
-                ))}
-              </View>
-
-              <View style={styles.drawerFooter}>
-                <Pressable
-                  onPress={signOut}
-                  style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutButtonPressed]}
-                >
-                  <Text style={styles.logoutText}>Log out</Text>
-                </Pressable>
-              </View>
-            </View>
+          <View style={styles.drawerItems}>
+            {drawerItems.map((item) => (
+              <Text key={item} style={styles.drawerItemText}>
+                {item}
+              </Text>
+            ))}
           </View>
-        </Modal>
+
+          <View style={styles.drawerFooter}>
+            <Pressable
+              onPress={signOut}
+              style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutButtonPressed]}
+            >
+              <Text style={styles.logoutText}>Log out</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
@@ -443,8 +455,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingTop: 26,
-    paddingBottom: 40,
+    paddingTop: 0,
+    paddingBottom: 0,
     alignItems: "center",
   },
   contentInner: {
@@ -454,8 +466,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 42,
-    paddingHorizontal: 6,
+    marginBottom: 28,
+    paddingHorizontal: 0,
   },
   headerIcon: {
     width: 44,
@@ -474,7 +486,7 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     color: "#111111",
     marginBottom: 28,
-    paddingHorizontal: 36,
+    paddingHorizontal: 6,
   },
   greetingTextTablet: {
     fontSize: 34,
@@ -503,64 +515,68 @@ const styles = StyleSheet.create({
   },
   todayCard: {
     backgroundColor: "#CFD1E0",
-    minHeight: 192,
-    paddingTop: 26,
-    paddingHorizontal: 30,
+    height: 180,
+    paddingTop: 22,
+    paddingHorizontal: 24,
     paddingBottom: 24,
   },
   backlogCard: {
     backgroundColor: "#FDE3C5",
-    minHeight: 192,
-    paddingTop: 28,
+    height: 180,
+    paddingTop: 24,
     paddingHorizontal: 20,
     paddingBottom: 24,
   },
   statusCard: {
     backgroundColor: "#D2E0D1",
-    minHeight: 214,
+    height: 180,
     paddingTop: 22,
     paddingHorizontal: 20,
     paddingBottom: 24,
   },
   otherTasksCard: {
     backgroundColor: "#FBF794",
-    minHeight: 214,
-    paddingTop: 28,
+    height: 180,
+    paddingTop: 22,
     paddingHorizontal: 26,
     paddingBottom: 24,
   },
   cardTitle: {
     fontFamily: "Jost_500Medium",
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 22,
+    lineHeight: 22,
     color: "#111111",
-    marginBottom: 16,
+    marginBottom: 6,
+    paddingTop: 4,
   },
   cardTitleSmall: {
     fontFamily: "Jost_500Medium",
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 18,
+    lineHeight: 22,
     color: "#111111",
-    marginBottom: 20,
+    marginBottom: 8,
   },
   bigNumber: {
-    fontFamily: "Jost_500Medium",
-    fontSize: 60,
-    lineHeight: 62,
+    fontFamily: "Jost_600Medium",
+    fontSize: 52,
+    lineHeight: 54,
+    paddingTop: 6,
     color: "#000000",
   },
   mediumNumber: {
-    fontFamily: "Jost_500Medium",
-    fontSize: 64,
-    lineHeight: 66,
+    fontFamily: "Jost_600Medium",
+    fontSize: 52,
+    lineHeight: 54,
     color: "#000000",
-    marginTop: 8,
+    marginTop: 0,
+    paddingTop: 8,
   },
   cardFootnote: {
     fontFamily: "Jost_400Regular",
     fontSize: 16,
     lineHeight: 18,
     color: "#111111",
+    marginTop: 2,
   },
   cardFootnoteAlt: {
     fontFamily: "Jost_400Regular",
@@ -571,32 +587,33 @@ const styles = StyleSheet.create({
   },
   cardArrow: {
     position: "absolute",
-    right: 26,
-    bottom: 20,
+    right: 12,
+    bottom: 16,
   },
   smallCardArrow: {
     position: "absolute",
-    right: 18,
-    bottom: 20,
+    right: 8,
+    bottom: 16,
   },
   otherCardArrow: {
     position: "absolute",
-    right: 22,
-    bottom: 20,
+    right: 16,
+    bottom: 16,
   },
   statusTitle: {
-    fontFamily: "Jost_400Regular",
-    fontSize: 14,
+    fontFamily: "Jost_500Medium",
+    fontSize: 18,
     lineHeight: 18,
     color: "#111111",
-    marginBottom: 18,
+    marginBottom: 12,
+    paddingTop: 4,
   },
   statusLine: {
     fontFamily: "Jost_400Regular",
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 20,
     color: "#111111",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   approvedText: {
     color: "#165A15",
@@ -612,8 +629,8 @@ const styles = StyleSheet.create({
   },
   statusArrow: {
     position: "absolute",
-    right: 16,
-    bottom: 18,
+    right: 12,
+    bottom: 16,
   },
   timeCard: {
     width: "100%",
@@ -621,16 +638,16 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     borderRadius: 28,
     paddingHorizontal: 22,
-    paddingVertical: 18,
-    marginBottom: 42,
+    paddingVertical: 10,
+    marginBottom: 36,
   },
   timeCardTitle: {
     fontFamily: "Jost_500Medium",
-    fontSize: 21,
+    fontSize: 18,
     lineHeight: 26,
     color: "#111111",
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 16,
   },
   timeCardValue: {
     fontFamily: "Jost_500Medium",
@@ -640,16 +657,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   itemsSection: {
-    width: "100%",
-    paddingHorizontal: 22,
-    marginBottom: 60,
+    width: "90%",
+    paddingHorizontal: 6,
+    marginBottom: 40,
+    marginLeft: 8,
   },
   itemsHeading: {
     fontFamily: "Jost_500Medium",
     fontSize: 21,
     lineHeight: 26,
     color: "#111111",
-    marginBottom: 30,
+    marginBottom: 20,
   },
   itemBullet: {
     fontFamily: "Jost_400Regular",
@@ -657,12 +675,13 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     color: "#111111",
     marginBottom: 2,
+    marginLeft: 12,
   },
   primaryButton: {
     alignSelf: "center",
     width: "100%",
     maxWidth: 340,
-    height: 66,
+    height: 50,
     borderRadius: 16,
     backgroundColor: "#131010",
     alignItems: "center",
@@ -676,6 +695,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     lineHeight: 28,
     color: "#FFFFFF",
+    paddingTop: 4,
   },
   modalRoot: {
     flex: 1,
@@ -688,18 +708,22 @@ const styles = StyleSheet.create({
   drawer: {
     position: "absolute",
     left: 0,
-    top: 0,
-    bottom: 0,
+    top: -60,
+    bottom: -40,
+    width: "100%",
     backgroundColor: "#C7C9E8",
-    borderTopRightRadius: 60,
-    borderBottomRightRadius: 60,
-    paddingTop: 72,
+    borderTopRightRadius: 80,
+    borderBottomRightRadius: 80,
+    overflow: "hidden",
+    paddingTop: 100,
+    paddingBottom: 40,
     paddingHorizontal: 28,
     shadowColor: "#000000",
     shadowOpacity: 0.22,
     shadowRadius: 18,
     shadowOffset: { width: 4, height: 0 },
     elevation: 10,
+    zIndex: 100,
   },
   drawerHeader: {
     flexDirection: "row",
@@ -709,9 +733,12 @@ const styles = StyleSheet.create({
   drawerHeaderText: {
     marginLeft: 18,
     fontFamily: "Jost_500Medium",
-    fontSize: 26,
+    fontSize: 28,
     lineHeight: 30,
     color: "#111111",
+  },
+  drawerHeaderArrow: {
+    marginBottom: 6,
   },
   drawerItems: {
     paddingLeft: 20,
@@ -719,15 +746,16 @@ const styles = StyleSheet.create({
   },
   drawerItemText: {
     fontFamily: "Jost_400Regular",
-    fontSize: 22,
-    lineHeight: 26,
+    fontSize: 20,
+    lineHeight: 20,
+    paddingTop: 2,
     color: "#2F2F2F",
   },
   drawerFooter: {
     flex: 1,
     justifyContent: "flex-end",
     alignItems: "center",
-    marginBottom: 80,
+    marginBottom: 140,
     width: "100%",
   },
   logoutButton: {
@@ -752,5 +780,25 @@ const styles = StyleSheet.create({
     fontSize: 22,
     lineHeight: 26,
     color: "#A12E2E",
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 12,
+  },
+
+  bullet: {
+    fontFamily: "Jost_400Regular",
+    fontSize: 20,
+    lineHeight: 28,
+    color: "#111111",
+  },
+
+  itemText: {
+    fontFamily: "Jost_400Regular",
+    fontSize: 18,
+    lineHeight: 26,
+    color: "#111111",
+    marginLeft: 8,
   },
 });

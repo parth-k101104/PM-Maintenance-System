@@ -46,7 +46,7 @@ function getReviewPillColor(reviewType?: string) {
 const TABS = [
   { id: "Under Review", label: "Under Review", activeColor: "#EAB308" },
   { id: "Approved",     label: "Approved",     activeColor: "#16A34A" },
-  { id: "Denied",       label: "Denied",       activeColor: "#DC2626", hasDot: true },
+  { id: "Denied",       label: "Denied",       activeColor: "#DC2626" },
 ];
 
 export function TaskApprovalScreen() {
@@ -133,7 +133,9 @@ export function TaskApprovalScreen() {
                 <Text style={[styles.tabText, isSelected && { color: tab.activeColor }]}>
                   {tab.label}
                 </Text>
-                {tab.hasDot && <View style={styles.redDot} />}
+                {tab.id === "Denied" && getFilteredTasks("Denied").length > 0 && (
+                  <View style={styles.redDot} />
+                )}
               </View>
             </Pressable>
           );
