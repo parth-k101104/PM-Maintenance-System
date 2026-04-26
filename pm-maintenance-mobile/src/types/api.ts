@@ -77,6 +77,7 @@ export type TaskDetails = {
   timeTaken?: number;
   /** Name of the employee who executed the task */
   employeeName?: string;
+  scheduleApprovalId?: number;
 };
 
 export type CompletedTask = {
@@ -113,6 +114,7 @@ export type QRScanRequest = {
   equipmentElementId?: number;
   equipmentPartId?: number;
   scheduleExecutionId: number;
+  scheduleApprovalId?: number;
 };
 
 export type SupervisorQRScanRequest = {
@@ -120,6 +122,7 @@ export type SupervisorQRScanRequest = {
   equipmentElementId?: number;
   equipmentPartId?: number;
   scheduleExecutionId: number;
+  scheduleApprovalId?: number;
 };
 
 /** One historical execution data point returned by the supervisor QR scan */

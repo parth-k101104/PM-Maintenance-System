@@ -8,4 +8,5 @@ public class QRScanRequest {
     private Long equipmentElementId;
     private Long equipmentPartId;
     private Long scheduleExecutionId;
+    private Long scheduleApprovalId;
 }
