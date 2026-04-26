@@ -42,6 +42,15 @@ public class TaskExecutionService {
                     request.getEquipmentPartId(),
                     endOfMonth);
             if (validation.isPresent()) {
+                // Check if the task was recently executed (less than a week ago)
+                java.time.LocalDateTime lastCompletion = executionRepository.findLastCompletionDateForScheduleOf(request.getScheduleExecutionId());
+                if (lastCompletion != null && lastCompletion.isAfter(today.atStartOfDay().minusDays(7))) {
+                    return com.maint.pm_backend.dto.QRScanResponse.builder()
+                            .status("recently_completed")
+                            .message("Last execution for the scanned task was done recently (less than a week ago).")
+                            .build();
+                }
+
                 com.maint.pm_backend.dto.TaskValidationProjection data = validation.get();
 
                 // Generate presigned PUT URL for observation image upload
@@ -77,12 +86,21 @@ public class TaskExecutionService {
                 executionRepository.findAssignedTasksForEquipment(
                         employeeId, request.getEquipmentId(), endOfMonth);
 
-        return com.maint.pm_backend.dto.QRScanResponse.builder()
-                .status("not_found")
-                .message("No matching task found. Select from the tasks assigned to you on this equipment.")
-                .relatedPartTasks(assignedTasks)
-                .relatedMachineTasks(java.util.Collections.emptyList())
-                .build();
+        if (assignedTasks.isEmpty()) {
+            return com.maint.pm_backend.dto.QRScanResponse.builder()
+                    .status("not_assigned")
+                    .message("No tasks assigned to you for this equipment at all.")
+                    .relatedPartTasks(java.util.Collections.emptyList())
+                    .relatedMachineTasks(java.util.Collections.emptyList())
+                    .build();
+        } else {
+            return com.maint.pm_backend.dto.QRScanResponse.builder()
+                    .status("not_found")
+                    .message("The specific task scanned is not assigned to you, but you have other tasks for this equipment. Please select from the list.")
+                    .relatedPartTasks(assignedTasks)
+                    .relatedMachineTasks(java.util.Collections.emptyList())
+                    .build();
+        }
     }
 
     public com.maint.pm_backend.dto.TaskCompletionResponse completeTask(com.maint.pm_backend.dto.TaskCompletionRequest request, Long employeeId) {
