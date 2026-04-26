@@ -41,4 +41,7 @@ public class PmStdTask {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "approval_workflow_id")
+    private Long approvalWorkflowId;
 }

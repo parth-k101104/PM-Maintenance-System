@@ -1,5 +1,6 @@
 package com.maint.pm_backend.service;
 
+import com.maint.pm_backend.config.AppWorkflowProperties;
 import com.maint.pm_backend.entity.Employee;
 import com.maint.pm_backend.repository.EmployeeRepository;
 import com.maint.pm_backend.repository.PmScheduleExecutionRepository;
@@ -17,9 +18,7 @@ public class TaskExecutionService {
     private final EmployeeRepository employeeRepository;
     private final com.maint.pm_backend.repository.PmScheduleApprovalRepository approvalRepository;
     private final AwsS3Service awsS3Service;
-
-    @org.springframework.beans.factory.annotation.Value("${app.approval.due-date-offset-days:1}")
-    private long offsetDays;
+    private final AppWorkflowProperties workflowProperties;
 
     public com.maint.pm_backend.dto.QRScanResponse handleQRScan(com.maint.pm_backend.dto.QRScanRequest request, Long employeeId) {
         Employee employee = employeeRepository.findById(employeeId)
@@ -127,8 +126,7 @@ public class TaskExecutionService {
         if (approvalOpt.isPresent()) {
             com.maint.pm_backend.entity.PmScheduleApproval approval = approvalOpt.get();
             approval.setApprovalStatus(com.maint.pm_backend.entity.enums.TaskApprovalStatus.APPROVAL_REQUESTED);
-            // using configurable offset (default 1)
-            approval.setApprovalDueDate(java.time.LocalDateTime.now().plusDays(offsetDays));
+            approval.setApprovalDueDate(java.time.LocalDateTime.now().plusDays(workflowProperties.getApprovalDueDateOffsetDays()));
             approvalRepository.save(approval);
         }
 
