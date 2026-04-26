@@ -239,6 +239,16 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             @Param("stdTaskId") Long stdTaskId,
             @Param("excludeExecutionId") Long excludeExecutionId);
 
+    @Query(value = "SELECT MAX(COALESCE(se.completed_dttm, se.assigned_dttm)) " +
+            "FROM pm_schedule_execution se " +
+            "WHERE se.task_schedule_id = (" +
+            "   SELECT se2.task_schedule_id FROM pm_schedule_execution se2 WHERE se2.schedule_execution_id = :scheduleExecutionId" +
+            ") " +
+            "  AND se.status IN ('IN_PROGRESS', 'COMPLETED', 'APPROVED', 'UNDER_SUPERVISOR_REVIEW', 'UNDER_LINE_MANAGER_REVIEW', 'UNDER_MAINT_MANAGER_REVIEW') " +
+            "  AND se.schedule_execution_id != :scheduleExecutionId", nativeQuery = true)
+    java.time.LocalDateTime findLastCompletionDateForScheduleOf(@Param("scheduleExecutionId") Long scheduleExecutionId);
+
+
     /**
      * Fallback for QR scan mismatch: returns ALL tasks assigned to the employee for the
      * given equipment that are still ASSIGNED or IN_PROGRESS, ordered by element then part.

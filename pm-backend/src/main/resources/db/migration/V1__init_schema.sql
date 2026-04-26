@@ -95,6 +95,7 @@ CREATE TABLE lines (
     line_name VARCHAR(255),
     line_code VARCHAR(100),
     supervisor_user_id BIGINT,
+    line_manager_id BIGINT, -- Added column for Line Manager
     capacity_per_hour NUMERIC,
     status VARCHAR(50),
     block VARCHAR(100),
@@ -115,6 +116,10 @@ CREATE TABLE lines (
 
     CONSTRAINT fk_lines_supervisor
         FOREIGN KEY (supervisor_user_id)
+        REFERENCES employees(employee_id),
+
+    CONSTRAINT fk_lines_line_manager
+        FOREIGN KEY (line_manager_id)
         REFERENCES employees(employee_id)
 );
 

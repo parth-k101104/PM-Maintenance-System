@@ -22,55 +22,39 @@ public class TaskExecutionController {
 
     @PostMapping("/scan")
     public ResponseEntity<com.maint.pm_backend.dto.QRScanResponse> handleQRScan(
-            @RequestBody com.maint.pm_backend.dto.QRScanRequest request, 
+            @RequestBody com.maint.pm_backend.dto.QRScanRequest request,
             Principal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(401).build();
-        }
+        if (principal == null) return ResponseEntity.status(401).build();
 
-        String email = principal.getName();
-        Employee employee = employeeRepository.findByEmail(email)
+        Employee employee = employeeRepository.findByEmail(principal.getName())
                 .orElseThrow(() -> new RuntimeException("Logged in user not found"));
-
-        com.maint.pm_backend.dto.QRScanResponse response = taskExecutionService.handleQRScan(request, employee.getEmployeeId());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(taskExecutionService.handleQRScan(request, employee.getEmployeeId()));
     }
 
     @PostMapping("/complete")
     public ResponseEntity<com.maint.pm_backend.dto.TaskCompletionResponse> completeTask(
             @RequestBody com.maint.pm_backend.dto.TaskCompletionRequest request,
             Principal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(401).build();
-        }
+        if (principal == null) return ResponseEntity.status(401).build();
 
-        String email = principal.getName();
-        Employee employee = employeeRepository.findByEmail(email)
+        Employee employee = employeeRepository.findByEmail(principal.getName())
                 .orElseThrow(() -> new RuntimeException("Logged in user not found"));
-
-        com.maint.pm_backend.dto.TaskCompletionResponse response = taskExecutionService.completeTask(request, employee.getEmployeeId());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(taskExecutionService.completeTask(request, employee.getEmployeeId()));
     }
 
     @PostMapping("/supervisor/scan")
     public ResponseEntity<com.maint.pm_backend.dto.SupervisorQRScanResponse> handleSupervisorQRScan(
             @RequestBody com.maint.pm_backend.dto.QRScanRequest request,
             Principal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(401).build();
-        }
+        if (principal == null) return ResponseEntity.status(401).build();
 
-        String email = principal.getName();
-        Employee employee = employeeRepository.findByEmail(email)
+        Employee employee = employeeRepository.findByEmail(principal.getName())
                 .orElseThrow(() -> new RuntimeException("Logged in user not found"));
-
         try {
-            com.maint.pm_backend.dto.SupervisorQRScanResponse response = taskExecutionService.handleSupervisorQRScan(request, employee.getEmployeeId());
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(
+                    taskExecutionService.handleSupervisorQRScan(request, employee.getEmployeeId()));
         } catch (RuntimeException e) {
-            if (e.getMessage().startsWith("Access denied")) {
-                return ResponseEntity.status(403).build();
-            }
+            if (e.getMessage().startsWith("Access denied")) return ResponseEntity.status(403).build();
             throw e;
         }
     }
