@@ -76,6 +76,7 @@ export function QRScannerScreen({ navigation, route }: Props) {
           equipmentElementId: scannedEquipment.equipmentElementId,
           equipmentPartId: scannedEquipment.equipmentPartId,
           scheduleExecutionId: task.scheduleExecutionId,
+          scheduleApprovalId: task.scheduleApprovalId,
         });
 
         if (supResponse.status?.toLowerCase() === "success") {
@@ -115,6 +116,61 @@ export function QRScannerScreen({ navigation, route }: Props) {
       const message =
         error instanceof Error ? error.message : "Unable to validate the QR code.";
       Alert.alert("QR validation failed", message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleSkipQR() {
+    if (isSubmitting || !authState.session) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      if (authState.session.roleId === 3) {
+        // Supervisor skip QR
+        const supResponse = await scanSupervisorTaskQr(authState.session.token, {
+          scheduleExecutionId: task.scheduleExecutionId,
+          scheduleApprovalId: task.scheduleApprovalId,
+        });
+
+        if (supResponse.status?.toLowerCase() === "success") {
+          navigation.replace("SupervisorTaskReview", {
+            task,
+            scanResponse: supResponse,
+            scannedEquipment: { rawValue: "SKIPPED" },
+          });
+          return;
+        }
+
+        Alert.alert(
+          "Validation failed",
+          supResponse.message || "This task could not be validated."
+        );
+      } else {
+        // Operator skip QR
+        const response = await scanTaskQr(authState.session.token, {
+          scheduleExecutionId: task.scheduleExecutionId,
+        });
+
+        if (response.status?.toLowerCase() === "success") {
+          navigation.replace("TaskExecution", {
+            task,
+            scanResponse: response,
+            scannedEquipment: { rawValue: "SKIPPED" },
+            startedAt: Date.now(),
+          });
+          return;
+        }
+
+        setFailureResponse(response);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to validate the task.";
+      Alert.alert("Validation failed", message);
     } finally {
       setIsSubmitting(false);
     }
@@ -188,9 +244,20 @@ export function QRScannerScreen({ navigation, route }: Props) {
           {isSubmitting ? (
             <View style={styles.validatingRow}>
               <ActivityIndicator size="small" color="#FFFFFF" />
-              <Text style={styles.validatingText}>Validating QR...</Text>
+              <Text style={styles.validatingText}>Validating...</Text>
             </View>
-          ) : null}
+          ) : (
+            (task.taskCriticality === "LOW" || task.taskCriticality === "MEDIUM") && (
+              <Pressable
+                style={styles.skipButton}
+                onPress={handleSkipQR}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.skipButtonText}>Skip QR Scan</Text>
+                <Ionicons name="chevron-forward-outline" size={16} color="#FFFFFF" />
+              </Pressable>
+            )
+          )}
         </View>
       </View>
 
@@ -415,6 +482,23 @@ const styles = StyleSheet.create({
   },
   validatingText: {
     fontFamily: "Jost_500Medium",
+    fontSize: 14,
+    color: "#FFFFFF",
+  },
+  skipButton: {
+    marginTop: 18,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    borderRadius: 12,
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  skipButtonText: {
+    fontFamily: "Jost_600SemiBold",
     fontSize: 14,
     color: "#FFFFFF",
   },

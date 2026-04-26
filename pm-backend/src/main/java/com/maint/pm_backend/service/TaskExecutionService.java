@@ -162,18 +162,33 @@ public class TaskExecutionService {
             throw new RuntimeException("Access denied: only supervisors can access this");
         }
 
-        if (request.getScheduleExecutionId() == null || request.getEquipmentId() == null) {
+        if (request.getScheduleExecutionId() == null) {
             return com.maint.pm_backend.dto.SupervisorQRScanResponse.builder()
                     .status("error")
-                    .message("Missing schedule execution ID or equipment ID in QR scan.")
+                    .message("Missing schedule execution ID in QR scan.")
                     .build();
         }
 
-        java.util.Optional<com.maint.pm_backend.dto.SupervisorTaskValidationProjection> validation = executionRepository.validateAndFetchSupervisorTaskMetadata(
-                request.getScheduleExecutionId(), supervisorId,
-                request.getEquipmentId(),
-                request.getEquipmentElementId(),
-                request.getEquipmentPartId());
+        java.util.Optional<com.maint.pm_backend.dto.SupervisorTaskValidationProjection> validation;
+
+        if (request.getScheduleApprovalId() != null) {
+            validation = executionRepository.validateAndFetchSupervisorTaskMetadataByApprovalId(
+                    request.getScheduleExecutionId(),
+                    request.getScheduleApprovalId(),
+                    supervisorId);
+        } else {
+            if (request.getEquipmentId() == null) {
+                return com.maint.pm_backend.dto.SupervisorQRScanResponse.builder()
+                        .status("error")
+                        .message("Missing equipment ID and schedule approval ID in QR scan.")
+                        .build();
+            }
+            validation = executionRepository.validateAndFetchSupervisorTaskMetadata(
+                    request.getScheduleExecutionId(), supervisorId,
+                    request.getEquipmentId(),
+                    request.getEquipmentElementId(),
+                    request.getEquipmentPartId());
+        }
 
         if (validation.isPresent()) {
             com.maint.pm_backend.dto.SupervisorTaskValidationProjection data = validation.get();

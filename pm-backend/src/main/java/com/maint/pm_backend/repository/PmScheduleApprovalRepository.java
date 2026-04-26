@@ -38,6 +38,7 @@ public interface PmScheduleApprovalRepository extends JpaRepository<PmScheduleAp
             @Param("today") LocalDate today);
 
     @Query(value = "SELECT " +
+            "  a.execution_approval_id AS scheduleApprovalId, " +
             "  se.schedule_execution_id AS scheduleExecutionId, " +
             "  st.std_task_id AS stdTaskId, " +
             "  st.task_ref_no AS taskRefNo, " +

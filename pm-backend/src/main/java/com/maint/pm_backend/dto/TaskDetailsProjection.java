@@ -18,4 +18,5 @@ public interface TaskDetailsProjection {
     java.time.LocalDateTime getDueDate();
     Double getTimeTaken();
     String getEmployeeName();
+    Long getScheduleApprovalId();
 }
