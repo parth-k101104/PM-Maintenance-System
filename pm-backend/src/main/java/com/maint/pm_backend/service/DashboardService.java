@@ -6,6 +6,7 @@ import com.maint.pm_backend.entity.Employee;
 import com.maint.pm_backend.entity.PmScheduleExecution;
 import com.maint.pm_backend.entity.enums.TaskExecutionStatus;
 import com.maint.pm_backend.repository.EmployeeRepository;
+import com.maint.pm_backend.repository.IssueFlagRepository;
 import com.maint.pm_backend.repository.PmScheduleExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,14 +22,15 @@ public class DashboardService {
 
     private final PmScheduleExecutionRepository executionRepository;
     private final EmployeeRepository employeeRepository;
+    private final IssueFlagRepository issueFlagRepository;
 
     public OperatorDashboardResponse getOperatorDashboard(Long employeeId) {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
         List<PmScheduleExecution> allTasks = executionRepository.findAllByEmployeeIdWithDetails(employeeId);
-        // Fixed date for testing to match seed data (Feb 1st, 2026)
-        LocalDate today = LocalDate.of(2026, 2, 1);
+        // Use central DateUtils for testing to match seed data
+        LocalDate today = com.maint.pm_backend.util.DateUtils.getToday();
 
         // 1. User Context
         // Fixed time for testing to ensure a consistent shift (10:00 AM)
@@ -108,6 +110,8 @@ public class DashboardService {
                 .map(entry -> new DashboardItemDTO(entry.getKey(), entry.getValue()))
                 .collect(Collectors.toList());
 
+        int activeFlags = issueFlagRepository.countActiveFlagsByAttendantId(employeeId);
+
         // 5. Build Final Response
         return OperatorDashboardResponse.builder()
                 .userContext(userContext)
@@ -126,6 +130,7 @@ public class DashboardService {
                         .formattedEstimate(formatMinutes(totalTimeMins))
                         .build())
                 .requiredItems(requiredItems)
+                .flagsRaised(activeFlags)
                 .build();
     }
 

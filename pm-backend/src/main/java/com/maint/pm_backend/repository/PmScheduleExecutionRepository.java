@@ -35,7 +35,12 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
                         "  se.due_date AS dueDate, " +
                         "  st.task_criticality AS taskCriticality, " +
                         "  se.time_taken AS timeTaken, " +
-                        "  emp.full_name AS employeeName " +
+                        "  emp.full_name AS employeeName, " +
+                        "  se.deviation_flag AS deviationFlag, " +
+                        "  CASE WHEN f.flag_status IS NOT NULL AND f.flag_status != 'CLOSED' THEN true ELSE false END AS hasActiveFlag, " +
+                        "  f.flag_status AS activeFlagStatus, " +
+                        "  se.reschedule_flag AS rescheduleFlag, " +
+                        "  se.parent_schedule_execution_id AS parentScheduleExecutionId " +
                         "FROM pm_schedule_execution se " +
                         "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
                         "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
@@ -44,6 +49,7 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
                         "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
                         "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
                         "LEFT JOIN lines l ON eq.line_id = l.line_id " +
+                        "LEFT JOIN issue_flags f ON se.schedule_execution_id = f.schedule_execution_id " +
                         "WHERE se.employee_id = :employeeId " +
                         "  AND se.status IN ('ASSIGNED', 'IN_PROGRESS') " +
                         "  AND CAST(se.due_date AS DATE) = :dueDate", nativeQuery = true)
@@ -69,7 +75,12 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
                         "  se.due_date AS dueDate, " +
                         "  st.task_criticality AS taskCriticality, " +
                         "  se.time_taken AS timeTaken, " +
-                        "  emp.full_name AS employeeName " +
+                        "  emp.full_name AS employeeName, " +
+                        "  se.deviation_flag AS deviationFlag, " +
+                        "  CASE WHEN f.flag_status IS NOT NULL AND f.flag_status != 'CLOSED' THEN true ELSE false END AS hasActiveFlag, " +
+                        "  f.flag_status AS activeFlagStatus, " +
+                        "  se.reschedule_flag AS rescheduleFlag, " +
+                        "  se.parent_schedule_execution_id AS parentScheduleExecutionId " +
                         "FROM pm_schedule_execution se " +
                         "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
                         "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
@@ -78,6 +89,7 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
                         "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
                         "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
                         "LEFT JOIN lines l ON eq.line_id = l.line_id " +
+                        "LEFT JOIN issue_flags f ON se.schedule_execution_id = f.schedule_execution_id " +
                         "WHERE se.employee_id = :employeeId " +
                         "  AND se.status IN ('ASSIGNED', 'IN_PROGRESS') " +
                         "  AND CAST(se.due_date AS DATE) < :today", nativeQuery = true)
@@ -103,7 +115,12 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
                         "  se.due_date AS dueDate, " +
                         "  st.task_criticality AS taskCriticality, " +
                         "  se.time_taken AS timeTaken, " +
-                        "  emp.full_name AS employeeName " +
+                        "  emp.full_name AS employeeName, " +
+                        "  se.deviation_flag AS deviationFlag, " +
+                        "  CASE WHEN f.flag_status IS NOT NULL AND f.flag_status != 'CLOSED' THEN true ELSE false END AS hasActiveFlag, " +
+                        "  f.flag_status AS activeFlagStatus, " +
+                        "  se.reschedule_flag AS rescheduleFlag, " +
+                        "  se.parent_schedule_execution_id AS parentScheduleExecutionId " +
                         "FROM pm_schedule_execution se " +
                         "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
                         "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
@@ -112,6 +129,7 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
                         "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
                         "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
                         "LEFT JOIN lines l ON eq.line_id = l.line_id " +
+                        "LEFT JOIN issue_flags f ON se.schedule_execution_id = f.schedule_execution_id " +
                         "WHERE se.employee_id = :employeeId " +
                         "  AND se.status IN ('ASSIGNED', 'IN_PROGRESS') " +
                         "  AND CAST(se.due_date AS DATE) > :today " +
@@ -143,7 +161,12 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
                         "    WHEN 'UNDER_LINE_MANAGER_REVIEW' THEN 'Line Manager Review' " +
                         "    WHEN 'UNDER_MAINT_MANAGER_REVIEW' THEN 'Maintenance Manager Review' " +
                         "    ELSE NULL " +
-                        "  END AS reviewType " +
+                        "  END AS reviewType, " +
+                        "  se.reschedule_flag AS rescheduleFlag, " +
+                        "  se.parent_schedule_execution_id AS parentScheduleExecutionId, " +
+                        "  re.schedule_execution_id AS rescheduledExecutionId, " +
+                        "  re.status AS rescheduledStatus, " +
+                        "  re.due_date AS rescheduledDueDate " +
                         "FROM pm_schedule_execution se " +
                         "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
                         "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
@@ -151,13 +174,12 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
                         "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
                         "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
                         "LEFT JOIN lines l ON eq.line_id = l.line_id " +
-                        "LEFT JOIN pm_schedule_approval sa ON se.schedule_execution_id = sa.schedule_execution_id AND sa.approval_level = 1 "
-                        +
+                        "LEFT JOIN pm_schedule_approval sa ON se.schedule_execution_id = sa.schedule_execution_id AND sa.approval_level = 1 " +
                         "LEFT JOIN employees sup ON sa.approver_id = sup.employee_id " +
-                        "LEFT JOIN pm_schedule_approval curr_sa ON curr_sa.schedule_execution_id = se.schedule_execution_id "
-                        +
+                        "LEFT JOIN pm_schedule_approval curr_sa ON curr_sa.schedule_execution_id = se.schedule_execution_id " +
                         "    AND curr_sa.approval_status = 'APPROVAL_REQUESTED' " +
                         "LEFT JOIN employees curr_sup ON curr_sa.approver_id = curr_sup.employee_id " +
+                        "LEFT JOIN pm_schedule_execution re ON re.parent_schedule_execution_id = se.schedule_execution_id " +
                         "WHERE se.employee_id = :employeeId " +
                         "  AND se.status IN ('COMPLETED', 'APPROVED', 'REJECTED', " +
                         "    'UNDER_SUPERVISOR_REVIEW', 'UNDER_LINE_MANAGER_REVIEW', 'UNDER_MAINT_MANAGER_REVIEW')", nativeQuery = true)
@@ -243,6 +265,63 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
                         @Param("scheduleExecutionId") Long scheduleExecutionId,
                         @Param("scheduleApprovalId") Long scheduleApprovalId,
                         @Param("supervisorId") Long supervisorId);
+
+        @Query(value = "SELECT st.uom AS uom, " +
+                        "st.tolerance_min AS toleranceMin, " +
+                        "st.tolerance_max AS toleranceMax, " +
+                        "st.standard_value AS standardValue, " +
+                        "se.actual_value AS actualValue, " +
+                        "se.deviation_flag AS deviationFlag, " +
+                        "se.time_taken AS timeTaken, " +
+                        "se.notes AS notes, " +
+                        "st.estimated_req_time AS estimatedReqTime, " +
+                        "st.std_task_id AS stdTaskId " +
+                        "FROM pm_schedule_execution se " +
+                        "JOIN pm_schedule_approval sa ON se.schedule_execution_id = sa.schedule_execution_id " +
+                        "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
+                        "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+                        "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
+                        "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
+                        "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
+                        "WHERE sa.approver_id = :approverId " +
+                        "  AND sa.approval_level = :approvalLevel " +
+                        "  AND sa.approval_status = 'APPROVAL_REQUESTED' " +
+                        "  AND se.schedule_execution_id = :scheduleExecutionId " +
+                        "  AND eq.equipment_id = :equipmentId " +
+                        "  AND ee.element_id = :elementId " +
+                        "  AND (:partId IS NULL OR ep.part_id = :partId)", nativeQuery = true)
+        java.util.Optional<com.maint.pm_backend.dto.SupervisorTaskValidationProjection> validateAndFetchApprovalTaskMetadata(
+                        @Param("scheduleExecutionId") Long scheduleExecutionId,
+                        @Param("approverId") Long approverId,
+                        @Param("approvalLevel") Integer approvalLevel,
+                        @Param("equipmentId") Long equipmentId,
+                        @Param("elementId") Long elementId,
+                        @Param("partId") Long partId);
+
+        @Query(value = "SELECT st.uom AS uom, " +
+                        "st.tolerance_min AS toleranceMin, " +
+                        "st.tolerance_max AS toleranceMax, " +
+                        "st.standard_value AS standardValue, " +
+                        "se.actual_value AS actualValue, " +
+                        "se.deviation_flag AS deviationFlag, " +
+                        "se.time_taken AS timeTaken, " +
+                        "se.notes AS notes, " +
+                        "st.estimated_req_time AS estimatedReqTime, " +
+                        "st.std_task_id AS stdTaskId " +
+                        "FROM pm_schedule_execution se " +
+                        "JOIN pm_schedule_approval sa ON se.schedule_execution_id = sa.schedule_execution_id " +
+                        "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
+                        "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+                        "WHERE sa.approver_id = :approverId " +
+                        "  AND sa.approval_level = :approvalLevel " +
+                        "  AND sa.approval_status = 'APPROVAL_REQUESTED' " +
+                        "  AND se.schedule_execution_id = :scheduleExecutionId " +
+                        "  AND sa.execution_approval_id = :scheduleApprovalId", nativeQuery = true)
+        java.util.Optional<com.maint.pm_backend.dto.SupervisorTaskValidationProjection> validateAndFetchApprovalTaskMetadataByApprovalId(
+                        @Param("scheduleExecutionId") Long scheduleExecutionId,
+                        @Param("scheduleApprovalId") Long scheduleApprovalId,
+                        @Param("approverId") Long approverId,
+                        @Param("approvalLevel") Integer approvalLevel);
 
         @Query(value = "SELECT " +
                         "  se.schedule_execution_id AS scheduleExecutionId, " +
@@ -374,4 +453,152 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
         java.util.Optional<com.maint.pm_backend.dto.ObservationPathProjection> findObservationPathDetails(
                         @Param("scheduleExecutionId") Long scheduleExecutionId,
                         @Param("employeeId") Long employeeId);
+
+        @Query("SELECT se FROM PmScheduleExecution se " +
+               "WHERE se.taskSchedule.stdTask.partId = :partId " +
+               "AND se.status IN ('ASSIGNED', 'IN_PROGRESS') " +
+               "ORDER BY se.dueDate ASC")
+        List<PmScheduleExecution> findUpcomingForPart(@Param("partId") Long partId);
+
+        @Query("SELECT se FROM PmScheduleExecution se " +
+               "WHERE se.taskSchedule.stdTask.partId = :partId " +
+               "AND se.status IN ('COMPLETED', 'APPROVED', 'UNDER_SUPERVISOR_REVIEW', 'UNDER_LINE_MANAGER_REVIEW', 'UNDER_MAINT_MANAGER_REVIEW') " +
+               "ORDER BY se.completedDttm DESC")
+        List<PmScheduleExecution> findPastExecutionsForPart(@Param("partId") Long partId);
+
+        // ─── Line Manager Dashboard Queries ───────────────────────────────────────
+
+        @Query(value =
+            "SELECT COUNT(DISTINCT se.schedule_execution_id) " +
+            "FROM pm_schedule_execution se " +
+            "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
+            "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+            "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
+            "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
+            "LEFT JOIN lines l ON eq.line_id = l.line_id " +
+            "WHERE l.line_manager_id = :lineManagerId " +
+            "  AND se.status IN ('ASSIGNED', 'IN_PROGRESS')",
+            nativeQuery = true)
+        int countActiveTasksForLineManager(@Param("lineManagerId") Long lineManagerId);
+
+        @Query(value =
+            "SELECT COUNT(DISTINCT se.schedule_execution_id) " +
+            "FROM pm_schedule_execution se " +
+            "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
+            "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+            "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
+            "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
+            "LEFT JOIN lines l ON eq.line_id = l.line_id " +
+            "WHERE l.line_manager_id = :lineManagerId " +
+            "  AND se.status IN ('UNDER_SUPERVISOR_REVIEW', 'UNDER_LINE_MANAGER_REVIEW', 'UNDER_MAINT_MANAGER_REVIEW')",
+            nativeQuery = true)
+        int countPendingReviewTasksForLineManager(@Param("lineManagerId") Long lineManagerId);
+
+        @Query(value =
+            "SELECT COUNT(DISTINCT se.schedule_execution_id) " +
+            "FROM pm_schedule_execution se " +
+            "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
+            "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+            "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
+            "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
+            "LEFT JOIN lines l ON eq.line_id = l.line_id " +
+            "WHERE l.line_manager_id = :lineManagerId " +
+            "  AND se.status = 'REJECTED' " +
+            "  AND NOT EXISTS (" +
+            "      SELECT 1 FROM pm_schedule_execution re " +
+            "      WHERE re.parent_schedule_execution_id = se.schedule_execution_id " +
+            "        AND re.status IN ('COMPLETED', 'APPROVED', 'UNDER_SUPERVISOR_REVIEW', 'UNDER_LINE_MANAGER_REVIEW', 'UNDER_MAINT_MANAGER_REVIEW') " +
+            "  )",
+            nativeQuery = true)
+        int countRejectedTasksForLineManager(@Param("lineManagerId") Long lineManagerId);
+
+        @Query(value =
+            "SELECT COUNT(DISTINCT eq.equipment_id) " +
+            "FROM equipments eq " +
+            "JOIN lines l ON eq.line_id = l.line_id " +
+            "WHERE l.line_manager_id = :lineManagerId",
+            nativeQuery = true)
+        int countTotalMachinesForLineManager(@Param("lineManagerId") Long lineManagerId);
+
+        @Query(value =
+            "SELECT COUNT(DISTINCT eq.equipment_id) " +
+            "FROM equipments eq " +
+            "JOIN lines l ON eq.line_id = l.line_id " +
+            "JOIN equipment_element ee ON ee.equipment_id = eq.equipment_id " +
+            "JOIN pm_std_tasks st ON st.element_id = ee.element_id " +
+            "JOIN pm_task_schedules ts ON ts.std_task_id = st.std_task_id " +
+            "JOIN pm_schedule_execution se ON se.task_schedule_id = ts.task_schedule_id " +
+            "JOIN issue_flags f ON f.schedule_execution_id = se.schedule_execution_id " +
+            "WHERE l.line_manager_id = :lineManagerId " +
+            "  AND f.flag_status != 'CLOSED'",
+            nativeQuery = true)
+        int countUnhealthyMachinesForLineManager(@Param("lineManagerId") Long lineManagerId);
+
+        @Query(value =
+            "SELECT COUNT(f.flag_id) " +
+            "FROM issue_flags f " +
+            "JOIN pm_schedule_execution se ON f.schedule_execution_id = se.schedule_execution_id " +
+            "JOIN pm_task_schedules ts     ON se.task_schedule_id = ts.task_schedule_id " +
+            "JOIN pm_std_tasks st          ON ts.std_task_id = st.std_task_id " +
+            "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
+            "LEFT JOIN equipments eq        ON ee.equipment_id = eq.equipment_id " +
+            "LEFT JOIN lines l              ON eq.line_id = l.line_id " +
+            "WHERE l.line_manager_id = :lineManagerId " +
+            "  AND f.flag_status != 'CLOSED'",
+            nativeQuery = true)
+        int countActiveFlagsForLineManager(@Param("lineManagerId") Long lineManagerId);
+
+        @Query(value =
+            "SELECT " +
+            "  eq.equipment_id AS equipmentId, " +
+            "  eq.name AS equipmentName, " +
+            "  ee.element_id AS elementId, " +
+            "  ee.element_name AS elementName, " +
+            "  ep.part_id AS partId, " +
+            "  ep.name AS partName " +
+            "FROM equipments eq " +
+            "JOIN lines l ON eq.line_id = l.line_id " +
+            "LEFT JOIN equipment_element ee ON ee.equipment_id = eq.equipment_id " +
+            "LEFT JOIN equipment_parts ep ON ep.equipment_element_id = ee.element_id " +
+            "WHERE l.line_manager_id = :lineManagerId " +
+            "ORDER BY eq.name, ee.element_name, ep.name",
+            nativeQuery = true)
+        List<com.maint.pm_backend.dto.EquipmentHierarchyProjection> findEquipmentHierarchyForLineManager(@Param("lineManagerId") Long lineManagerId);
+
+        @Query(value = "SELECT " +
+            "  NULL AS scheduleApprovalId, " +
+            "  se.schedule_execution_id AS scheduleExecutionId, " +
+            "  st.std_task_id AS stdTaskId, " +
+            "  st.task_ref_no AS taskRefNo, " +
+            "  st.method AS taskName, " +
+            "  st.estimated_req_time AS timeRequired, " +
+            "  eq.name AS machineName, " +
+            "  ee.element_name AS machineElementName, " +
+            "  ep.name AS machinePartName, " +
+            "  l.zone AS zone, " +
+            "  l.block AS block, " +
+            "  l.line_name AS lineName, " +
+            "  l.line_code AS lineCode, " +
+            "  l.line_id AS lineId, " +
+            "  se.due_date AS dueDate, " +
+            "  st.task_criticality AS taskCriticality, " +
+            "  se.time_taken AS timeTaken, " +
+            "  emp.full_name AS employeeName, " +
+            "  se.deviation_flag AS deviationFlag, " +
+            "  CASE WHEN f.flag_status IS NOT NULL AND f.flag_status != 'CLOSED' THEN true ELSE false END AS hasActiveFlag, " +
+            "  f.flag_status AS activeFlagStatus, " +
+            "  se.status AS executionStatus " +
+            "FROM pm_schedule_execution se " +
+            "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
+            "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+            "LEFT JOIN employees emp ON se.employee_id = emp.employee_id " +
+            "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
+            "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
+            "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
+            "LEFT JOIN lines l ON eq.line_id = l.line_id " +
+            "LEFT JOIN issue_flags f ON se.schedule_execution_id = f.schedule_execution_id " +
+            "WHERE l.line_manager_id = :lineManagerId " +
+            "  AND se.status IN ('ASSIGNED', 'IN_PROGRESS')", nativeQuery = true)
+        List<com.maint.pm_backend.dto.TaskDetailsProjection> findActiveTasksListForLineManager(@Param("lineManagerId") Long lineManagerId);
+
 }

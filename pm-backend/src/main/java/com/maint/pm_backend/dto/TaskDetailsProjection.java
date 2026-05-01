@@ -19,4 +19,9 @@ public interface TaskDetailsProjection {
     Double getTimeTaken();
     String getEmployeeName();
     Long getScheduleApprovalId();
+    Boolean getDeviationFlag();
+    Boolean getHasActiveFlag();
+    String getActiveFlagStatus();
+    Boolean getRescheduleFlag();
+    Long getParentScheduleExecutionId();
 }

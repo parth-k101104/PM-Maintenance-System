@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { fetchOperatorDashboard, fetchSupervisorDashboard, login } from "../api/client";
+import { fetchLineManagerDashboard, fetchOperatorDashboard, fetchSupervisorDashboard, login } from "../api/client";
 import { AuthSession, DashboardKind, LoginResponse } from "../types/api";
 
 type AuthState = {
@@ -34,6 +34,10 @@ function getDashboardKind(session: LoginResponse): DashboardKind {
     return "supervisor";
   }
 
+  if (session.roleId === 2 || roleName.includes("line manager") || accessLevelName.includes("line manager")) {
+    return "lineManager";
+  }
+
   return "operator";
 }
 
@@ -42,6 +46,8 @@ async function fetchDashboardForSession(session: LoginResponse | AuthSession) {
   const dashboard =
     dashboardKind === "supervisor"
       ? await fetchSupervisorDashboard(session.token)
+      : dashboardKind === "lineManager"
+      ? await fetchLineManagerDashboard(session.token)
       : await fetchOperatorDashboard(session.token);
 
   return {

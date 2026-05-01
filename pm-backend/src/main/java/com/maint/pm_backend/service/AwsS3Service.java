@@ -178,6 +178,34 @@ public class AwsS3Service {
             long expiresInMinutes
     ) {}
 
+    /**
+     * Generates a presigned PUT URL for uploading a replacement photo for a flag.
+     *
+     * Bucket: pm-tasks-observations (reuses the same bucket)
+     * Key pattern: pm-issues-replacements/{partId}/{flagId}_{employeeId}.jpg
+     */
+    public ObservationUploadResult generateFlagPhotoUploadUrl(Long partId, Long flagId, Long employeeId) {
+        String key = String.format("pm-issues-replacements/%d/%d_%d.jpg", partId, flagId, employeeId);
+
+        log.info("Generating presigned PUT URL for flag photo bucket={} key={}", observationsBucketName, key);
+
+        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(observationsBucketName)
+                .key(key)
+                .contentType("image/jpeg")
+                .build();
+
+        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofMinutes(uploadExpiryMinutes))
+                .putObjectRequest(putObjectRequest)
+                .build();
+
+        String presignedUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
+        log.debug("Generated presigned PUT URL for flag photo key={}", key);
+
+        return new ObservationUploadResult(presignedUrl, key, uploadExpiryMinutes);
+    }
+
     // ──────────────────────────────────────────────────────────────
     // UTILITY
     // ──────────────────────────────────────────────────────────────

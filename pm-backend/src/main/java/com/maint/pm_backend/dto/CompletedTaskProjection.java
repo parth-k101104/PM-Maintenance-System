@@ -1,5 +1,7 @@
 package com.maint.pm_backend.dto;
 
+import java.time.LocalDateTime;
+
 public interface CompletedTaskProjection {
     Long getScheduleExecutionId();
     String getTaskName();
@@ -18,4 +20,13 @@ public interface CompletedTaskProjection {
     String getSupervisorName();
     String getReviewerName();
     String getReviewType();
+
+    // Reschedule / rejection fields
+    Boolean getRescheduleFlag();
+    Long getParentScheduleExecutionId();
+
+    // For REJECTED tasks: the linked rescheduled child execution
+    Long getRescheduledExecutionId();
+    String getRescheduledStatus();
+    LocalDateTime getRescheduledDueDate();
 }

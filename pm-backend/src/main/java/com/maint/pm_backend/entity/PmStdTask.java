@@ -20,6 +20,12 @@ public class PmStdTask {
     @Column(name = "task_ref_no", length = 100)
     private String taskRefNo;
 
+    @Column(name = "element_id")
+    private Long elementId;
+
+    @Column(name = "part_id")
+    private Long partId;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "tools", columnDefinition = "jsonb")
     private List<String> tools;
