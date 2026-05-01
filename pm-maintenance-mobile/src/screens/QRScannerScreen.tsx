@@ -19,11 +19,13 @@ import {
   useCameraPermissions,
 } from "expo-camera";
 
-import { scanSupervisorTaskQr, scanTaskQr } from "../api/client";
+import { scanLineManagerTaskQr, scanMaintenanceManagerTaskQr, scanSupervisorTaskQr, scanTaskQr } from "../api/client";
+import { AppMessageModal } from "../components/AppMessageModal";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { QRScanResponse } from "../types/api";
 import { RootStackParamList } from "../types/navigation";
+import { getBackendMessage, getResponseMessage } from "../utils/messages";
 import { dedupeQrTasks, formatQrTaskHierarchy, parseEquipmentQr } from "../utils/qr";
 
 type Props = NativeStackScreenProps<RootStackParamList, "QRScanner">;
@@ -34,6 +36,15 @@ export function QRScannerScreen({ navigation, route }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [failureResponse, setFailureResponse] = useState<QRScanResponse | null>(null);
+  const [messageModal, setMessageModal] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+  });
 
   const relatedTasks = useMemo(() => {
     if (!failureResponse) {
@@ -69,15 +80,21 @@ export function QRScannerScreen({ navigation, route }: Props) {
     setIsSubmitting(true);
 
     try {
-      // Supervisors (roleId 3) use a different scan endpoint
-      if (authState.session.roleId === 3) {
-        const supResponse = await scanSupervisorTaskQr(authState.session.token, {
+      const isApprovalRole = [1, 2, 3].includes(authState.session.roleId);
+      if (isApprovalRole) {
+        const approvalPayload = {
           equipmentId: scannedEquipment.equipmentId,
           equipmentElementId: scannedEquipment.equipmentElementId,
           equipmentPartId: scannedEquipment.equipmentPartId,
           scheduleExecutionId: task.scheduleExecutionId,
           scheduleApprovalId: task.scheduleApprovalId,
-        });
+        };
+        const supResponse =
+          authState.session.roleId === 2
+            ? await scanLineManagerTaskQr(authState.session.token, approvalPayload)
+            : authState.session.roleId === 1
+            ? await scanMaintenanceManagerTaskQr(authState.session.token, approvalPayload)
+            : await scanSupervisorTaskQr(authState.session.token, approvalPayload);
 
         if (supResponse.status?.toLowerCase() === "success") {
           navigation.replace("SupervisorTaskReview", {
@@ -88,8 +105,11 @@ export function QRScannerScreen({ navigation, route }: Props) {
           return;
         }
 
-        // On supervisor failure, show a simple alert (no related tasks returned)
-        Alert.alert("QR validation failed", supResponse.message || "This task is not assigned to you for approval.");
+        setMessageModal({
+          visible: true,
+          title: "QR validation failed",
+          message: getResponseMessage(supResponse, "This task is not assigned to you for approval."),
+        });
         return;
       }
 
@@ -113,9 +133,11 @@ export function QRScannerScreen({ navigation, route }: Props) {
 
       setFailureResponse(response);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to validate the QR code.";
-      Alert.alert("QR validation failed", message);
+      setMessageModal({
+        visible: true,
+        title: "QR validation failed",
+        message: getBackendMessage(error, "Unable to validate the QR code."),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -130,7 +152,6 @@ export function QRScannerScreen({ navigation, route }: Props) {
 
     try {
       if (authState.session.roleId === 3) {
-        // Supervisor skip QR
         const supResponse = await scanSupervisorTaskQr(authState.session.token, {
           scheduleExecutionId: task.scheduleExecutionId,
           scheduleApprovalId: task.scheduleApprovalId,
@@ -145,10 +166,35 @@ export function QRScannerScreen({ navigation, route }: Props) {
           return;
         }
 
-        Alert.alert(
-          "Validation failed",
-          supResponse.message || "This task could not be validated."
-        );
+        setMessageModal({
+          visible: true,
+          title: "Validation failed",
+          message: getResponseMessage(supResponse, "This task could not be validated."),
+        });
+      } else if (authState.session.roleId === 2 || authState.session.roleId === 1) {
+        const payload = {
+          scheduleExecutionId: task.scheduleExecutionId,
+          scheduleApprovalId: task.scheduleApprovalId,
+        };
+        const supResponse =
+          authState.session.roleId === 2
+            ? await scanLineManagerTaskQr(authState.session.token, payload)
+            : await scanMaintenanceManagerTaskQr(authState.session.token, payload);
+
+        if (supResponse.status?.toLowerCase() === "success") {
+          navigation.replace("SupervisorTaskReview", {
+            task,
+            scanResponse: supResponse,
+            scannedEquipment: { rawValue: "SKIPPED" },
+          });
+          return;
+        }
+
+        setMessageModal({
+          visible: true,
+          title: "Validation failed",
+          message: getResponseMessage(supResponse, "This task could not be validated."),
+        });
       } else {
         // Operator skip QR
         const response = await scanTaskQr(authState.session.token, {
@@ -168,9 +214,11 @@ export function QRScannerScreen({ navigation, route }: Props) {
         setFailureResponse(response);
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to validate the task.";
-      Alert.alert("Validation failed", message);
+      setMessageModal({
+        visible: true,
+        title: "Validation failed",
+        message: getBackendMessage(error, "Unable to validate the task."),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -305,6 +353,13 @@ export function QRScannerScreen({ navigation, route }: Props) {
           </View>
         </View>
       </Modal>
+      <AppMessageModal
+        visible={messageModal.visible}
+        type="failure"
+        title={messageModal.title}
+        message={messageModal.message}
+        onPrimaryAction={() => setMessageModal((current) => ({ ...current, visible: false }))}
+      />
     </SafeAreaView>
   );
 }

@@ -1,7 +1,14 @@
 import type {
   LoginRequest,
   LoginResponse,
+  ApprovalActionRequest,
+  ApprovalActionResponse,
+  FlagReplacementRequest,
+  FlagScanRequest,
+  FlagScanResponse,
+  IssueFlag,
   OperatorDashboardResponse,
+  LineManagerDashboardResponse,
   QRScanRequest,
   QRScanResponse,
   SupervisorDashboardResponse,
@@ -44,7 +51,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const message = await response.text();
+    const text = await response.text();
+    let message = text;
+
+    try {
+      const parsed = JSON.parse(text);
+      message = parsed?.message || parsed?.error || text;
+    } catch {
+      message = text;
+    }
+
     throw new Error(message || "Request failed");
   }
 
@@ -80,6 +96,13 @@ export async function fetchSupervisorDashboard(token: string) {
   });
 }
 
+export async function fetchLineManagerDashboard(token: string) {
+  return request<LineManagerDashboardResponse>("/api/v1/dashboard/line-manager", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Task lists
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,6 +116,41 @@ export async function fetchTasksForToday(token: string) {
 
 export async function fetchSupervisorTodaysApprovals(token: string) {
   return request<import("../types/api").TaskDetails[]>("/api/v1/tasks/supervisor/approvals/today", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchLineManagerTodaysApprovals(token: string) {
+  return request<import("../types/api").TaskDetails[]>("/api/v1/line-manager/approvals/today", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchLineManagerBacklogApprovals(token: string) {
+  return request<import("../types/api").TaskDetails[]>("/api/v1/line-manager/approvals/backlog", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchLineManagerFlags(token: string) {
+  return request<IssueFlag[]>("/api/v1/line-manager/flags", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchLineManagerActiveTasks(token: string) {
+  return request<import("../types/api").TaskDetails[]>("/api/v1/line-manager/tasks/active", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchLineManagerEquipments(token: string) {
+  return request<import("../types/api").LineEquipment[]>("/api/v1/line-manager/equipments", {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -150,6 +208,46 @@ export async function scanSupervisorTaskQr(token: string, payload: SupervisorQRS
   });
 }
 
+export async function scanLineManagerTaskQr(token: string, payload: SupervisorQRScanRequest) {
+  return request<SupervisorQRScanResponse>("/api/v1/task-execution/line-manager/scan", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function scanMaintenanceManagerTaskQr(token: string, payload: SupervisorQRScanRequest) {
+  return request<SupervisorQRScanResponse>("/api/v1/task-execution/maintenance-manager/scan", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function processSupervisorApproval(token: string, payload: ApprovalActionRequest) {
+  return request<ApprovalActionResponse>("/api/v1/supervisor/approvals/action", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function processLineManagerApproval(token: string, payload: ApprovalActionRequest) {
+  return request<ApprovalActionResponse>("/api/v1/line-manager/approvals/action", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function processMaintenanceManagerApproval(token: string, payload: ApprovalActionRequest) {
+  return request<ApprovalActionResponse>("/api/v1/maintenance-manager/approvals/action", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function completeTask(token: string, payload: TaskCompletionRequest) {
   return request<TaskCompletionResponse>("/api/v1/task-execution/complete", {
     method: "POST",
@@ -158,4 +256,53 @@ export async function completeTask(token: string, payload: TaskCompletionRequest
   });
 }
 
+// --- Flags ---
+
+export async function fetchMyFlags(token: string) {
+  return request<IssueFlag[]>("/api/v1/issues/operator", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function scanFlagQr(token: string, flagId: number, payload: FlagScanRequest) {
+  return request<FlagScanResponse>(`/api/v1/issues/${flagId}/scan`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function completeFlagReplacement(token: string, flagId: number, payload: FlagReplacementRequest) {
+  return request<any>(`/api/v1/issues/${flagId}/complete-replacement`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchSupervisorFlags(token: string) {
+  return request<IssueFlag[]>("/api/v1/issues/supervisor", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function reviewFlagAsLineManager(token: string, flagId: number, payload: { newStatus: string, criticality?: string, notes?: string, closureReason?: string }) {
+  return request<IssueFlag>(`/api/v1/issues/${flagId}/review`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function reviewFlagAsSupervisor(token: string, flagId: number, payload: { newStatus: string, notes?: string }) {
+  return request<IssueFlag>(`/api/v1/issues/${flagId}/review`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
 export { API_BASE_URL };
+
+

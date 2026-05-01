@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   Pressable,
@@ -12,9 +13,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
+import {
+  processLineManagerApproval,
+  processMaintenanceManagerApproval,
+  processSupervisorApproval,
+} from "../api/client";
+import { AppMessageModal } from "../components/AppMessageModal";
+import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { HistoricalDataPoint } from "../types/api";
 import { RootStackParamList } from "../types/navigation";
+import { getBackendMessage, getResponseMessage } from "../utils/messages";
 
 type Props = NativeStackScreenProps<RootStackParamList, "SupervisorTaskReview">;
 
@@ -88,8 +97,25 @@ const chip = StyleSheet.create({
 
 export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
   const { task, scanResponse, scannedEquipment } = route.params;
+  const { authState } = useAuth();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [messageModal, setMessageModal] = React.useState<{
+    visible: boolean;
+    type: "success" | "failure";
+    title: string;
+    message: string;
+    goDashboardOnClose?: boolean;
+  }>({
+    visible: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
   const isMeasurement = isMeasurementTask(scanResponse.uom);
   const historicalData = scanResponse.historicalData ?? [];
+  const roleId = authState.session?.roleId;
+  const reviewTitle =
+    roleId === 2 ? "Line Manager Review" : roleId === 1 ? "Maintenance Review" : "Supervisor Review";
 
   // Compute bar chart max value
   const values = historicalData.map((p) => chartValue(p, isMeasurement));
@@ -97,6 +123,54 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
     ? scanResponse.standardValue ?? 0
     : scanResponse.estimatedReqTime ?? 0;
   const maxVal = Math.max(...values, refValue, 1);
+
+  async function submitDecision(action: "APPROVE" | "REJECT") {
+    if (!authState.session?.token || isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        scheduleExecutionId: task.scheduleExecutionId,
+        action,
+      };
+      const response =
+        roleId === 2
+          ? await processLineManagerApproval(authState.session.token, payload)
+          : roleId === 1
+          ? await processMaintenanceManagerApproval(authState.session.token, payload)
+          : await processSupervisorApproval(authState.session.token, payload);
+
+      setMessageModal({
+        visible: true,
+        type: "success",
+        title: action === "APPROVE" ? "Task approved" : "Task rejected",
+        message: getResponseMessage(response, "Decision submitted successfully."),
+        goDashboardOnClose: true,
+      });
+    } catch (error) {
+      setMessageModal({
+        visible: true,
+        type: "failure",
+        title: "Decision failed",
+        message: getBackendMessage(error, "Unable to submit this decision."),
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function closeMessageModal() {
+    const shouldGoDashboard = messageModal.goDashboardOnClose;
+    setMessageModal((current) => ({ ...current, visible: false }));
+    if (shouldGoDashboard) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Dashboard" }],
+      });
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -106,7 +180,7 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
           <Ionicons name="arrow-back-outline" size={28} color="#111111" />
         </Pressable>
         <View style={styles.headerTextWrap}>
-          <Text style={styles.headerTitle}>Supervisor Review</Text>
+          <Text style={styles.headerTitle}>{reviewTitle}</Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
             {task.taskName}
           </Text>
@@ -285,18 +359,38 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {/* ── Approve / Reject buttons (placeholder) ── */}
         <View style={styles.actionsRow}>
-          <Pressable style={[styles.actionBtn, styles.rejectBtn]}>
+          <Pressable
+            style={[styles.actionBtn, styles.rejectBtn, isSubmitting && styles.actionBtnDisabled]}
+            disabled={isSubmitting}
+            onPress={() => submitDecision("REJECT")}
+          >
             <Ionicons name="close-circle-outline" size={20} color="#B42318" />
             <Text style={styles.rejectBtnText}>Reject</Text>
           </Pressable>
-          <Pressable style={[styles.actionBtn, styles.approveBtn]}>
-            <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.approveBtnText}>Approve</Text>
+          <Pressable
+            style={[styles.actionBtn, styles.approveBtn, isSubmitting && styles.actionBtnDisabled]}
+            disabled={isSubmitting}
+            onPress={() => submitDecision("APPROVE")}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.approveBtnText}>Approve</Text>
+              </>
+            )}
           </Pressable>
         </View>
       </ScrollView>
+      <AppMessageModal
+        visible={messageModal.visible}
+        type={messageModal.type}
+        title={messageModal.title}
+        message={messageModal.message}
+        onPrimaryAction={closeMessageModal}
+      />
     </SafeAreaView>
   );
 }
@@ -500,6 +594,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingVertical: 16,
   },
+  actionBtnDisabled: { opacity: 0.72 },
   rejectBtn: { backgroundColor: "#FDE8E7" },
   rejectBtnText: { fontFamily: "Jost_600SemiBold", fontSize: 16, color: "#B42318" },
   approveBtn: { backgroundColor: "#167C16" },

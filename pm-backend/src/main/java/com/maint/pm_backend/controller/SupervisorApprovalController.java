@@ -72,13 +72,16 @@ public class SupervisorApprovalController {
     @GetMapping("/employees/{employeeId}/tasks")
     public ResponseEntity<List<EmployeeTaskProjection>> getEmployeeTasks(
             @PathVariable Long employeeId,
-            @RequestParam(name = "period", required = false, defaultValue = "CURRENT_MONTH") String period,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate,
             Principal principal) {
         Employee supervisor = resolveEmployee(principal);
         if (supervisor == null) return ResponseEntity.status(401).build();
         try {
             return ResponseEntity.ok(
-                    supervisorApprovalService.getTasksByEmployee(supervisor.getEmployeeId(), employeeId, period));
+                    supervisorApprovalService.getTasksByEmployee(supervisor.getEmployeeId(), employeeId, month, year, startDate, endDate));
         } catch (RuntimeException e) {
             if (isAccessDenied(e)) return ResponseEntity.status(403).build();
             throw e;
@@ -113,13 +116,16 @@ public class SupervisorApprovalController {
      */
     @GetMapping("/employees/summary")
     public ResponseEntity<List<EmployeeTaskSummaryDto>> getEmployeeSummary(
-            @RequestParam(name = "period", required = false, defaultValue = "CURRENT_MONTH") String period,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate,
             Principal principal) {
         Employee supervisor = resolveEmployee(principal);
         if (supervisor == null) return ResponseEntity.status(401).build();
         try {
             return ResponseEntity.ok(
-                    supervisorApprovalService.getEmployeeSummary(supervisor.getEmployeeId(), period));
+                    supervisorApprovalService.getEmployeeSummary(supervisor.getEmployeeId(), month, year, startDate, endDate));
         } catch (RuntimeException e) {
             if (isAccessDenied(e)) return ResponseEntity.status(403).build();
             throw e;
