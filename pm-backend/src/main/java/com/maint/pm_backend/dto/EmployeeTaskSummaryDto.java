@@ -24,6 +24,12 @@ public class EmployeeTaskSummaryDto {
     /** Tasks still ASSIGNED or IN_PROGRESS — employee has not submitted yet */
     private int assignedOrInProgress;
 
+    /**
+     * Active backlog tasks: ASSIGNED or IN_PROGRESS with due_date < today.
+     * These are overdue tasks the employee has not yet completed or sent for review.
+     */
+    private int backlogTasks;
+
     /** Tasks submitted by employee and awaiting THIS supervisor's approval (UNDER_SUPERVISOR_REVIEW) */
     private int pendingSupervisorApproval;
 

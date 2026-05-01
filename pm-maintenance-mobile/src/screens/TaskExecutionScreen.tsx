@@ -20,6 +20,8 @@ import * as ImagePicker from "expo-image-picker";
 import { RootStackParamList } from "../types/navigation";
 import { useAuth } from "../context/AuthContext";
 import { completeTask } from "../api/client";
+import { AppMessageModal } from "../components/AppMessageModal";
+import { getBackendMessage, getResponseMessage } from "../utils/messages";
 
 type Props = NativeStackScreenProps<RootStackParamList, "TaskExecution">;
 
@@ -56,6 +58,18 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [messageModal, setMessageModal] = useState<{
+    visible: boolean;
+    type: "success" | "failure";
+    title: string;
+    message: string;
+    navigateHomeOnClose?: boolean;
+  }>({
+    visible: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
 
   const [elapsedSeconds, setElapsedSeconds] = useState(() =>
     Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
@@ -158,32 +172,44 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
       const timeTakenMins = Math.max(1, Math.round(elapsedRef.current / 60));
 
       // 3. Submit task completion to backend
-      await completeTask(authState.session.token, {
+      const completionResponse = await completeTask(authState.session.token, {
         scheduleExecutionId: task.scheduleExecutionId,
         timeTaken: timeTakenMins,
         actualValue: requiresValue ? Number(actualValue.trim()) : null,
         notes: notes.trim() || undefined,
       });
 
-      Alert.alert(
-        "Task completed",
-        "Your task has been submitted successfully and sent for review.",
-        [
-          {
-            text: "OK",
-            onPress: () =>
-              navigation.reset({
-                index: 0,
-                routes: [{ name: "Dashboard" }],
-              }),
-          },
-        ]
-      );
+      setMessageModal({
+        visible: true,
+        type: "success",
+        title: "Task completed",
+        message: getResponseMessage(
+          completionResponse,
+          "Your task has been submitted successfully and sent for review."
+        ),
+        navigateHomeOnClose: true,
+      });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Something went wrong. Please try again.";
-      Alert.alert("Submission failed", message);
+      setMessageModal({
+        visible: true,
+        type: "failure",
+        title: "Submission failed",
+        message: getBackendMessage(err, "Something went wrong. Please try again."),
+      });
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  function closeMessageModal() {
+    const shouldNavigateHome = messageModal.navigateHomeOnClose;
+    setMessageModal((current) => ({ ...current, visible: false }));
+
+    if (shouldNavigateHome) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Dashboard" }],
+      });
     }
   }
 
@@ -374,6 +400,13 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      <AppMessageModal
+        visible={messageModal.visible}
+        type={messageModal.type}
+        title={messageModal.title}
+        message={messageModal.message}
+        onPrimaryAction={closeMessageModal}
+      />
     </SafeAreaView>
   );
 }

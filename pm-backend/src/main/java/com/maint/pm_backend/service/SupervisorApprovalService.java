@@ -41,6 +41,7 @@ public class SupervisorApprovalService {
     private final PmScheduleApprovalRepository approvalRepository;
     private final EmployeeRepository employeeRepository;
     private final AppWorkflowProperties workflowProperties;
+    private final ApprovalWorkflowService approvalWorkflowService;
 
     // ─── Guards ───────────────────────────────────────────────────────────────
 
@@ -71,22 +72,16 @@ public class SupervisorApprovalService {
      * Returns all task executions for a given employee that fall under this supervisor's scope,
      * filtered by the specified time period.
      */
-    public List<EmployeeTaskProjection> getTasksByEmployee(Long supervisorId, Long employeeId, String period) {
+    public List<EmployeeTaskProjection> getTasksByEmployee(Long supervisorId, Long employeeId, Integer month, Integer year, LocalDate startDate, LocalDate endDate) {
         requireSupervisor(supervisorId);
 
-        String normalised = (period == null || period.isBlank()) ? "CURRENT_MONTH" : period.toUpperCase();
-        LocalDate fromDate = switch (normalised) {
-            case "LAST_2_MONTHS" -> LocalDate.now().minusMonths(2).with(TemporalAdjusters.firstDayOfMonth());
-            case "QUARTER"       -> LocalDate.now().minusMonths(3).with(TemporalAdjusters.firstDayOfMonth());
-            case "YEAR"          -> LocalDate.now().minusYears(1).with(TemporalAdjusters.firstDayOfMonth());
-            default              -> LocalDate.now().with(TemporalAdjusters.firstDayOfMonth()); // CURRENT_MONTH
-        };
+        LocalDate[] dateRange = calculateDateRange(month, year, startDate, endDate);
 
-        // Note: You will need to update the repository method to accept this 3rd parameter.
         return approvalRepository.findTasksByEmployeeForSupervisor(
                 supervisorId, 
                 employeeId, 
-                fromDate.atStartOfDay()
+                dateRange[0].atStartOfDay(),
+                dateRange[1].atTime(23, 59, 59)
         );
     }
 
@@ -99,34 +94,64 @@ public class SupervisorApprovalService {
      * Returns aggregated task counts for every employee whose tasks this
      * supervisor reviews, limited to the selected time window.
      */
-    public List<EmployeeTaskSummaryDto> getEmployeeSummary(Long supervisorId, String period) {
+    public List<EmployeeTaskSummaryDto> getEmployeeSummary(Long supervisorId, Integer month, Integer year, LocalDate startDate, LocalDate endDate) {
         requireSupervisor(supervisorId);
 
-        String normalised = (period == null || period.isBlank()) ? "CURRENT_MONTH" : period.toUpperCase();
-        LocalDate fromDate = switch (normalised) {
-            case "LAST_2_MONTHS" -> LocalDate.now().minusMonths(2).with(TemporalAdjusters.firstDayOfMonth());
-            case "QUARTER"       -> LocalDate.now().minusMonths(3).with(TemporalAdjusters.firstDayOfMonth());
-            case "YEAR"          -> LocalDate.now().minusYears(1).with(TemporalAdjusters.firstDayOfMonth());
-            default              -> LocalDate.now().with(TemporalAdjusters.firstDayOfMonth()); // CURRENT_MONTH
-        };
+        LocalDate[] dateRange = calculateDateRange(month, year, startDate, endDate);
+        String periodDesc = "Custom Date Range";
+        if (startDate == null && endDate == null) {
+            if (month != null && year != null) periodDesc = month + "/" + year;
+            else if (year != null) periodDesc = String.valueOf(year);
+            else periodDesc = "Current Month";
+        }
 
         List<Object[]> rows = approvalRepository.findEmployeeSummaryForSupervisor(
-                supervisorId, fromDate.atStartOfDay());
+                supervisorId, dateRange[0].atStartOfDay(), dateRange[1].atTime(23, 59, 59), com.maint.pm_backend.util.DateUtils.getToday());
 
+        final String finalPeriodDesc = periodDesc;
         return rows.stream().map(row -> EmployeeTaskSummaryDto.builder()
                 .employeeId(((Number) row[0]).longValue())
                 .employeeName((String) row[1])
-                .period(normalised)
+                .period(finalPeriodDesc)
                 .totalTasks(((Number) row[2]).intValue())
                 .assignedOrInProgress(((Number) row[3]).intValue())
-                .pendingSupervisorApproval(((Number) row[4]).intValue())
-                .underLineManagerReview(((Number) row[5]).intValue())
-                .underMaintManagerReview(((Number) row[6]).intValue())
-                .approved(((Number) row[7]).intValue())
-                .rejected(((Number) row[8]).intValue())
-                .totalExecuted(((Number) row[9]).intValue())
+                .backlogTasks(((Number) row[4]).intValue())
+                .pendingSupervisorApproval(((Number) row[5]).intValue())
+                .underLineManagerReview(((Number) row[6]).intValue())
+                .underMaintManagerReview(((Number) row[7]).intValue())
+                .approved(((Number) row[8]).intValue())
+                .rejected(((Number) row[9]).intValue())
+                .totalExecuted(((Number) row[10]).intValue())
                 .build()
         ).collect(Collectors.toList());
+    }
+
+    private LocalDate[] calculateDateRange(Integer month, Integer year, LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null) {
+            return new LocalDate[]{startDate, endDate};
+        } else if (startDate != null) {
+            return new LocalDate[]{startDate, startDate.plusYears(100)}; // practically unbounded
+        } else if (endDate != null) {
+            return new LocalDate[]{LocalDate.of(1970, 1, 1), endDate};
+        }
+
+        LocalDate today = com.maint.pm_backend.util.DateUtils.getToday();
+        int targetYear = (year != null) ? year : today.getYear();
+        
+        if (month != null) {
+            LocalDate start = LocalDate.of(targetYear, month, 1);
+            LocalDate end = start.with(TemporalAdjusters.lastDayOfMonth());
+            return new LocalDate[]{start, end};
+        } else if (year != null) {
+            LocalDate start = LocalDate.of(targetYear, 1, 1);
+            LocalDate end = LocalDate.of(targetYear, 12, 31);
+            return new LocalDate[]{start, end};
+        }
+        
+        // Default: current month
+        LocalDate start = today.with(TemporalAdjusters.firstDayOfMonth());
+        LocalDate end = today.with(TemporalAdjusters.lastDayOfMonth());
+        return new LocalDate[]{start, end};
     }
 
     // ─── Approve / Reject ─────────────────────────────────────────────────────
@@ -158,47 +183,7 @@ public class SupervisorApprovalService {
      */
     @Transactional
     public SupervisorApprovalResponse processApproval(SupervisorApprovalRequest request, Long supervisorId) {
-        requireSupervisor(supervisorId);
-
-        // Validate action
-        if (request.getAction() == null ||
-                (!request.getAction().equalsIgnoreCase("APPROVE") &&
-                 !request.getAction().equalsIgnoreCase("REJECT"))) {
-            throw new RuntimeException("Invalid action: must be 'APPROVE' or 'REJECT'");
-        }
-        boolean isApprove = request.getAction().equalsIgnoreCase("APPROVE");
-
-        // 1. Load and validate the level-1 approval row
-        PmScheduleApproval level1 = approvalRepository
-                .findByScheduleExecution_ScheduleExecutionIdAndApprovalLevel(
-                        request.getScheduleExecutionId(), 1)
-                .orElseThrow(() -> new RuntimeException(
-                        "No level-1 approval row found for execution: " + request.getScheduleExecutionId()));
-
-        if (!level1.getApprover().getEmployeeId().equals(supervisorId)) {
-            throw new RuntimeException("Access denied: you are not the assigned supervisor for this task");
-        }
-        if (level1.getApprovalStatus() != TaskApprovalStatus.APPROVAL_REQUESTED) {
-            throw new RuntimeException("Approval is not in APPROVAL_REQUESTED state (current: "
-                    + level1.getApprovalStatus() + ")");
-        }
-
-        // 2. Load the execution
-        PmScheduleExecution execution = executionRepository.findById(request.getScheduleExecutionId())
-                .orElseThrow(() -> new RuntimeException("Task execution not found: "
-                        + request.getScheduleExecutionId()));
-
-        // 3. Record the supervisor's decision on level-1
-        level1.setApprovalStatus(isApprove ? TaskApprovalStatus.APPROVED : TaskApprovalStatus.REJECTED);
-        level1.setApprovedDttm(LocalDateTime.now());
-        level1.setRemarks(request.getRemarks());
-        approvalRepository.save(level1);
-
-        if (isApprove) {
-            return handleApprove(execution);
-        } else {
-            return handleReject(execution, request.getRemarks());
-        }
+        return approvalWorkflowService.processApproval(request, supervisorId, 1, 3L, "Supervisor");
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────
@@ -280,6 +265,7 @@ public class SupervisorApprovalService {
                 LocalDateTime.now().plusDays(workflowProperties.getRescheduleDueDateOffsetDays()));
         rescheduled.setStatus(TaskExecutionStatus.ASSIGNED);
         rescheduled.setRescheduleFlag(true);
+        rescheduled.setParentScheduleExecution(execution);
         rescheduled.setNotes("Rescheduled after supervisor rejection. Supervisor remarks: "
                 + (remarks != null ? remarks : "N/A"));
         executionRepository.save(rescheduled);

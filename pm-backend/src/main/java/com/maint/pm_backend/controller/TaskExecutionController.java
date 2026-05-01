@@ -58,4 +58,38 @@ public class TaskExecutionController {
             throw e;
         }
     }
+
+    @PostMapping("/line-manager/scan")
+    public ResponseEntity<com.maint.pm_backend.dto.SupervisorQRScanResponse> handleLineManagerQRScan(
+            @RequestBody com.maint.pm_backend.dto.QRScanRequest request,
+            Principal principal) {
+        if (principal == null) return ResponseEntity.status(401).build();
+
+        Employee employee = employeeRepository.findByEmail(principal.getName())
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
+        try {
+            return ResponseEntity.ok(
+                    taskExecutionService.handleApprovalQRScan(request, employee.getEmployeeId(), 2, 2L, "Line Manager"));
+        } catch (RuntimeException e) {
+            if (e.getMessage().startsWith("Access denied")) return ResponseEntity.status(403).build();
+            throw e;
+        }
+    }
+
+    @PostMapping("/maintenance-manager/scan")
+    public ResponseEntity<com.maint.pm_backend.dto.SupervisorQRScanResponse> handleMaintenanceManagerQRScan(
+            @RequestBody com.maint.pm_backend.dto.QRScanRequest request,
+            Principal principal) {
+        if (principal == null) return ResponseEntity.status(401).build();
+
+        Employee employee = employeeRepository.findByEmail(principal.getName())
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
+        try {
+            return ResponseEntity.ok(
+                    taskExecutionService.handleApprovalQRScan(request, employee.getEmployeeId(), 3, 1L, "Maintenance Manager"));
+        } catch (RuntimeException e) {
+            if (e.getMessage().startsWith("Access denied")) return ResponseEntity.status(403).build();
+            throw e;
+        }
+    }
 }

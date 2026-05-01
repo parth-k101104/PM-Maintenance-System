@@ -24,7 +24,7 @@ public class TaskListService {
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
         // Using a fixed static date due to database seed values mapping dynamically 
-        LocalDate mockToday = LocalDate.of(2026, 2, 1);
+        LocalDate mockToday = com.maint.pm_backend.util.DateUtils.getToday();
         return executionRepository.findTasksForTodayNative(employeeId, mockToday);
     }
 
@@ -32,7 +32,7 @@ public class TaskListService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
-        LocalDate mockToday = LocalDate.of(2026, 2, 1);
+        LocalDate mockToday = com.maint.pm_backend.util.DateUtils.getToday();
         LocalDate endOfMonth = mockToday.withDayOfMonth(mockToday.lengthOfMonth());
         
         return executionRepository.findUpcomingTasksNative(employeeId, mockToday, endOfMonth);
@@ -42,7 +42,7 @@ public class TaskListService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
-        LocalDate mockToday = LocalDate.of(2026, 2, 1);
+        LocalDate mockToday = com.maint.pm_backend.util.DateUtils.getToday();
         return executionRepository.findBacklogTasksNative(employeeId, mockToday);
     }
 
@@ -61,7 +61,7 @@ public class TaskListService {
             throw new RuntimeException("Access denied: only supervisors can access this");
         }
 
-        LocalDate mockToday = LocalDate.of(2026, 2, 1);
+        LocalDate mockToday = com.maint.pm_backend.util.DateUtils.getToday();
         return approvalRepository.findTodaysDueApprovalsList(supervisorId, mockToday);
     }
 

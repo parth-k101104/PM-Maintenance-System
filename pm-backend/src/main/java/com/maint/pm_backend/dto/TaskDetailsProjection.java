@@ -18,4 +18,10 @@ public interface TaskDetailsProjection {
     java.time.LocalDateTime getDueDate();
     Double getTimeTaken();
     String getEmployeeName();
+    Long getScheduleApprovalId();
+    Boolean getDeviationFlag();
+    Boolean getHasActiveFlag();
+    String getActiveFlagStatus();
+    Boolean getRescheduleFlag();
+    Long getParentScheduleExecutionId();
 }

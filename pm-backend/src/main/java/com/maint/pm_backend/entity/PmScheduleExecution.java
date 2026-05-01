@@ -48,6 +48,10 @@ public class PmScheduleExecution {
     @Column(name = "reschedule_flag")
     private Boolean rescheduleFlag;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_schedule_execution_id")
+    private PmScheduleExecution parentScheduleExecution;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 }

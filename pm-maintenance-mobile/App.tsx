@@ -15,9 +15,19 @@ import { TaskDocumentsScreen } from "./src/screens/TaskDocumentsScreen";
 import { TaskExecutionScreen } from "./src/screens/TaskExecutionScreen";
 import { TaskListScreen } from "./src/screens/TaskListScreen";
 import { SupervisorDueApprovalsScreen } from "./src/screens/SupervisorDueApprovalsScreen";
+import { LineManagerTodayApprovalsScreen } from "./src/screens/LineManagerTodayApprovalsScreen";
+import { LineManagerBacklogApprovalsScreen } from "./src/screens/LineManagerBacklogApprovalsScreen";
+import { LineManagerFlagsScreen } from "./src/screens/LineManagerFlagsScreen";
+import { LineManagerEquipmentsScreen } from "./src/screens/LineManagerEquipmentsScreen";
 import { SupervisorTaskReviewScreen } from "./src/screens/SupervisorTaskReviewScreen";
 import { BacklogTasksScreen } from "./src/screens/BacklogTasksScreen";
 import { UpcomingTasksScreen } from "./src/screens/UpcomingTasksScreen";
+import { FlagsRaisedScreen } from "./src/screens/FlagsRaisedScreen";
+import { FlagDetailScreen } from "./src/screens/FlagDetailScreen";
+import { LineManagerActiveTasksScreen } from "./src/screens/LineManagerActiveTasksScreen";
+import { LineManagerFlagDetailScreen } from "./src/screens/LineManagerFlagDetailScreen";
+import { SupervisorFlagsScreen } from "./src/screens/SupervisorFlagsScreen";
+import { SupervisorFlagReviewScreen } from "./src/screens/SupervisorFlagReviewScreen";
 import { colors } from "./src/theme/colors";
 import { RootStackParamList } from "./src/types/navigation";
 
@@ -45,6 +55,10 @@ function RootNavigator() {
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="TaskList" component={TaskListScreen} />
         <Stack.Screen name="SupervisorDueApprovals" component={SupervisorDueApprovalsScreen} />
+        <Stack.Screen name="LineManagerTodayApprovals" component={LineManagerTodayApprovalsScreen} />
+        <Stack.Screen name="LineManagerBacklogApprovals" component={LineManagerBacklogApprovalsScreen} />
+        <Stack.Screen name="LineManagerFlags" component={LineManagerFlagsScreen} />
+        <Stack.Screen name="LineManagerEquipments" component={LineManagerEquipmentsScreen} />
         <Stack.Screen name="BacklogTasks" component={BacklogTasksScreen} />
         <Stack.Screen name="TaskApproval" component={TaskApprovalScreen} />
         <Stack.Screen name="UpcomingTasks" component={UpcomingTasksScreen} />
@@ -52,6 +66,12 @@ function RootNavigator() {
         <Stack.Screen name="QRScanner" component={QRScannerScreen} />
         <Stack.Screen name="TaskExecution" component={TaskExecutionScreen} />
         <Stack.Screen name="SupervisorTaskReview" component={SupervisorTaskReviewScreen} />
+        <Stack.Screen name="FlagsRaised" component={FlagsRaisedScreen} />
+        <Stack.Screen name="FlagDetail" component={FlagDetailScreen} />
+        <Stack.Screen name="LineManagerActiveTasks" component={LineManagerActiveTasksScreen} />
+        <Stack.Screen name="LineManagerFlagDetail" component={LineManagerFlagDetailScreen} />
+        <Stack.Screen name="SupervisorFlags" component={SupervisorFlagsScreen} />
+        <Stack.Screen name="SupervisorFlagReview" component={SupervisorFlagReviewScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -89,3 +109,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
 });
+

@@ -4,5 +4,6 @@ public enum TaskApprovalStatus {
     PENDING,
     APPROVAL_REQUESTED,
     APPROVED,
-    REJECTED
+    REJECTED,
+    DEVIATION_FLAGGED
 }
