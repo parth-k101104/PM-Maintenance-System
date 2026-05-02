@@ -158,4 +158,29 @@ export async function completeTask(token: string, payload: TaskCompletionRequest
   });
 }
 
+
+export async function fetchEmployeeApprovalSummary(
+  token: string,
+  period: "CURRENT_MONTH" | "YEAR"
+) {
+  return request<
+    {
+      employeeId: number;
+      employeeName: string;
+      period: string;
+      totalTasks: number;
+      assignedOrInProgress: number;
+      pendingSupervisorApproval: number;
+      underLineManagerReview: number;
+      underMaintManagerReview: number;
+      totalExecuted: number;
+      approved: number;
+      rejected: number;
+    }[]
+  >(`/api/v1/supervisor/approvals/employees/summary?period=${period}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export { API_BASE_URL };

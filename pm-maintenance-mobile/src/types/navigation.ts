@@ -24,4 +24,5 @@ export type RootStackParamList = {
     scanResponse: SupervisorQRScanResponse;
     scannedEquipment: ScannedEquipmentDetails;
   };
+  EmployeeApprovalChart: undefined;
 };
