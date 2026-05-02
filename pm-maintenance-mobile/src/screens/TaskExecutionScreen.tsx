@@ -197,11 +197,11 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
       >
         <View style={styles.header}>
           <Pressable hitSlop={12} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back-outline" size={28} color="#111111" />
+            <Ionicons name="arrow-back-outline" marginTop={4} size={28} color="#111111" />
           </Pressable>
           <View style={styles.headerTextWrap}>
-            <Text style={styles.headerTitle}>Task execution</Text>
-            <Text style={styles.headerSubtitle}>{scanResponse.message}</Text>
+            <Text style={styles.headerTitle}>{task.taskName}</Text>
+            <Text style={styles.headerSubtitle}>{machineHierarchy || "Machine hierarchy unavailable"}</Text>
           </View>
         </View>
 
@@ -224,7 +224,7 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
           {/* ── Task details ───────────────────────────────────── */}
           <View style={styles.infoCard}>
             <Text style={styles.cardLabel}>Task details</Text>
-            <Text style={styles.taskName}>{task.taskName}</Text>
+            {/* <Text style={styles.taskName}></Text> */}
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Execution ID</Text>
               <Text style={styles.infoValue}>#{task.scheduleExecutionId}</Text>
@@ -237,9 +237,9 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
               <Text style={styles.infoLabel}>Line</Text>
               <Text style={styles.infoValue}>{task.lineCode || task.lineName || "N/A"}</Text>
             </View>
-            <Text style={styles.hierarchyText}>
-              {machineHierarchy || "Machine hierarchy unavailable"}
-            </Text>
+            {/* <Text style={styles.hierarchyText}>
+              
+            </Text> */}
           </View>
 
           {/* ── Measurement card (only for measurement tasks) ── */}
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 14,
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 12,
     paddingBottom: 18,
   },
   headerTextWrap: { flex: 1 },
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: "#4E556E",
-    marginTop: 5,
+    marginTop: 2,
   },
   content: { paddingHorizontal: 18, paddingBottom: 42, gap: 16 },
 
