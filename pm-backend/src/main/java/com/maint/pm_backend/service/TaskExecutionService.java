@@ -19,13 +19,14 @@ public class TaskExecutionService {
     private final com.maint.pm_backend.repository.PmScheduleApprovalRepository approvalRepository;
     private final AwsS3Service awsS3Service;
     private final AppWorkflowProperties workflowProperties;
+    private final com.maint.pm_backend.repository.IssueFlagRepository issueFlagRepository;
 
     public com.maint.pm_backend.dto.QRScanResponse handleQRScan(com.maint.pm_backend.dto.QRScanRequest request, Long employeeId) {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
-        // Fixed baseline date for 'today' due to static database seeding (Feb 1st, 2026)
-        LocalDate today = LocalDate.of(2026, 2, 1);
+        // Use centralized DateUtils instead of hardcoded baseline date
+        LocalDate today = com.maint.pm_backend.util.DateUtils.getToday();
         LocalDate endOfMonth = today.withDayOfMonth(today.lengthOfMonth());
 
         // 1. Access Level Check
@@ -116,7 +117,7 @@ public class TaskExecutionService {
             throw new RuntimeException("Task is not in a valid state for completion");
         }
 
-        execution.setCompletedDttm(java.time.LocalDateTime.now());
+        execution.setCompletedDttm(com.maint.pm_backend.util.DateUtils.getNow());
         execution.setTimeTaken(request.getTimeTaken());
         execution.setActualValue(request.getActualValue());
         execution.setNotes(request.getNotes());
@@ -133,33 +134,108 @@ public class TaskExecutionService {
             }
         }
         execution.setDeviationFlag(isDeviated);
-        execution.setStatus(com.maint.pm_backend.entity.enums.TaskExecutionStatus.UNDER_SUPERVISOR_REVIEW);
 
-        executionRepository.save(execution);
+        boolean issueFlagged = false;
+        String responseMessage = "Task completed and sent for review";
 
-        // Update Level 1 Approval
-        java.util.Optional<com.maint.pm_backend.entity.PmScheduleApproval> approvalOpt =
-                approvalRepository.findByScheduleExecution_ScheduleExecutionIdAndApprovalLevel(execution.getScheduleExecutionId(), 1);
+        // --- Handle Issue Flags ---
+        
+        // 1. Manual Flag (if requested in payload)
+        if (request.isManualDeviation() && request.getManualFlagStatus() != null) {
+            com.maint.pm_backend.entity.IssueFlag manualFlag = com.maint.pm_backend.entity.IssueFlag.builder()
+                    .scheduleExecution(execution)
+                    .raisedBy(execution.getEmployee())
+                    .raisedDttm(com.maint.pm_backend.util.DateUtils.getNow())
+                    .issueDetails(request.getManualIssueDetails())
+                    .criticality(com.maint.pm_backend.entity.enums.IssueFlagCriticality.CRITICAL)
+                    .flagStatus(com.maint.pm_backend.entity.enums.IssueFlagStatus.fromValue(request.getManualFlagStatus()))
+                    .attendant(execution.getEmployee())
+                    .build();
+            issueFlagRepository.save(manualFlag);
+            issueFlagged = true;
+            responseMessage = "Issue flagged manually: " + (request.getManualIssueDetails() != null ? request.getManualIssueDetails() : "No details provided");
+        }
+        // 2. Automated Flag (on deviation)
+        else if (isDeviated) {
+            com.maint.pm_backend.entity.IssueFlag autoFlag = com.maint.pm_backend.entity.IssueFlag.builder()
+                    .scheduleExecution(execution)
+                    .raisedBy(null) // Automated, raised by system
+                    .raisedDttm(com.maint.pm_backend.util.DateUtils.getNow())
+                    .issueDetails("Automated flag: Value " + execution.getActualValue() + " is outside tolerance.")
+                    .criticality(com.maint.pm_backend.entity.enums.IssueFlagCriticality.HIGH)
+                    .flagStatus(com.maint.pm_backend.entity.enums.IssueFlagStatus.REPLACEMENT_REQUIRED)
+                    .attendant(execution.getEmployee())
+                    .build();
+            issueFlagRepository.save(autoFlag);
+            issueFlagged = true;
+            responseMessage = "Automated deviation detected: Value " + execution.getActualValue() + " is outside tolerance limits.";
+        }
+        // 3. Normal Execution - Check for pre-existing flags
+        else {
+            List<com.maint.pm_backend.entity.IssueFlag> existingFlags = issueFlagRepository.findByScheduleExecution_ScheduleExecutionId(execution.getScheduleExecutionId());
+            boolean hasPendingFlag = false;
+            for (com.maint.pm_backend.entity.IssueFlag f : existingFlags) {
+                if (f.getFlagStatus() != com.maint.pm_backend.entity.enums.IssueFlagStatus.CLOSED) {
+                    hasPendingFlag = true;
+                    break;
+                }
+                if (f.getAddressedDttm() == null || !f.getAddressedDttm().toLocalDate().isBefore(com.maint.pm_backend.util.DateUtils.getToday())) {
+                    hasPendingFlag = true;
+                    break;
+                }
+            }
+            if (hasPendingFlag) {
+                issueFlagged = true;
+                responseMessage = "Task completed but an associated issue flag is still pending.";
+            }
+        }
 
-        if (approvalOpt.isPresent()) {
-            com.maint.pm_backend.entity.PmScheduleApproval approval = approvalOpt.get();
-            approval.setApprovalStatus(com.maint.pm_backend.entity.enums.TaskApprovalStatus.APPROVAL_REQUESTED);
-            approval.setApprovalDueDate(java.time.LocalDateTime.now().plusDays(workflowProperties.getApprovalDueDateOffsetDays()));
-            approvalRepository.save(approval);
+        if (issueFlagged) {
+            execution.setStatus(com.maint.pm_backend.entity.enums.TaskExecutionStatus.FLAGGED_AND_COMPLETED);
+            executionRepository.save(execution);
+            
+            java.util.List<com.maint.pm_backend.entity.PmScheduleApproval> approvals = approvalRepository.findByScheduleExecution_ScheduleExecutionId(execution.getScheduleExecutionId());
+            for (com.maint.pm_backend.entity.PmScheduleApproval approval : approvals) {
+                approval.setApprovalStatus(com.maint.pm_backend.entity.enums.TaskApprovalStatus.DEVIATION_FLAGGED);
+                approvalRepository.save(approval);
+            }
+        } else {
+            execution.setStatus(com.maint.pm_backend.entity.enums.TaskExecutionStatus.UNDER_SUPERVISOR_REVIEW);
+            executionRepository.save(execution);
+
+            // Update Level 1 Approval only if no issue flagged
+            java.util.Optional<com.maint.pm_backend.entity.PmScheduleApproval> approvalOpt =
+                    approvalRepository.findByScheduleExecution_ScheduleExecutionIdAndApprovalLevel(execution.getScheduleExecutionId(), 1);
+
+            if (approvalOpt.isPresent()) {
+                com.maint.pm_backend.entity.PmScheduleApproval approval = approvalOpt.get();
+                approval.setApprovalStatus(com.maint.pm_backend.entity.enums.TaskApprovalStatus.APPROVAL_REQUESTED);
+                approval.setApprovalDueDate(com.maint.pm_backend.util.DateUtils.getNow().plusDays(workflowProperties.getApprovalDueDateOffsetDays()));
+                approvalRepository.save(approval);
+            }
         }
 
         return com.maint.pm_backend.dto.TaskCompletionResponse.builder()
                 .status("success")
-                .message("Task completed and sent for review")
+                .message(responseMessage)
                 .build();
     }
 
     public com.maint.pm_backend.dto.SupervisorQRScanResponse handleSupervisorQRScan(com.maint.pm_backend.dto.QRScanRequest request, Long supervisorId) {
-        Employee supervisor = employeeRepository.findById(supervisorId)
+        return handleApprovalQRScan(request, supervisorId, 1, 3L, "Supervisor");
+    }
+
+    public com.maint.pm_backend.dto.SupervisorQRScanResponse handleApprovalQRScan(
+            com.maint.pm_backend.dto.QRScanRequest request,
+            Long approverId,
+            Integer approvalLevel,
+            Long requiredRoleId,
+            String roleLabel) {
+        Employee approver = employeeRepository.findById(approverId)
                 .orElseThrow(() -> new RuntimeException("Supervisor not found"));
 
-        if (supervisor.getRoleId() == null || supervisor.getRoleId() != 3L) {
-            throw new RuntimeException("Access denied: only supervisors can access this");
+        if (approver.getRoleId() == null || !approver.getRoleId().equals(requiredRoleId)) {
+            throw new RuntimeException("Access denied: only " + roleLabel.toLowerCase() + "s can access this");
         }
 
         if (request.getScheduleExecutionId() == null) {
@@ -169,11 +245,27 @@ public class TaskExecutionService {
                     .build();
         }
 
-        java.util.Optional<com.maint.pm_backend.dto.SupervisorTaskValidationProjection> validation = executionRepository.validateAndFetchSupervisorTaskMetadata(
-                request.getScheduleExecutionId(), supervisorId,
-                request.getEquipmentId(),
-                request.getEquipmentElementId(),
-                request.getEquipmentPartId());
+        java.util.Optional<com.maint.pm_backend.dto.SupervisorTaskValidationProjection> validation;
+
+        if (request.getScheduleApprovalId() != null) {
+            validation = executionRepository.validateAndFetchApprovalTaskMetadataByApprovalId(
+                    request.getScheduleExecutionId(),
+                    request.getScheduleApprovalId(),
+                    approverId,
+                    approvalLevel);
+        } else {
+            if (request.getEquipmentId() == null) {
+                return com.maint.pm_backend.dto.SupervisorQRScanResponse.builder()
+                        .status("error")
+                        .message("Missing equipment ID and schedule approval ID in QR scan.")
+                        .build();
+            }
+            validation = executionRepository.validateAndFetchApprovalTaskMetadata(
+                    request.getScheduleExecutionId(), approverId, approvalLevel,
+                    request.getEquipmentId(),
+                    request.getEquipmentElementId(),
+                    request.getEquipmentPartId());
+        }
 
         if (validation.isPresent()) {
             com.maint.pm_backend.dto.SupervisorTaskValidationProjection data = validation.get();
@@ -220,3 +312,4 @@ public class TaskExecutionService {
                 .build();
     }
 }
+

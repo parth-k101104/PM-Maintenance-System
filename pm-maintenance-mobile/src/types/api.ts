@@ -40,6 +40,56 @@ export type OperatorDashboardResponse = {
     formattedEstimate: string;
   };
   requiredItems: DashboardItem[];
+  flagsRaised: number;
+};
+
+export type IssueFlag = {
+  flagId: number;
+  scheduleExecutionId: number;
+  partId: number;
+  partName: string;
+  equipmentId: number;
+  equipmentName: string;
+  location: string;
+  attendantId: number;
+  attendantName: string;
+  status: string;
+  criticality: string;
+  dueDate: string;
+  raisedDttm: string;
+};
+
+export type FlagScanRequest = {
+  equipmentId?: number;
+  equipmentElementId?: number;
+  equipmentPartId?: number;
+};
+
+export type FlagScanResponse = {
+  status: string;
+  message: string;
+  partId?: number;
+  partName?: string;
+  partCode?: string;
+  sparePartId?: number;
+  sparePartName?: string;
+  sparePartNumber?: string;
+  sparePartLocation?: string;
+  sparePartCurrentStock?: number;
+  actualValue?: number;
+  uom?: string;
+  toleranceMin?: number;
+  toleranceMax?: number;
+  standardValue?: number;
+  photoUploadUrl?: string;
+  photoS3Key?: string;
+  uploadExpiresInMinutes?: number;
+};
+
+export type FlagReplacementRequest = {
+  replacementDone: boolean;
+  sparePartId?: number;
+  notes?: string;
 };
 
 export type SupervisorDashboardResponse = {
@@ -50,11 +100,39 @@ export type SupervisorDashboardResponse = {
   tasksInPipeline: number;
 };
 
-export type DashboardKind = "operator" | "supervisor";
+export type LineManagerDashboardResponse = {
+  totalApprovalsToday: number;
+  backlogApprovals: number;
+  lineHealth: number;
+  totalFlagsRaised: number;
+  activeTasksToday: number;
+  pendingReviewTasks?: number;
+  rejectedTasks?: number;
+  todayTasks?: TaskDetails[];
+};
+
+export type LinePart = {
+  partId: number;
+  partName: string;
+};
+
+export type LineElement = {
+  elementId: number;
+  elementName: string;
+  parts: LinePart[];
+};
+
+export type LineEquipment = {
+  equipmentId: number;
+  equipmentName: string;
+  elements: LineElement[];
+};
+
+export type DashboardKind = "operator" | "supervisor" | "lineManager";
 
 export type AuthSession = LoginResponse & {
   dashboardKind?: DashboardKind;
-  dashboard?: OperatorDashboardResponse | SupervisorDashboardResponse;
+  dashboard?: OperatorDashboardResponse | SupervisorDashboardResponse | LineManagerDashboardResponse;
 };
 
 export type TaskDetails = {
@@ -77,6 +155,12 @@ export type TaskDetails = {
   timeTaken?: number;
   /** Name of the employee who executed the task */
   employeeName?: string;
+  scheduleApprovalId?: number;
+  deviationFlag?: boolean;
+  hasActiveFlag?: boolean;
+  activeFlagStatus?: string;
+  rescheduleFlag?: boolean;
+  parentScheduleExecutionId?: number;
 };
 
 export type CompletedTask = {
@@ -99,6 +183,13 @@ export type CompletedTask = {
   reviewerName?: string;
   /** Human-readable review stage label, e.g. "Supervisor Review" */
   reviewType?: string;
+  
+  // Reschedule info for rejected tasks
+  rescheduleFlag?: boolean;
+  parentScheduleExecutionId?: number;
+  rescheduledExecutionId?: number;
+  rescheduledStatus?: string;
+  rescheduledDueDate?: string;
 };
 
 export type TaskDocumentUrls = {
@@ -113,6 +204,7 @@ export type QRScanRequest = {
   equipmentElementId?: number;
   equipmentPartId?: number;
   scheduleExecutionId: number;
+  scheduleApprovalId?: number;
 };
 
 export type SupervisorQRScanRequest = {
@@ -120,6 +212,7 @@ export type SupervisorQRScanRequest = {
   equipmentElementId?: number;
   equipmentPartId?: number;
   scheduleExecutionId: number;
+  scheduleApprovalId?: number;
 };
 
 /** One historical execution data point returned by the supervisor QR scan */
@@ -191,6 +284,20 @@ export type TaskCompletionRequest = {
 export type TaskCompletionResponse = {
   status: string;
   message: string;
+};
+
+export type ApprovalActionRequest = {
+  scheduleExecutionId: number;
+  action: "APPROVE" | "REJECT";
+  remarks?: string;
+};
+
+export type ApprovalActionResponse = {
+  status: string;
+  message: string;
+  executionStatus?: string;
+  nextApproverId?: number;
+  rescheduledExecutionId?: number;
 };
 
 export type ScannedEquipmentDetails = {

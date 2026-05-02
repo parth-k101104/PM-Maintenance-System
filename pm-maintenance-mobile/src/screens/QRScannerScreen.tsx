@@ -19,11 +19,13 @@ import {
   useCameraPermissions,
 } from "expo-camera";
 
-import { scanSupervisorTaskQr, scanTaskQr } from "../api/client";
+import { scanLineManagerTaskQr, scanMaintenanceManagerTaskQr, scanSupervisorTaskQr, scanTaskQr } from "../api/client";
+import { AppMessageModal } from "../components/AppMessageModal";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { QRScanResponse } from "../types/api";
 import { RootStackParamList } from "../types/navigation";
+import { getBackendMessage, getResponseMessage } from "../utils/messages";
 import { dedupeQrTasks, formatQrTaskHierarchy, parseEquipmentQr } from "../utils/qr";
 
 type Props = NativeStackScreenProps<RootStackParamList, "QRScanner">;
@@ -34,6 +36,15 @@ export function QRScannerScreen({ navigation, route }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [failureResponse, setFailureResponse] = useState<QRScanResponse | null>(null);
+  const [messageModal, setMessageModal] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+  });
 
   const relatedTasks = useMemo(() => {
     if (!failureResponse) {
@@ -69,14 +80,21 @@ export function QRScannerScreen({ navigation, route }: Props) {
     setIsSubmitting(true);
 
     try {
-      // Supervisors (roleId 3) use a different scan endpoint
-      if (authState.session.roleId === 3) {
-        const supResponse = await scanSupervisorTaskQr(authState.session.token, {
+      const isApprovalRole = [1, 2, 3].includes(authState.session.roleId);
+      if (isApprovalRole) {
+        const approvalPayload = {
           equipmentId: scannedEquipment.equipmentId,
           equipmentElementId: scannedEquipment.equipmentElementId,
           equipmentPartId: scannedEquipment.equipmentPartId,
           scheduleExecutionId: task.scheduleExecutionId,
-        });
+          scheduleApprovalId: task.scheduleApprovalId,
+        };
+        const supResponse =
+          authState.session.roleId === 2
+            ? await scanLineManagerTaskQr(authState.session.token, approvalPayload)
+            : authState.session.roleId === 1
+            ? await scanMaintenanceManagerTaskQr(authState.session.token, approvalPayload)
+            : await scanSupervisorTaskQr(authState.session.token, approvalPayload);
 
         if (supResponse.status?.toLowerCase() === "success") {
           navigation.replace("SupervisorTaskReview", {
@@ -87,8 +105,11 @@ export function QRScannerScreen({ navigation, route }: Props) {
           return;
         }
 
-        // On supervisor failure, show a simple alert (no related tasks returned)
-        Alert.alert("QR validation failed", supResponse.message || "This task is not assigned to you for approval.");
+        setMessageModal({
+          visible: true,
+          title: "QR validation failed",
+          message: getResponseMessage(supResponse, "This task is not assigned to you for approval."),
+        });
         return;
       }
 
@@ -112,9 +133,92 @@ export function QRScannerScreen({ navigation, route }: Props) {
 
       setFailureResponse(response);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to validate the QR code.";
-      Alert.alert("QR validation failed", message);
+      setMessageModal({
+        visible: true,
+        title: "QR validation failed",
+        message: getBackendMessage(error, "Unable to validate the QR code."),
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleSkipQR() {
+    if (isSubmitting || !authState.session) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      if (authState.session.roleId === 3) {
+        const supResponse = await scanSupervisorTaskQr(authState.session.token, {
+          scheduleExecutionId: task.scheduleExecutionId,
+          scheduleApprovalId: task.scheduleApprovalId,
+        });
+
+        if (supResponse.status?.toLowerCase() === "success") {
+          navigation.replace("SupervisorTaskReview", {
+            task,
+            scanResponse: supResponse,
+            scannedEquipment: { rawValue: "SKIPPED" },
+          });
+          return;
+        }
+
+        setMessageModal({
+          visible: true,
+          title: "Validation failed",
+          message: getResponseMessage(supResponse, "This task could not be validated."),
+        });
+      } else if (authState.session.roleId === 2 || authState.session.roleId === 1) {
+        const payload = {
+          scheduleExecutionId: task.scheduleExecutionId,
+          scheduleApprovalId: task.scheduleApprovalId,
+        };
+        const supResponse =
+          authState.session.roleId === 2
+            ? await scanLineManagerTaskQr(authState.session.token, payload)
+            : await scanMaintenanceManagerTaskQr(authState.session.token, payload);
+
+        if (supResponse.status?.toLowerCase() === "success") {
+          navigation.replace("SupervisorTaskReview", {
+            task,
+            scanResponse: supResponse,
+            scannedEquipment: { rawValue: "SKIPPED" },
+          });
+          return;
+        }
+
+        setMessageModal({
+          visible: true,
+          title: "Validation failed",
+          message: getResponseMessage(supResponse, "This task could not be validated."),
+        });
+      } else {
+        // Operator skip QR
+        const response = await scanTaskQr(authState.session.token, {
+          scheduleExecutionId: task.scheduleExecutionId,
+        });
+
+        if (response.status?.toLowerCase() === "success") {
+          navigation.replace("TaskExecution", {
+            task,
+            scanResponse: response,
+            scannedEquipment: { rawValue: "SKIPPED" },
+            startedAt: Date.now(),
+          });
+          return;
+        }
+
+        setFailureResponse(response);
+      }
+    } catch (error) {
+      setMessageModal({
+        visible: true,
+        title: "Validation failed",
+        message: getBackendMessage(error, "Unable to validate the task."),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -188,9 +292,20 @@ export function QRScannerScreen({ navigation, route }: Props) {
           {isSubmitting ? (
             <View style={styles.validatingRow}>
               <ActivityIndicator size="small" color="#FFFFFF" />
-              <Text style={styles.validatingText}>Validating QR...</Text>
+              <Text style={styles.validatingText}>Validating...</Text>
             </View>
-          ) : null}
+          ) : (
+            (task.taskCriticality === "LOW" || task.taskCriticality === "MEDIUM") && (
+              <Pressable
+                style={styles.skipButton}
+                onPress={handleSkipQR}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.skipButtonText}>Skip QR Scan</Text>
+                <Ionicons name="chevron-forward-outline" size={16} color="#FFFFFF" />
+              </Pressable>
+            )
+          )}
         </View>
       </View>
 
@@ -238,6 +353,13 @@ export function QRScannerScreen({ navigation, route }: Props) {
           </View>
         </View>
       </Modal>
+      <AppMessageModal
+        visible={messageModal.visible}
+        type="failure"
+        title={messageModal.title}
+        message={messageModal.message}
+        onPrimaryAction={() => setMessageModal((current) => ({ ...current, visible: false }))}
+      />
     </SafeAreaView>
   );
 }
@@ -415,6 +537,23 @@ const styles = StyleSheet.create({
   },
   validatingText: {
     fontFamily: "Jost_500Medium",
+    fontSize: 14,
+    color: "#FFFFFF",
+  },
+  skipButton: {
+    marginTop: 18,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    borderRadius: 12,
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  skipButtonText: {
+    fontFamily: "Jost_600SemiBold",
     fontSize: 14,
     color: "#FFFFFF",
   },

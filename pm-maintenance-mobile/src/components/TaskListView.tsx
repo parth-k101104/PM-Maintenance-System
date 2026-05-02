@@ -101,6 +101,8 @@ export function TaskListView({ tasks, emptyMessage, onTaskPress, onSkipQrPress, 
                   const lineDisplay = item.lineCode || item.lineName || (item.lineId ? `PL${item.lineId}` : "LINE");
                   const stripeColor = getCriticalityColor(item.taskCriticality);
                   const displayBlock = item.block;
+                  const isRescheduled = item.rescheduleFlag === true || !!item.parentScheduleExecutionId;
+                  const hasActiveFlag = item.hasActiveFlag === true || !!item.activeFlagStatus;
 
                   return (
                     <Pressable
@@ -125,6 +127,24 @@ export function TaskListView({ tasks, emptyMessage, onTaskPress, onSkipQrPress, 
                         </View>
 
                         <Text style={styles.taskPath}>{path}</Text>
+                        {(isRescheduled || hasActiveFlag) && (
+                          <View style={styles.tagRow}>
+                            {isRescheduled ? (
+                              <View style={[styles.tagBadge, styles.rescheduledBadge]}>
+                                <Ionicons name="refresh-outline" size={12} color="#8A3D00" />
+                                <Text style={[styles.tagText, styles.rescheduledText]}>Rescheduled</Text>
+                              </View>
+                            ) : null}
+                            {hasActiveFlag ? (
+                              <View style={[styles.tagBadge, styles.flagBadge]}>
+                                <Ionicons name="flag-outline" size={12} color="#8A1F1F" />
+                                <Text style={[styles.tagText, styles.flagText]}>
+                                  {item.activeFlagStatus ? item.activeFlagStatus.replace(/_/g, " ") : "Flag raised"}
+                                </Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        )}
                         <View style={styles.timeRow}>
                           {item.timeTaken != null ? (
                             <Text style={styles.timeRequired}>
@@ -293,6 +313,37 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#7A7A8D",
     flex: 1,
+  },
+  tagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 7,
+  },
+  tagBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  rescheduledBadge: {
+    backgroundColor: "#FFF2DC",
+  },
+  flagBadge: {
+    backgroundColor: "#FDE8E7",
+  },
+  tagText: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  rescheduledText: {
+    color: "#8A3D00",
+  },
+  flagText: {
+    color: "#8A1F1F",
   },
   employeeRow: {
     flexDirection: "row",

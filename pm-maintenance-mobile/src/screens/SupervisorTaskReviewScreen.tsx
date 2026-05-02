@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   Pressable,
@@ -15,11 +16,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { BarChart } from "react-native-gifted-charts";
 
+import {
+  processLineManagerApproval,
+  processMaintenanceManagerApproval,
+  processSupervisorApproval,
+} from "../api/client";
+import { AppMessageModal } from "../components/AppMessageModal";
+import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { HistoricalDataPoint } from "../types/api";
 import { RootStackParamList } from "../types/navigation";
 import { useAuth } from "../context/AuthContext";
 import { processSupervisorApproval } from "../api/client";
+import { getBackendMessage, getResponseMessage } from "../utils/messages";
 
 type Props = NativeStackScreenProps<RootStackParamList, "SupervisorTaskReview">;
 
@@ -93,8 +102,25 @@ const chip = StyleSheet.create({
 
 export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
   const { task, scanResponse, scannedEquipment } = route.params;
+  const { authState } = useAuth();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [messageModal, setMessageModal] = React.useState<{
+    visible: boolean;
+    type: "success" | "failure";
+    title: string;
+    message: string;
+    goDashboardOnClose?: boolean;
+  }>({
+    visible: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
   const isMeasurement = isMeasurementTask(scanResponse.uom);
   const historicalData = scanResponse.historicalData ?? [];
+  const roleId = authState.session?.roleId;
+  const reviewTitle =
+    roleId === 2 ? "Line Manager Review" : roleId === 1 ? "Maintenance Review" : "Supervisor Review";
 
   const { authState } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -155,6 +181,54 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
     ? scanResponse.standardValue ?? 0
     : scanResponse.estimatedReqTime ?? 0;
   const maxVal = Math.max(...values, refValue, 1);
+
+  async function submitDecision(action: "APPROVE" | "REJECT") {
+    if (!authState.session?.token || isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        scheduleExecutionId: task.scheduleExecutionId,
+        action,
+      };
+      const response =
+        roleId === 2
+          ? await processLineManagerApproval(authState.session.token, payload)
+          : roleId === 1
+          ? await processMaintenanceManagerApproval(authState.session.token, payload)
+          : await processSupervisorApproval(authState.session.token, payload);
+
+      setMessageModal({
+        visible: true,
+        type: "success",
+        title: action === "APPROVE" ? "Task approved" : "Task rejected",
+        message: getResponseMessage(response, "Decision submitted successfully."),
+        goDashboardOnClose: true,
+      });
+    } catch (error) {
+      setMessageModal({
+        visible: true,
+        type: "failure",
+        title: "Decision failed",
+        message: getBackendMessage(error, "Unable to submit this decision."),
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function closeMessageModal() {
+    const shouldGoDashboard = messageModal.goDashboardOnClose;
+    setMessageModal((current) => ({ ...current, visible: false }));
+    if (shouldGoDashboard) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Dashboard" }],
+      });
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -363,6 +437,13 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
           </Pressable>
         </View>
       </ScrollView>
+      <AppMessageModal
+        visible={messageModal.visible}
+        type={messageModal.type}
+        title={messageModal.title}
+        message={messageModal.message}
+        onPrimaryAction={closeMessageModal}
+      />
     </SafeAreaView>
   );
 }
@@ -566,6 +647,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingVertical: 16,
   },
+  actionBtnDisabled: { opacity: 0.72 },
   rejectBtn: { backgroundColor: "#FDE8E7" },
   rejectBtnText: { fontFamily: "Jost_600SemiBold", fontSize: 16, color: "#B42318" },
   approveBtn: { backgroundColor: "#167C16" },

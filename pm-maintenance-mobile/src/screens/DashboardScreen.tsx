@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { RootStackParamList } from "../types/navigation";
-import type { DashboardItem, OperatorDashboardResponse, SupervisorDashboardResponse } from "../types/api";
+import type { DashboardItem, LineManagerDashboardResponse, OperatorDashboardResponse, SupervisorDashboardResponse } from "../types/api";
 
 const drawerItems = [
   "Dashboard",
@@ -55,7 +55,7 @@ type DashboardCard = {
   title: string;
   value: number | string;
   footnote?: string;
-  variant: "today" | "backlog" | "status" | "other";
+  variant: "today" | "backlog" | "status" | "other" | "health";
   size: "large" | "small";
   navigateTo?: DashboardRouteTarget;
   statusLines?: {
@@ -63,10 +63,23 @@ type DashboardCard = {
     value: number | string;
     tone: StatusTone;
   }[];
+  healthValue?: number;
 };
 
 type StatusTone = "approved" | "pending" | "denied";
-type DashboardRouteTarget = "TaskList" | "SupervisorDueApprovals" | "BacklogTasks" | "TaskApproval" | "UpcomingTasks" | "EmployeeApprovalChart";
+type DashboardRouteTarget =
+  | "TaskList"
+  | "SupervisorDueApprovals"
+  | "LineManagerTodayApprovals"
+  | "LineManagerBacklogApprovals"
+  | "LineManagerFlags"
+  | "LineManagerEquipments"
+  | "BacklogTasks"
+  | "TaskApproval"
+  | "UpcomingTasks"
+  | "FlagsRaised"
+  | "LineManagerActiveTasks"
+  | "EmployeeApprovalChart";
 
 type DashboardViewModel = {
   greetingShift?: string;
@@ -96,6 +109,16 @@ function isSupervisorDashboard(dashboard: unknown): dashboard is SupervisorDashb
       typeof dashboard === "object" &&
       "todaysDueApprovals" in dashboard &&
       "openDeviations" in dashboard,
+  );
+}
+
+function isLineManagerDashboard(dashboard: unknown): dashboard is LineManagerDashboardResponse {
+  return Boolean(
+    dashboard &&
+      typeof dashboard === "object" &&
+      "totalApprovalsToday" in dashboard &&
+      "backlogApprovals" in dashboard &&
+      "lineHealth" in dashboard,
   );
 }
 
@@ -145,6 +168,13 @@ function buildOperatorDashboardViewModel(
         variant: "other",
         size: "large",
         navigateTo: "UpcomingTasks",
+      },
+      {
+        title: "Flags\nraised-",
+        value: dashboard?.flagsRaised ?? 0,
+        variant: "backlog",
+        size: "small",
+        navigateTo: "FlagsRaised",
       },
     ],
     summaryTitle: "Total time required to finish today's tasks-",
@@ -200,6 +230,57 @@ function buildSupervisorDashboardViewModel(
   };
 }
 
+function buildLineManagerDashboardViewModel(
+  dashboard: LineManagerDashboardResponse | undefined,
+  fallbackName: string,
+): DashboardViewModel {
+  return {
+    userName: fallbackName,
+    cards: [
+      {
+        title: "Line health-",
+        value: `${Math.round(dashboard?.lineHealth ?? 0)}%`,
+        footnote: "equipment health",
+        variant: "health",
+        size: "large",
+        navigateTo: "LineManagerEquipments",
+        healthValue: dashboard?.lineHealth ?? 0,
+      },
+      {
+        title: "Flags\nraised-",
+        value: dashboard?.totalFlagsRaised ?? 0,
+        variant: "backlog",
+        size: "small",
+        navigateTo: "LineManagerFlags",
+      },
+      {
+        title: "Active line tasks\nfor today-",
+        value: dashboard?.activeTasksToday ?? 0,
+        variant: "backlog",
+        size: "small",
+        navigateTo: "LineManagerActiveTasks",
+      },
+      {
+        title: "Today's approvals-",
+        value: dashboard?.totalApprovalsToday ?? 0,
+        footnote: "due today",
+        variant: "today",
+        size: "large",
+        navigateTo: "LineManagerTodayApprovals",
+      },
+      {
+        title: "Backlog\napprovals-",
+        value: dashboard?.backlogApprovals ?? 0,
+        variant: "other",
+        size: "small",
+        navigateTo: "LineManagerBacklogApprovals",
+      },
+    ],
+    ctaLabel: "Review Tasks",
+    ctaTarget: "LineManagerTodayApprovals",
+  };
+}
+
 function getCardStyle(variant: DashboardCard["variant"]) {
   switch (variant) {
     case "today":
@@ -210,9 +291,18 @@ function getCardStyle(variant: DashboardCard["variant"]) {
       return styles.statusCard;
     case "other":
       return styles.otherTasksCard;
+    case "health":
+      return styles.statusCard;
     default:
       return styles.todayCard;
   }
+}
+
+function getHealthCardStyle(value?: number) {
+  const health = value ?? 0;
+  if (health >= 90) return styles.healthGoodCard;
+  if (health >= 70) return styles.healthWarningCard;
+  return styles.healthBadCard;
 }
 
 function getStatusToneStyle(tone: StatusTone) {
@@ -257,6 +347,13 @@ export function DashboardScreen() {
       );
     }
 
+    if (session?.dashboardKind === "lineManager" || isLineManagerDashboard(dashboard)) {
+      return buildLineManagerDashboardViewModel(
+        isLineManagerDashboard(dashboard) ? dashboard : undefined,
+        fallbackName,
+      );
+    }
+
     return buildOperatorDashboardViewModel(isOperatorDashboard(dashboard) ? dashboard : undefined, fallbackName);
   }, [dashboard, fallbackName, session?.dashboardKind]);
   const greeting = formatGreeting(dashboardView.greetingShift);
@@ -287,6 +384,18 @@ export function DashboardScreen() {
       case "SupervisorDueApprovals":
         navigation.navigate("SupervisorDueApprovals");
         break;
+      case "LineManagerTodayApprovals":
+        navigation.navigate("LineManagerTodayApprovals");
+        break;
+      case "LineManagerBacklogApprovals":
+        navigation.navigate("LineManagerBacklogApprovals");
+        break;
+      case "LineManagerFlags":
+        navigation.navigate("LineManagerFlags");
+        break;
+      case "LineManagerEquipments":
+        navigation.navigate("LineManagerEquipments");
+        break;
       case "BacklogTasks":
         navigation.navigate("BacklogTasks");
         break;
@@ -298,6 +407,11 @@ export function DashboardScreen() {
         break;
       case "EmployeeApprovalChart":
         navigation.navigate("EmployeeApprovalChart");
+      case "FlagsRaised":
+        navigation.navigate("FlagsRaised");
+        break;
+      case "LineManagerActiveTasks":
+        navigation.navigate("LineManagerActiveTasks");
         break;
       default:
         break;
@@ -328,54 +442,57 @@ export function DashboardScreen() {
             </Text>
 
             <View style={styles.cardsWrapper}>
-              {[0, 2].map((startIndex) => (
-                <View key={startIndex} style={styles.cardsRow}>
-                  {dashboardView.cards.slice(startIndex, startIndex + 2).map((card) => (
-                    <Pressable
-                      key={card.title}
-                      style={[
-                        styles.card,
-                        getCardStyle(card.variant),
-                        card.size === "large" ? styles.flexLarge : styles.flexSmall,
-                      ]}
-                      onPress={() => navigateToDashboardTarget(card.navigateTo)}
-                    >
-                      {card.statusLines ? (
-                        <>
-                          <Text style={styles.statusTitle}>{card.title}</Text>
-                          {card.statusLines.map((line) => (
-                            <Text key={line.label} style={styles.statusLine}>
-                              {line.label}
-                              <Text style={getStatusToneStyle(line.tone)}>{line.value}</Text>
+              {Array.from({ length: Math.ceil(dashboardView.cards.length / 2) }).map((_, rowIndex) => {
+                const startIndex = rowIndex * 2;
+                return (
+                  <View key={startIndex} style={styles.cardsRow}>
+                    {dashboardView.cards.slice(startIndex, startIndex + 2).map((card) => (
+                      <Pressable
+                        key={card.title}
+                        style={[
+                          styles.card,
+                          card.variant === "health" ? getHealthCardStyle(card.healthValue) : getCardStyle(card.variant),
+                          card.size === "large" ? styles.flexLarge : styles.flexSmall,
+                        ]}
+                        onPress={() => navigateToDashboardTarget(card.navigateTo)}
+                      >
+                        {card.statusLines ? (
+                          <>
+                            <Text style={styles.statusTitle}>{card.title}</Text>
+                            {card.statusLines.map((line) => (
+                              <Text key={line.label} style={styles.statusLine}>
+                                {line.label}
+                                <Text style={getStatusToneStyle(line.tone)}>{line.value}</Text>
+                              </Text>
+                            ))}
+                            <Ionicons name="arrow-forward-outline" size={28} color="#111111" style={styles.statusArrow} />
+                          </>
+                        ) : (
+                          <>
+                            <Text style={card.size === "large" ? styles.cardTitle : styles.cardTitleSmall}>
+                              {card.title}
                             </Text>
-                          ))}
-                          <Ionicons name="arrow-forward-outline" size={28} color="#111111" style={styles.statusArrow} />
-                        </>
-                      ) : (
-                        <>
-                          <Text style={card.size === "large" ? styles.cardTitle : styles.cardTitleSmall}>
-                            {card.title}
-                          </Text>
-                          <Text style={card.size === "large" ? styles.bigNumber : styles.mediumNumber}>
-                            {card.value}
-                          </Text>
-                          {card.footnote ? (
-                            <Text style={card.variant === "other" ? styles.cardFootnoteAlt : styles.cardFootnote}>
-                              {card.footnote}
+                            <Text style={card.size === "large" ? styles.bigNumber : styles.mediumNumber}>
+                              {card.value}
                             </Text>
-                          ) : null}
-                          <Ionicons
-                            name="arrow-forward-outline"
-                            size={card.size === "large" ? 32 : 30}
-                            color="#111111"
-                            style={card.size === "large" ? styles.cardArrow : styles.smallCardArrow}
-                          />
-                        </>
-                      )}
-                    </Pressable>
-                  ))}
-                </View>
-              ))}
+                            {card.footnote ? (
+                              <Text style={card.variant === "other" ? styles.cardFootnoteAlt : styles.cardFootnote}>
+                                {card.footnote}
+                              </Text>
+                            ) : null}
+                            <Ionicons
+                              name="arrow-forward-outline"
+                              size={card.size === "large" ? 32 : 30}
+                              color="#111111"
+                              style={card.size === "large" ? styles.cardArrow : styles.smallCardArrow}
+                            />
+                          </>
+                        )}
+                      </Pressable>
+                    ))}
+                  </View>
+                );
+              })}
             </View>
 
             {dashboardView.summaryTitle && dashboardView.summaryValue ? (
@@ -531,6 +648,27 @@ const styles = StyleSheet.create({
     height: 180,
     paddingTop: 22,
     paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  healthGoodCard: {
+    backgroundColor: "#D8EAD7",
+    height: 180,
+    paddingTop: 22,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  healthWarningCard: {
+    backgroundColor: "#F5E4C9",
+    height: 180,
+    paddingTop: 22,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  healthBadCard: {
+    backgroundColor: "#FDE8E7",
+    height: 180,
+    paddingTop: 22,
+    paddingHorizontal: 24,
     paddingBottom: 24,
   },
   otherTasksCard: {

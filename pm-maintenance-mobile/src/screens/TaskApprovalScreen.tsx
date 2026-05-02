@@ -12,11 +12,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { fetchCompletedTasks } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { CompletedTask } from "../types/api";
+import { RootStackParamList } from "../types/navigation";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -51,7 +53,7 @@ const TABS = [
 ];
 
 export function TaskApprovalScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { authState } = useAuth();
   const [tasks, setTasks] = useState<CompletedTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -263,9 +265,46 @@ export function TaskApprovalScreen() {
                         <View style={styles.bottomRow}>
                           <View style={{ flex: 1 }} />
                           {isDenied && (
-                            <Pressable style={styles.redoButton}>
-                              <Text style={styles.redoText}>REDO NOW</Text>
-                            </Pressable>
+                            <>
+                              {item.rescheduledStatus === "ASSIGNED" || item.rescheduledStatus === "IN_PROGRESS" ? (
+                                <Pressable
+                                  style={styles.redoButton}
+                                  onPress={() => {
+                                    if (item.rescheduledExecutionId) {
+                                      // Same navigation pattern as TaskList
+                                      navigation.navigate("QRScanner", {
+                                        task: {
+                                          scheduleExecutionId: item.rescheduledExecutionId,
+                                          stdTaskId: 0, // Mock, usually backend provides this if fully hydrated
+                                          taskRefNo: item.taskName,
+                                          taskName: item.taskName,
+                                          timeRequired: item.stdAmountOfTime,
+                                          machineName: item.machineName,
+                                          machineElementName: item.machineElementName,
+                                          machinePartName: item.machinePartName,
+                                          zone: item.zone,
+                                          block: item.block,
+                                          lineName: item.lineName,
+                                          lineCode: item.lineCode,
+                                          lineId: item.lineId,
+                                          taskCriticality: item.taskCriticality,
+                                          dueDate: item.rescheduledDueDate,
+                                        },
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <Text style={styles.redoText}>REDO NOW</Text>
+                                </Pressable>
+                              ) : (
+                                <View style={[styles.reviewPill, { backgroundColor: "#A0550E22", marginBottom: 0 }]}>
+                                  <Ionicons name="alert-circle-outline" size={12} color="#A0550E" />
+                                  <Text style={[styles.reviewPillText, { color: "#A0550E" }]}>
+                                    Rescheduled: {item.rescheduledStatus?.replace(/_/g, ' ') ?? "UNDER REVIEW"}
+                                  </Text>
+                                </View>
+                              )}
+                            </>
                           )}
                         </View>
                       </View>

@@ -13,6 +13,8 @@ public class OperatorDashboardResponse {
     private TaskStatusCount taskStatus;
     private TimeEstimate timeEstimate;
     private List<DashboardItemDTO> requiredItems;
+    /** Number of active (non-closed) flags currently assigned to this operator. */
+    private int flagsRaised;
 
     @Data
     @Builder
