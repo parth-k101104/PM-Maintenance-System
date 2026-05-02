@@ -241,7 +241,7 @@ public class TaskExecutionService {
         if (request.getScheduleExecutionId() == null) {
             return com.maint.pm_backend.dto.SupervisorQRScanResponse.builder()
                     .status("error")
-                    .message("Missing schedule execution ID in QR scan.")
+                    .message("Missing schedule execution ID.")
                     .build();
         }
 

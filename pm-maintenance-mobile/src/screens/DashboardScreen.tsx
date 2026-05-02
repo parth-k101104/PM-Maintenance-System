@@ -78,7 +78,8 @@ type DashboardRouteTarget =
   | "TaskApproval"
   | "UpcomingTasks"
   | "FlagsRaised"
-  | "LineManagerActiveTasks";
+  | "LineManagerActiveTasks"
+  | "EmployeeApprovalChart";
 
 type DashboardViewModel = {
   greetingShift?: string;
@@ -209,15 +210,11 @@ function buildSupervisorDashboardViewModel(
       },
       {
         title: "Team status-",
-        value: "",
         variant: "status",
         size: "small",
-        navigateTo: "TaskApproval",
-        statusLines: [
-          { label: "Employees-", value: dashboard?.supervisedEmployeeCount ?? 0, tone: "approved" },
-          { label: "Pipeline-", value: dashboard?.tasksInPipeline ?? 0, tone: "denied" },
-          { label: "Upcoming-", value: dashboard?.upcomingApprovalsThisMonth ?? 0, tone: "pending" },
-        ],
+        navigateTo: "EmployeeApprovalChart",
+        value: dashboard?.supervisedEmployeeCount ?? 0,
+        footnote: "Employees",
       },
       {
         title: "Upcoming approvals-",
@@ -408,6 +405,8 @@ export function DashboardScreen() {
       case "UpcomingTasks":
         navigation.navigate("UpcomingTasks");
         break;
+      case "EmployeeApprovalChart":
+        navigation.navigate("EmployeeApprovalChart");
       case "FlagsRaised":
         navigation.navigate("FlagsRaised");
         break;

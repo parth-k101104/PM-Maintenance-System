@@ -200,6 +200,25 @@ export async function scanTaskQr(token: string, payload: QRScanRequest) {
   });
 }
 
+export interface SupervisorApprovalResponse {
+  status: string;
+  message: string;
+  executionStatus?: string;
+  nextApproverId?: number;
+  rescheduledExecutionId?: number;
+}
+
+export async function processSupervisorApproval(
+  token: string,
+  payload: { scheduleExecutionId: number; action: "APPROVE" | "REJECT"; remarks?: string }
+) {
+  return request<SupervisorApprovalResponse>("/api/v1/supervisor/approvals/action", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function scanSupervisorTaskQr(token: string, payload: SupervisorQRScanRequest) {
   return request<SupervisorQRScanResponse>("/api/v1/task-execution/supervisor/scan", {
     method: "POST",
@@ -256,6 +275,26 @@ export async function completeTask(token: string, payload: TaskCompletionRequest
   });
 }
 
+
+export async function fetchEmployeeApprovalSummary(
+  token: string,
+  period: "CURRENT_MONTH" | "YEAR"
+) {
+  return request<
+    {
+      employeeId: number;
+      employeeName: string;
+      period: string;
+      totalTasks: number;
+      assignedOrInProgress: number;
+      pendingSupervisorApproval: number;
+      underLineManagerReview: number;
+      underMaintManagerReview: number;
+      totalExecuted: number;
+      approved: number;
+      rejected: number;
+    }[]
+  >(`/api/v1/supervisor/approvals/employees/summary?period=${period}`, {
 // --- Flags ---
 
 export async function fetchMyFlags(token: string) {
