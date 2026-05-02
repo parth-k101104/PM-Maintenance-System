@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
 
   db:
@@ -26,11 +24,29 @@ services:
       - DB_PORT=5432
       - DB_USER=postgres
       - DB_PASSWORD=root
+      - ANALYTICS_SERVICE_BASE_URL=http://analytics-service:8000
+      - ANALYTICS_SHARED_SECRET=${ANALYTICS_SHARED_SECRET:-dev-analytics-shared-secret-change-me}
     depends_on:
       - db
+      - analytics-service
     restart: unless-stopped
     # Spring Boot runs Flyway migrations automatically because spring-boot-starter-flyway is in pom.xml
     # If a standalone Flyway container is strictly necessary, it can be added here. But standard Spring Boot apps execute their own flyway tasks during startup.
+
+  analytics-service:
+    build:
+      context: ../pm-analytics-service
+    container_name: pm_analytics_service
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:root@db:5432/pm_db
+      - ANALYTICS_SHARED_SECRET=${ANALYTICS_SHARED_SECRET:-dev-analytics-shared-secret-change-me}
+      - DB_POOL_MIN_SIZE=1
+      - DB_POOL_MAX_SIZE=8
+    depends_on:
+      - db
+    restart: unless-stopped
 
 volumes:
   postgres_data:
