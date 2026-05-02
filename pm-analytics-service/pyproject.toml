@@ -1,0 +1,22 @@
+[project]
+name = "pm-analytics-service"
+version = "0.1.0"
+description = "Predictive maintenance analytics microservice for PHM degradation predictions."
+readme = "README.md"
+requires-python = ">=3.12,<4.0"
+authors = [
+    {name = "PM Maintenance Team"}
+]
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "psycopg[binary,pool]==3.2.3",
+    "pydantic-settings==2.7.1"
+]
+
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
