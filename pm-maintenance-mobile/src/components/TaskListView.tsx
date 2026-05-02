@@ -23,10 +23,11 @@ type Props = {
   tasks: TaskDetails[];
   emptyMessage: string;
   onTaskPress?: (task: TaskDetails) => void;
+  onSkipQrPress?: (task: TaskDetails) => void;
   showTabs?: boolean;
 };
 
-export function TaskListView({ tasks, emptyMessage, onTaskPress, showTabs = true }: Props) {
+export function TaskListView({ tasks, emptyMessage, onTaskPress, onSkipQrPress, showTabs = true }: Props) {
   const zones = useMemo(() => Array.from(new Set(tasks.map((task) => task.zone || "All"))).sort(), [tasks]);
   const [selectedZone, setSelectedZone] = useState<string | null>(zones[0] ?? null);
   const horizontalListRef = useRef<FlatList>(null);
@@ -159,12 +160,27 @@ export function TaskListView({ tasks, emptyMessage, onTaskPress, showTabs = true
                             </View>
                           ) : null}
                         </View>
-                        {!!item.employeeName && (
-                          <View style={styles.employeeRow}>
-                            <Ionicons name="person-outline" size={13} color="#5A5F75" />
-                            <Text style={styles.employeeName}>{item.employeeName}</Text>
-                          </View>
-                        )}
+                        <View style={styles.footerRow}>
+                          {!!item.employeeName ? (
+                            <View style={styles.employeeRow}>
+                              <Ionicons name="person-outline" size={13} color="#5A5F75" />
+                              <Text style={styles.employeeName}>{item.employeeName}</Text>
+                            </View>
+                          ) : (
+                            <View />
+                          )}
+                          {onSkipQrPress && item.taskCriticality === "LOW" && (
+                            <Pressable
+                              style={styles.skipButton}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                onSkipQrPress(item);
+                              }}
+                            >
+                              <Text style={styles.skipButtonText}>Skip QR</Text>
+                            </Pressable>
+                          )}
+                        </View>
                       </View>
                     </Pressable>
                   );
@@ -360,5 +376,24 @@ const styles = StyleSheet.create({
     marginTop: 36,
     fontSize: 15,
     color: "#666",
+  },
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 5,
+  },
+  skipButton: {
+    backgroundColor: "#E2E2E8",
+    borderWidth: 1,
+    borderColor: "#111111",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  skipButtonText: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 12,
+    color: "#111111",
   },
 });

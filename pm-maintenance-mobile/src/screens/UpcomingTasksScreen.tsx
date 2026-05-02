@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   View,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,6 +43,8 @@ export function UpcomingTasksScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [legendVisible, setLegendVisible] = useState(false);
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const horizontalListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -97,15 +100,48 @@ export function UpcomingTasksScreen() {
     return ` | Due: ${datePart}`;
   };
 
+  const filteredTasks = tasks.filter((task) => {
+    const query = searchQuery.toLowerCase();
+    return Object.values(task)
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+  });
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Pressable hitSlop={12} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back-outline" size={28} color="#111111" />
         </Pressable>
-        <Text style={styles.headerTitle}>Upcoming Tasks</Text>
-        <Pressable hitSlop={12}>
-          <Ionicons name="search-outline" size={28} color="#111111" />
+
+        {searchActive ? (
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search tasks..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+            placeholderTextColor="#999"
+          />
+        ) : (
+          <Text style={styles.headerTitle}>Upcoming Tasks</Text>
+        )}
+
+        <Pressable
+          hitSlop={12}
+          onPress={() => {
+            if (searchActive) {
+              setSearchQuery("");
+            }
+            setSearchActive((prev) => !prev);
+          }}
+        >
+          <Ionicons
+            name={searchActive ? "close-outline" : "search-outline"}
+            size={28}
+            color="#111111"
+          />
         </Pressable>
       </View>
 
@@ -144,7 +180,8 @@ export function UpcomingTasksScreen() {
           <Text style={styles.emptyText}>No upcoming tasks scheduled.</Text>
         }
         renderItem={({ item: zone }) => {
-          const zoneTasks = tasks.filter((t) => t.zone === zone);
+          const baseTasks = searchActive ? filteredTasks : tasks;
+          const zoneTasks = baseTasks.filter((t) => t.zone === zone);
 
           return (
             <View style={{ width: SCREEN_WIDTH }}>
@@ -160,7 +197,7 @@ export function UpcomingTasksScreen() {
                   const path = [item.machineName, item.machineElementName, item.machinePartName]
                     .filter(Boolean)
                     .join(" > ");
-                  
+
                   const lineDisplay = item.lineCode || item.lineName || (item.lineId ? `PL${item.lineId}` : "LINE");
                   const stripeColor = getCriticalityColor(item.taskCriticality);
                   const displayBlock = item.block;
@@ -175,7 +212,7 @@ export function UpcomingTasksScreen() {
                           <Text style={styles.stripText}>{lineDisplay}</Text>
                         </View>
                       </View>
-                      
+
                       <View style={styles.cardContent}>
                         <View style={styles.cardHeader}>
                           <Text style={styles.taskName}>{item.taskName}</Text>
@@ -185,7 +222,7 @@ export function UpcomingTasksScreen() {
                             </View>
                           )}
                         </View>
-                        
+
                         <Text style={styles.taskPath}>{path}</Text>
                         <Text style={styles.timeRequired}>
                           Time required- {item.timeRequired} mins{formatDate(item.dueDate)}
@@ -235,6 +272,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     flex: 1,
     marginLeft: 16,
+    color: "#111111",
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 16,
+    fontFamily: "Jost_400Regular",
+    fontSize: 18,
     color: "#111111",
   },
   tabsContainer: {
