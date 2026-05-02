@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   View,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -55,6 +56,8 @@ export function TaskApprovalScreen() {
   const [tasks, setTasks] = useState<CompletedTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<string>("Under Review");
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const horizontalListRef = useRef<FlatList>(null);
 
   async function loadTasks() {
@@ -88,8 +91,17 @@ export function TaskApprovalScreen() {
     if (TABS[index]) setSelectedTab(TABS[index].id);
   };
 
+  const filteredTasks = tasks.filter((task) => {
+    const query = searchQuery.toLowerCase();
+    return Object.values(task)
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+  });
+
   const getFilteredTasks = (tabId: string) => {
-    return tasks.filter((t) => {
+    const baseTasks = searchActive ? filteredTasks : tasks;
+    return baseTasks.filter((t) => {
       const status = t.status.toUpperCase();
       if (tabId === "Under Review") return UNDER_REVIEW_STATUSES.has(status);
       if (tabId === "Approved")     return ["COMPLETED", "APPROVED"].includes(status);
@@ -114,9 +126,34 @@ export function TaskApprovalScreen() {
         <Pressable hitSlop={12} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back-outline" size={28} color="#111111" />
         </Pressable>
-        <Text style={styles.headerTitle}>Task approval status</Text>
-        <Pressable hitSlop={12}>
-          <Ionicons name="search-outline" size={28} color="#111111" />
+
+        {searchActive ? (
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search tasks..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+            placeholderTextColor="#999"
+          />
+        ) : (
+          <Text style={styles.headerTitle}>Task approval status</Text>
+        )}
+
+        <Pressable
+          hitSlop={12}
+          onPress={() => {
+            if (searchActive) {
+              setSearchQuery("");
+            }
+            setSearchActive((prev) => !prev);
+          }}
+        >
+          <Ionicons
+            name={searchActive ? "close-outline" : "search-outline"}
+            size={28}
+            color="#111111"
+          />
         </Pressable>
       </View>
 
@@ -260,6 +297,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     flex: 1,
     marginLeft: 16,
+    color: "#111111",
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 16,
+    fontFamily: "Jost_400Regular",
+    fontSize: 18,
     color: "#111111",
   },
   tabsContainer: {
