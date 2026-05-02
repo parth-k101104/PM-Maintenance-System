@@ -162,10 +162,10 @@ public class TaskExecutionService {
             throw new RuntimeException("Access denied: only supervisors can access this");
         }
 
-        if (request.getScheduleExecutionId() == null || request.getEquipmentId() == null) {
+        if (request.getScheduleExecutionId() == null) {
             return com.maint.pm_backend.dto.SupervisorQRScanResponse.builder()
                     .status("error")
-                    .message("Missing schedule execution ID or equipment ID in QR scan.")
+                    .message("Missing schedule execution ID.")
                     .build();
         }
 

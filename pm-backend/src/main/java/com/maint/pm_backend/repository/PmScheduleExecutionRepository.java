@@ -205,9 +205,9 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             "  AND sa.approval_level = 1 " +
             "  AND sa.approval_status = 'APPROVAL_REQUESTED' " +
             "  AND se.schedule_execution_id = :scheduleExecutionId " +
-            "  AND eq.equipment_id = :equipmentId " +
-            "  AND ee.element_id = :elementId " +
-            "  AND (:partId IS NULL OR ep.part_id = :partId)", nativeQuery = true)
+            "  AND (CAST(:equipmentId AS bigint) IS NULL OR eq.equipment_id = :equipmentId) " +
+            "  AND (CAST(:elementId AS bigint) IS NULL OR ee.element_id = :elementId) " +
+            "  AND (CAST(:partId AS bigint) IS NULL OR ep.part_id = :partId)", nativeQuery = true)
     java.util.Optional<com.maint.pm_backend.dto.SupervisorTaskValidationProjection> validateAndFetchSupervisorTaskMetadata(
             @Param("scheduleExecutionId") Long scheduleExecutionId,
             @Param("supervisorId") Long supervisorId,

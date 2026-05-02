@@ -20,6 +20,7 @@ import { BacklogTasksScreen } from "./src/screens/BacklogTasksScreen";
 import { UpcomingTasksScreen } from "./src/screens/UpcomingTasksScreen";
 import { colors } from "./src/theme/colors";
 import { RootStackParamList } from "./src/types/navigation";
+import EmployeeApprovalChartScreen from "src/screens/EmployeeApprovalChartScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -52,6 +53,7 @@ function RootNavigator() {
         <Stack.Screen name="QRScanner" component={QRScannerScreen} />
         <Stack.Screen name="TaskExecution" component={TaskExecutionScreen} />
         <Stack.Screen name="SupervisorTaskReview" component={SupervisorTaskReviewScreen} />
+        <Stack.Screen name="EmployeeApprovalChart" component={EmployeeApprovalChartScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Dimensions,
   Image,
@@ -7,14 +7,19 @@ import {
   StyleSheet,
   Text,
   View,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { BarChart } from "react-native-gifted-charts";
 
 import { colors } from "../theme/colors";
 import { HistoricalDataPoint } from "../types/api";
 import { RootStackParamList } from "../types/navigation";
+import { useAuth } from "../context/AuthContext";
+import { processSupervisorApproval } from "../api/client";
 
 type Props = NativeStackScreenProps<RootStackParamList, "SupervisorTaskReview">;
 
@@ -91,8 +96,61 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
   const isMeasurement = isMeasurementTask(scanResponse.uom);
   const historicalData = scanResponse.historicalData ?? [];
 
+  const { authState } = useAuth();
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleAction = (action: "APPROVE" | "REJECT") => {
+    Alert.alert(
+      `Confirm ${action === "APPROVE" ? "Approval" : "Rejection"}`,
+      `Are you sure you want to ${action.toLowerCase()} this task?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: action === "APPROVE" ? "Approve" : "Reject",
+          style: action === "APPROVE" ? "default" : "destructive",
+          onPress: async () => {
+            if (!authState.session) return;
+            setIsProcessing(true);
+            try {
+              const payload = {
+                scheduleExecutionId: task.scheduleExecutionId,
+                action,
+              };
+              console.log("Submitting supervisor action:", payload);
+              const res = await processSupervisorApproval(authState.session.token, payload);
+              if (res.status === "error") {
+                Alert.alert("Error", res.message || "Failed to process action");
+              } else {
+                Alert.alert("Success", `Task ${action.toLowerCase()}d successfully!`, [
+                  { text: "OK", onPress: () => navigation.goBack() }
+                ]);
+              }
+            } catch (error: any) {
+              Alert.alert("Error", error.message || "An error occurred");
+            } finally {
+              setIsProcessing(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const combinedData = [
+    {
+      scheduleExecutionId: task.scheduleExecutionId,
+      actualValue: scanResponse.actualValue,
+      deviationFlag: scanResponse.deviationFlag ?? false,
+      timeTaken: scanResponse.timeTaken,
+      completedDate: new Date().toISOString(),
+      status: "CURRENT",
+      executedBy: "Current Execution",
+    } as HistoricalDataPoint,
+    ...historicalData,
+  ];
+
   // Compute bar chart max value
-  const values = historicalData.map((p) => chartValue(p, isMeasurement));
+  const values = combinedData.map((p) => chartValue(p, isMeasurement));
   const refValue = isMeasurement
     ? scanResponse.standardValue ?? 0
     : scanResponse.estimatedReqTime ?? 0;
@@ -106,10 +164,7 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
           <Ionicons name="arrow-back-outline" size={28} color="#111111" />
         </Pressable>
         <View style={styles.headerTextWrap}>
-          <Text style={styles.headerTitle}>Supervisor Review</Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {task.taskName}
-          </Text>
+          <Text style={styles.headerTitle}>{task.taskName}</Text>
         </View>
       </View>
 
@@ -117,14 +172,6 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Success banner ── */}
-        <View style={styles.successCard}>
-          <View style={styles.successIconWrap}>
-            <Ionicons name="qr-code-outline" size={28} color="#FFFFFF" />
-          </View>
-          <Text style={styles.successTitle}>QR verified</Text>
-          <Text style={styles.successText}>{scanResponse.message}</Text>
-        </View>
 
         {/* ── Current execution metrics ── */}
         <View style={styles.card}>
@@ -190,47 +237,54 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
         )}
 
         {/* ── Historical chart ── */}
-        {historicalData.length > 0 && (
+        {combinedData.length > 0 && (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>
-              Historical {isMeasurement ? "measurements" : "time taken"} (last{" "}
-              {historicalData.length} executions)
+              Current & Historical {isMeasurement ? "measurements" : "time taken"} (last{" "}
+              {combinedData.length} executions)
             </Text>
 
             {/* Bar chart */}
-            <View style={styles.chartArea}>
-              {/* Reference line */}
-              <View
-                style={[
-                  styles.refLine,
-                  { bottom: (refValue / maxVal) * 140 },
-                ]}
-              >
-                <Text style={styles.refLineLabel}>
-                  {isMeasurement ? `Std: ${refValue}` : `Est: ${refValue}m`}
-                </Text>
-              </View>
-
-              {historicalData.map((point, idx) => {
-                const val = chartValue(point, isMeasurement);
-                const barH = Math.max(4, (val / maxVal) * 140);
-                const isDeviation = point.deviationFlag;
-                return (
-                  <View key={point.scheduleExecutionId} style={styles.barWrap}>
-                    <Text style={styles.barValue}>
-                      {val > 0 ? val : "—"}
-                    </Text>
-                    <View
-                      style={[
-                        styles.bar,
-                        { height: barH },
-                        isDeviation ? styles.barDeviation : styles.barNormal,
-                      ]}
-                    />
-                    <Text style={styles.barLabel}>#{idx + 1}</Text>
-                  </View>
-                );
-              })}
+            <View style={{ marginTop: 24, marginBottom: 12, alignItems: "center", paddingRight: 20 }}>
+              <BarChart
+                data={combinedData.map((point, idx) => {
+                  const val = chartValue(point, isMeasurement);
+                  const isDeviation = point.deviationFlag;
+                  return {
+                    value: val > 0 ? val : 0,
+                    label: idx === 0 ? "Current" : `#${idx}`,
+                    frontColor: isDeviation ? "#B42318" : "#167C16",
+                    topLabelComponent: () => (
+                      <Text style={{ color: isDeviation ? "#B42318" : "#167C16", fontSize: 11, marginBottom: 4, fontFamily: "Jost_500Medium" }}>
+                        {val > 0 ? val : "—"}
+                      </Text>
+                    ),
+                  };
+                })}
+                width={SCREEN_WIDTH - 150}
+                height={160}
+                barWidth={28}
+                spacing={18}
+                initialSpacing={10}
+                endSpacing={20}
+                roundedTop
+                roundedBottom
+                hideRules
+                xAxisThickness={1}
+                yAxisThickness={0}
+                yAxisTextStyle={{ color: "#7A7A8D", fontSize: 11, fontFamily: "Jost_400Regular" }}
+                xAxisLabelTextStyle={{ color: "#7A7A8D", fontSize: 12, fontFamily: "Jost_500Medium" }}
+                noOfSections={4}
+                maxValue={maxVal}
+                showReferenceLine1
+                referenceLine1Position={refValue}
+                referenceLine1Config={{
+                  color: "#B42318",
+                  dashWidth: 4,
+                  dashGap: 4,
+                  thickness: 1,
+                }}
+              />
             </View>
 
             {/* Legend */}
@@ -247,24 +301,24 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
 
             {/* Historical table */}
             <View style={styles.historyTable}>
-              {historicalData.map((point, idx) => (
+              {combinedData.map((point, idx) => (
                 <View
-                  key={point.scheduleExecutionId}
+                  key={idx === 0 ? "current" : point.scheduleExecutionId}
                   style={[
                     styles.historyRow,
-                    idx === historicalData.length - 1 && styles.historyRowLast,
+                    idx === combinedData.length - 1 && styles.historyRowLast,
                   ]}
                 >
                   <View style={styles.historyLeft}>
-                    <Text style={styles.historyIdx}>#{idx + 1}</Text>
+                    <Text style={styles.historyIdx}>{idx === 0 ? "Current" : `#${idx}`}</Text>
                     <View>
                       <Text style={styles.historyBy}>{point.executedBy ?? "Unknown"}</Text>
                       <Text style={styles.historyDate}>
                         {point.completedDate
                           ? new Date(point.completedDate).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "short",
-                            })
+                            day: "numeric",
+                            month: "short",
+                          })
                           : "—"}
                       </Text>
                     </View>
@@ -285,14 +339,26 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {/* ── Approve / Reject buttons (placeholder) ── */}
+        {/* ── Approve / Reject buttons ── */}
         <View style={styles.actionsRow}>
-          <Pressable style={[styles.actionBtn, styles.rejectBtn]}>
+          <Pressable 
+            style={[styles.actionBtn, styles.rejectBtn, isProcessing && { opacity: 0.5 }]}
+            onPress={() => handleAction("REJECT")}
+            disabled={isProcessing}
+          >
             <Ionicons name="close-circle-outline" size={20} color="#B42318" />
             <Text style={styles.rejectBtnText}>Reject</Text>
           </Pressable>
-          <Pressable style={[styles.actionBtn, styles.approveBtn]}>
-            <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+          <Pressable 
+            style={[styles.actionBtn, styles.approveBtn, isProcessing && { opacity: 0.5 }]}
+            onPress={() => handleAction("APPROVE")}
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+            )}
             <Text style={styles.approveBtnText}>Approve</Text>
           </Pressable>
         </View>

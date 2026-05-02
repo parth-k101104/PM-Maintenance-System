@@ -142,6 +142,25 @@ export async function scanTaskQr(token: string, payload: QRScanRequest) {
   });
 }
 
+export interface SupervisorApprovalResponse {
+  status: string;
+  message: string;
+  executionStatus?: string;
+  nextApproverId?: number;
+  rescheduledExecutionId?: number;
+}
+
+export async function processSupervisorApproval(
+  token: string,
+  payload: { scheduleExecutionId: number; action: "APPROVE" | "REJECT"; remarks?: string }
+) {
+  return request<SupervisorApprovalResponse>("/api/v1/supervisor/approvals/action", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function scanSupervisorTaskQr(token: string, payload: SupervisorQRScanRequest) {
   return request<SupervisorQRScanResponse>("/api/v1/task-execution/supervisor/scan", {
     method: "POST",
