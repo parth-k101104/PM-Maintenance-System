@@ -73,6 +73,7 @@ type StatusTone = "approved" | "pending" | "denied";
 type DashboardRouteTarget =
   | "TaskList"
   | "SupervisorDueApprovals"
+  | "SupervisorFlags"
   | "LineManagerTodayApprovals"
   | "LineManagerBacklogApprovals"
   | "LineManagerFlags"
@@ -206,11 +207,11 @@ function buildSupervisorDashboardViewModel(
         navigateTo: "SupervisorDueApprovals",
       },
       {
-        title: "Deviation\nobserved-",
-        value: dashboard?.openDeviations ?? 0,
+        title: "Flags\nraised-",
+        value: dashboard?.activeFlags ?? 0,
         variant: "backlog",
         size: "small",
-        navigateTo: "TaskApproval",
+        navigateTo: "SupervisorFlags",
       },
       {
         title: "Team status-",
@@ -425,6 +426,12 @@ export function DashboardScreen() {
     loadLineInsights();
   }, [loadLineInsights]);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadLineInsights();
+    }, [loadLineInsights]),
+  );
+
   function navigateToDashboardTarget(target?: DashboardRouteTarget) {
     if (!target) {
       return;
@@ -436,6 +443,9 @@ export function DashboardScreen() {
         break;
       case "SupervisorDueApprovals":
         navigation.navigate("SupervisorDueApprovals");
+        break;
+      case "SupervisorFlags":
+        navigation.navigate("SupervisorFlags");
         break;
       case "LineManagerTodayApprovals":
         navigation.navigate("LineManagerTodayApprovals");

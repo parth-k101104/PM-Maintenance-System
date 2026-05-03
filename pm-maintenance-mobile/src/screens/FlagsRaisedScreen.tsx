@@ -14,6 +14,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { fetchMyFlags } from "../api/client";
+import { FlagListCard, getFlagStatusColor } from "../components/FlagListCard";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { IssueFlag } from "../types/api";
@@ -35,15 +36,6 @@ const STATUS_TABS = [
   { id: "REPLACEMENT_REQUIRED", label: "Required" },
   { id: "POTENTIAL_REPLACEMENT", label: "Potential" },
 ];
-
-function getStatusColor(status: string) {
-  switch (status) {
-    case "REPLACEMENT_INITIATED": return "#DC2626"; // Red
-    case "REPLACEMENT_REQUIRED": return "#EAB308"; // Yellow/Orange
-    case "POTENTIAL_REPLACEMENT": return "#3B82F6"; // Blue
-    default: return "#6B7280"; // Gray
-  }
-}
 
 export function FlagsRaisedScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -119,10 +111,10 @@ export function FlagsRaisedScreen() {
           return (
             <Pressable
               key={tab.id}
-              style={[styles.tab, isSelected && { borderBottomColor: getStatusColor(tab.id) }]}
+              style={[styles.tab, isSelected && { borderBottomColor: getFlagStatusColor(tab.id) }]}
               onPress={() => handleTabPress(tab.id, index)}
             >
-              <Text style={[styles.tabText, isSelected && { color: getStatusColor(tab.id) }]}>
+              <Text style={[styles.tabText, isSelected && { color: getFlagStatusColor(tab.id) }]}>
                 {tab.label}
               </Text>
             </Pressable>
@@ -157,48 +149,19 @@ export function FlagsRaisedScreen() {
                   <Text style={styles.emptyText}>No flags found for this status.</Text>
                 }
                 renderItem={({ item }) => {
-                  const path = [item.equipmentName, item.location, item.partName]
-                    .filter(Boolean)
-                    .join(" > ");
                   const isActionable = item.status === "REPLACEMENT_INITIATED";
 
                   return (
-                    <Pressable
-                      style={styles.card}
+                    <FlagListCard
+                      flag={item}
+                      showChevron={isActionable}
+                      actionLabel={isActionable ? "Complete Replacement" : undefined}
                       onPress={() => {
                         if (isActionable) {
                           navigation.navigate("FlagDetail", { flag: item });
                         }
                       }}
-                    >
-                      <View style={[styles.leftStrip, { backgroundColor: getStatusColor(item.status) }]} />
-
-                      <View style={styles.cardContent}>
-                        <View style={styles.cardHeader}>
-                          <Text style={styles.taskName}>{item.partName || "Unknown Part"}</Text>
-                          {isActionable && <Ionicons name="chevron-forward" size={20} color="#111111" />}
-                        </View>
-
-                        <Text style={styles.taskPath}>{path}</Text>
-
-                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + "22" }]}>
-                          <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-                            {item.status.replace(/_/g, " ")}
-                          </Text>
-                        </View>
-
-                        <View style={styles.infoRow}>
-                          <Text style={styles.dueDate}>
-                            Due: {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : "N/A"}
-                          </Text>
-                          <Text style={styles.criticality}>
-                            Priority: {item.criticality}
-                          </Text>
-                        </View>
-
-                        <Text style={styles.linkedText}>Linked to Exec ID: {item.scheduleExecutionId}</Text>
-                      </View>
-                    </Pressable>
+                    />
                   );
                 }}
               />
@@ -250,75 +213,6 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
   },
   listContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 50 },
-  card: {
-    flexDirection: "row",
-    backgroundColor: "#F3F4F6",
-    borderRadius: 16,
-    marginBottom: 16,
-    position: "relative",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  leftStrip: {
-    width: 12,
-    borderTopLeftRadius: 16,
-    borderBottomLeftRadius: 16,
-  },
-  cardContent: { flex: 1, padding: 16 },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 4,
-  },
-  taskName: {
-    fontFamily: "Jost_600SemiBold",
-    fontSize: 18,
-    color: "#111111",
-    flex: 1,
-  },
-  taskPath: {
-    fontFamily: "Jost_400Regular",
-    fontSize: 13,
-    color: "#6B7280",
-    marginBottom: 10,
-  },
-  statusBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: 12,
-  },
-  statusText: {
-    fontFamily: "Jost_500Medium",
-    fontSize: 11,
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  dueDate: {
-    fontFamily: "Jost_500Medium",
-    fontSize: 13,
-    color: "#111111",
-  },
-  criticality: {
-    fontFamily: "Jost_400Regular",
-    fontSize: 13,
-    color: "#4B5563",
-  },
-  linkedText: {
-    fontFamily: "Jost_400Regular",
-    fontSize: 11,
-    color: "#9CA3AF",
-    marginTop: 4,
-  },
   emptyText: {
     fontFamily: "Jost_400Regular",
     textAlign: "center",

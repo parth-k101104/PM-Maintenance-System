@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Generator - PM Maintenance System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .search-container {
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        input#search {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input#search:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+        }
+
+        .parts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .part-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: transform 0.2s, border-color 0.2s;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .part-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary);
+        }
+
+        .part-info h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .part-info p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .btn-generate {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-align: center;
+        }
+
+        .btn-generate:hover {
+            background: var(--primary-hover);
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            padding: 2.5rem;
+            border-radius: 24px;
+            border: 1px solid var(--border);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            position: relative;
+        }
+
+        .modal-content h2 {
+            margin-bottom: 1.5rem;
+        }
+
+        .qr-placeholder {
+            width: 250px;
+            height: 250px;
+            background: white;
+            margin: 0 auto 1.5rem;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .qr-placeholder img {
+            width: 100%;
+            height: 100%;
+        }
+
+        .btn-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .btn-download {
+            display: inline-block;
+            margin-top: 1rem;
+            text-decoration: none;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>QR Generator</h1>
+            <p class="subtitle">Maintenance System Equipment Parts</p>
+        </header>
+
+        <div class="search-container">
+            <input type="text" id="search" placeholder="Search parts by name or ID...">
+        </div>
+
+        <div id="parts-container" class="parts-grid">
+            <div class="loading">Loading parts...</div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="qr-modal" class="modal">
+        <div class="modal-content">
+            <button class="btn-close" onclick="closeModal()">&times;</button>
+            <h2 id="modal-title">Part QR Code</h2>
+            <div class="qr-placeholder" id="qr-display">
+                <!-- QR Image will be injected here -->
+            </div>
+            <p id="modal-desc" style="font-size: 0.9rem; color: var(--text-muted);"></p>
+            <a href="#" id="download-link" class="btn-download" download="qr.png">Download PNG</a>
+        </div>
+    </div>
+
+    <script>
+        let allParts = [];
+
+        async function fetchParts() {
+            try {
+                const response = await fetch('/api/parts');
+                allParts = await response.json();
+                renderParts(allParts);
+            } catch (error) {
+                console.error('Error fetching parts:', error);
+                document.getElementById('parts-container').innerHTML = '<div class="loading">Error loading parts. Check database connection.</div>';
+            }
+        }
+
+        function renderParts(parts) {
+            const container = document.getElementById('parts-container');
+            container.innerHTML = '';
+
+            if (parts.length === 0) {
+                container.innerHTML = '<div class="loading">No parts found.</div>';
+                return;
+            }
+
+            parts.forEach(part => {
+                const card = document.createElement('div');
+                card.className = 'part-card';
+                card.onclick = () => generateQR(part.part_id, part.part_name);
+                
+                card.innerHTML = `
+                    <div class="part-info">
+                        <h3>${part.part_name}</h3>
+                        <p>Part ID: ${part.part_id}</p>
+                    </div>
+                    <button class="btn-generate">Generate QR</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function generateQR(id, name) {
+            const modal = document.getElementById('qr-modal');
+            const qrDisplay = document.getElementById('qr-display');
+            const downloadLink = document.getElementById('download-link');
+            
+            document.getElementById('modal-title').textContent = name;
+            document.getElementById('modal-desc').textContent = `Part ID: ${id}`;
+            
+            qrDisplay.innerHTML = '<div style="color: black">Generating...</div>';
+            modal.classList.add('active');
+
+            const qrUrl = `/api/generate/${id}`;
+            qrDisplay.innerHTML = `<img src="${qrUrl}" alt="QR Code">`;
+            downloadLink.href = qrUrl;
+            downloadLink.download = `QR_${id}_${name.replace(/\s+/g, '_')}.png`;
+        }
+
+        function closeModal() {
+            document.getElementById('qr-modal').classList.remove('active');
+        }
+
+        document.getElementById('search').oninput = (e) => {
+            const query = e.target.value.toLowerCase();
+            const filtered = allParts.filter(p => 
+                p.part_name.toLowerCase().includes(query) || 
+                p.part_id.toString().includes(query)
+            );
+            renderParts(filtered);
+        };
+
+        // Close modal on background click
+        window.onclick = (event) => {
+            const modal = document.getElementById('qr-modal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        };
+
+        fetchParts();
+    </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   FlatList,
   Pressable,
   RefreshControl,
@@ -13,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { LineChart } from "react-native-gifted-charts";
 
 import {
   acknowledgeLineManagerInsight,
@@ -21,8 +23,11 @@ import {
 } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
-import type { ActionInsight, AnalyticsDashboardResponse, PartPrediction } from "../types/api";
+import type { ActionInsight, AnalyticsDashboardResponse, HealthScore, PartPrediction } from "../types/api";
 import { RootStackParamList } from "../types/navigation";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const HEALTH_CHART_WIDTH = SCREEN_WIDTH - 32 - 36;
 
 function formatPercent(value?: number | null) {
   if (value === undefined || value === null) return "N/A";
@@ -39,6 +44,106 @@ function getRiskTone(value?: number | null) {
   if (risk >= 75) return styles.riskCritical;
   if (risk >= 45) return styles.riskWarning;
   return styles.riskStable;
+}
+
+type HealthGroup = {
+  key: string;
+  latest: HealthScore;
+  history: HealthScore[];
+};
+
+type EquipmentHealthNode = {
+  equipmentId?: number;
+  equipmentName: string;
+  health?: HealthGroup;
+  parts: PartPrediction[];
+};
+
+function healthKey(score: HealthScore) {
+  return `${score.entityType}:${score.entityId}`;
+}
+
+function compactDate(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(5);
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function buildHealthGroups(scores: HealthScore[] = []) {
+  const groups = new Map<string, HealthGroup>();
+  scores.forEach((score) => {
+    const key = healthKey(score);
+    const current = groups.get(key);
+    groups.set(key, {
+      key,
+      latest: current?.latest ?? score,
+      history: [...(current?.history ?? []), score],
+    });
+  });
+
+  return Array.from(groups.values()).map((group) => {
+    const history = group.history
+      .filter((score) => score.healthScore !== undefined && score.healthScore !== null)
+      .sort((a, b) => new Date(a.evaluationDate).getTime() - new Date(b.evaluationDate).getTime());
+    const latest = [...history].sort(
+      (a, b) => new Date(b.evaluationDate).getTime() - new Date(a.evaluationDate).getTime(),
+    )[0] ?? group.latest;
+    return { ...group, latest, history };
+  });
+}
+
+function HealthTrendChart({ group }: { group?: HealthGroup }) {
+  const points = group?.history ?? [];
+  const chartData = points.map((score, index) => ({
+    value: Number(score.healthScore ?? 0),
+    label: index === 0 || index === points.length - 1 ? compactDate(score.evaluationDate) : "",
+    dataPointText: index === points.length - 1 ? `${Math.round(score.healthScore ?? 0)}` : undefined,
+  }));
+
+  return (
+    <View style={styles.healthTrendCard}>
+      <View style={styles.healthTrendHeader}>
+        <View>
+          <Text style={styles.healthTrendTitle}>{group?.latest.entityName || "Select equipment"}</Text>
+          <Text style={styles.healthTrendMeta}>
+            {group?.latest.entityType || "Health"} trend | {group?.latest.trend || "N/A"}
+          </Text>
+        </View>
+        <Text style={styles.healthTrendValue}>{formatPercent(group?.latest.healthScore)}</Text>
+      </View>
+
+      {chartData.length >= 2 ? (
+        <LineChart
+          data={chartData}
+          height={170}
+          width={HEALTH_CHART_WIDTH}
+          initialSpacing={8}
+          endSpacing={8}
+          spacing={Math.max(38, HEALTH_CHART_WIDTH / Math.max(chartData.length - 1, 1))}
+          color="#6366F1"
+          thickness={3}
+          dataPointsColor="#6366F1"
+          dataPointsRadius={4}
+          curved={false}
+          maxValue={100}
+          noOfSections={4}
+          stepValue={25}
+          yAxisTextStyle={styles.axisLabel}
+          xAxisLabelTextStyle={styles.axisLabel}
+          xAxisColor="#E5E7EB"
+          yAxisColor="#E5E7EB"
+          rulesColor="#F3F4F6"
+          disableScroll
+          hideRules={false}
+        />
+      ) : (
+        <View style={styles.healthTrendEmpty}>
+          <Text style={styles.emptyText}>More health snapshots are needed for a trend graph.</Text>
+        </View>
+      )}
+    </View>
+  );
 }
 
 function InsightCard({
@@ -90,11 +195,11 @@ function InsightCard({
   );
 }
 
-function PredictionCard({ prediction }: { prediction: PartPrediction }) {
+function PredictionCard({ prediction, onPress }: { prediction: PartPrediction; onPress?: () => void }) {
   const lifecycle = prediction.lifecycleRatio !== undefined ? prediction.lifecycleRatio * 100 : undefined;
 
   return (
-    <View style={styles.predictionCard}>
+    <Pressable style={styles.predictionCard} onPress={onPress}>
       <View style={styles.predictionHeader}>
         <View>
           <Text style={styles.predictionTitle}>{prediction.partName}</Text>
@@ -128,7 +233,7 @@ function PredictionCard({ prediction }: { prediction: PartPrediction }) {
         Failure estimate: {prediction.predictedFailureDate || "Not enough data"} | Remaining:{" "}
         {prediction.daysRemaining ?? "N/A"} days
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -140,6 +245,7 @@ export function LineManagerAnalyticsDashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [closingInsightId, setClosingInsightId] = useState<number | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [selectedHealthKey, setSelectedHealthKey] = useState<string | null>(null);
 
   const loadDashboard = useCallback(
     async (asRefresh = false) => {
@@ -170,6 +276,52 @@ export function LineManagerAnalyticsDashboardScreen() {
     const lineScores = data?.healthScores.filter((score) => score.entityType === "LINE") ?? [];
     return lineScores[0];
   }, [data?.healthScores]);
+
+  const healthGroups = useMemo(() => buildHealthGroups(data?.healthScores ?? []), [data?.healthScores]);
+
+  const selectedHealthGroup = useMemo(() => {
+    if (!healthGroups.length) return undefined;
+    return healthGroups.find((group) => group.key === selectedHealthKey) ?? healthGroups[0];
+  }, [healthGroups, selectedHealthKey]);
+
+  const equipmentHierarchy = useMemo<EquipmentHealthNode[]>(() => {
+    const equipmentGroups = healthGroups.filter((group) => group.latest.entityType === "EQUIPMENT");
+    const predictionsByEquipment = new Map<number, PartPrediction[]>();
+    (data?.predictions ?? []).forEach((prediction) => {
+      if (prediction.equipmentId === undefined || prediction.equipmentId === null) return;
+      predictionsByEquipment.set(prediction.equipmentId, [
+        ...(predictionsByEquipment.get(prediction.equipmentId) ?? []),
+        prediction,
+      ]);
+    });
+
+    const ids = new Set<number>([
+      ...equipmentGroups.map((group) => group.latest.entityId),
+      ...Array.from(predictionsByEquipment.keys()),
+    ]);
+
+    return Array.from(ids).map((equipmentId) => {
+      const health = equipmentGroups.find((group) => group.latest.entityId === equipmentId);
+      const parts = predictionsByEquipment.get(equipmentId) ?? [];
+      return {
+        equipmentId,
+        equipmentName: health?.latest.entityName || parts[0]?.equipmentName || `Equipment #${equipmentId}`,
+        health,
+        parts,
+      };
+    });
+  }, [data?.predictions, healthGroups]);
+
+  function openPartAnalytics(part: PartPrediction) {
+    navigation.navigate("LineManagerPartAnalytics", {
+      part: {
+        partId: part.partId,
+        partName: part.partName,
+        equipmentId: part.equipmentId ?? 0,
+        equipmentName: part.equipmentName ?? "Equipment unavailable",
+      },
+    });
+  }
 
   async function acknowledgeInsight(insightId: number) {
     if (!authState.session?.token) return;
@@ -252,6 +404,83 @@ export function LineManagerAnalyticsDashboardScreen() {
             </View>
 
             {/* ── Actionable insights inside scrollable card ── */}
+            <Text style={styles.sectionTitle}>Health score trends</Text>
+            <HealthTrendChart group={selectedHealthGroup} />
+
+            <View style={styles.hierarchyCard}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.healthSelectorRow}
+              >
+                {healthGroups.map((group) => {
+                  const selected = group.key === selectedHealthGroup?.key;
+                  return (
+                    <Pressable
+                      key={group.key}
+                      style={[styles.healthChip, selected && styles.healthChipSelected]}
+                      onPress={() => setSelectedHealthKey(group.key)}
+                    >
+                      <Text style={[styles.healthChipLabel, selected && styles.healthChipLabelSelected]}>
+                        {group.latest.entityType}
+                      </Text>
+                      <Text
+                        style={[styles.healthChipName, selected && styles.healthChipNameSelected]}
+                        numberOfLines={1}
+                      >
+                        {group.latest.entityName || `#${group.latest.entityId}`}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              {equipmentHierarchy.length ? (
+                equipmentHierarchy.map((equipment) => (
+                  <View key={equipment.equipmentId ?? equipment.equipmentName} style={styles.equipmentNode}>
+                    <Pressable
+                      style={styles.equipmentNodeHeader}
+                      onPress={() => equipment.health && setSelectedHealthKey(equipment.health.key)}
+                      disabled={!equipment.health}
+                    >
+                      <View style={styles.equipmentTitleWrap}>
+                        <Ionicons name="hardware-chip-outline" size={18} color="#4B5563" />
+                        <Text style={styles.equipmentNodeTitle}>{equipment.equipmentName}</Text>
+                      </View>
+                      <View style={styles.equipmentScorePill}>
+                        <Text style={styles.equipmentScoreText}>
+                          {formatPercent(equipment.health?.latest.healthScore)}
+                        </Text>
+                      </View>
+                    </Pressable>
+                    {equipment.parts.length ? (
+                      <View style={styles.partNodeList}>
+                        {equipment.parts.map((part) => (
+                          <Pressable
+                            key={part.partId}
+                            style={styles.partNode}
+                            onPress={() => openPartAnalytics(part)}
+                          >
+                            <View style={styles.partNodeTextWrap}>
+                              <Text style={styles.partNodeTitle}>{part.partName}</Text>
+                              <Text style={styles.partNodeMeta}>
+                                Risk {formatPercent(part.riskScore)} | Remaining {part.daysRemaining ?? "N/A"}d
+                              </Text>
+                            </View>
+                            <Ionicons name="analytics-outline" size={18} color="#6366F1" />
+                          </Pressable>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.partNodeEmpty}>No part predictions for this equipment yet.</Text>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>No equipment health scores are available yet.</Text>
+              )}
+            </View>
+
             <Text style={styles.sectionTitle}>Actionable insights</Text>
             <View style={styles.insightsCard}>
               {(data?.actionInsights ?? []).length ? (
@@ -292,7 +521,7 @@ export function LineManagerAnalyticsDashboardScreen() {
         ListEmptyComponent={
           <Text style={styles.emptyText}>No predictions are available for your line yet.</Text>
         }
-        renderItem={({ item }) => <PredictionCard prediction={item} />}
+        renderItem={({ item }) => <PredictionCard prediction={item} onPress={() => openPartAnalytics(item)} />}
       />
     </SafeAreaView>
   );
@@ -339,6 +568,76 @@ const styles = StyleSheet.create({
   healthMetaBox: { alignItems: "flex-end" },
   healthMetaLabel: { fontFamily: "Jost_400Regular", fontSize: 12, color: "#36503A" },
   healthMetaValue: { fontFamily: "Jost_600SemiBold", fontSize: 16, color: "#111111", marginTop: 2 },
+  healthTrendCard: {
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#EEF0F5",
+  },
+  healthTrendHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  healthTrendTitle: { fontFamily: "Jost_600SemiBold", fontSize: 16, color: "#111111" },
+  healthTrendMeta: { fontFamily: "Jost_400Regular", fontSize: 12, color: "#626781", marginTop: 2 },
+  healthTrendValue: { fontFamily: "Jost_600SemiBold", fontSize: 24, color: "#111111" },
+  healthTrendEmpty: { height: 170, alignItems: "center", justifyContent: "center" },
+  axisLabel: { color: "#9CA3AF", fontSize: 9, fontFamily: "Jost_400Regular" },
+  hierarchyCard: {
+    borderRadius: 18,
+    backgroundColor: "#F5F6FA",
+    padding: 12,
+    marginBottom: 22,
+  },
+  healthSelectorRow: { gap: 8, paddingBottom: 12 },
+  healthChip: {
+    width: 138,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
+  },
+  healthChipSelected: { borderColor: "#6366F1", backgroundColor: "#EEF2FF" },
+  healthChipLabel: { fontFamily: "Jost_600SemiBold", fontSize: 10, color: "#626781" },
+  healthChipLabelSelected: { color: "#4F46E5" },
+  healthChipName: { fontFamily: "Jost_500Medium", fontSize: 13, color: "#111111", marginTop: 2 },
+  healthChipNameSelected: { color: "#312E81" },
+  equipmentNode: {
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    marginBottom: 10,
+  },
+  equipmentNodeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  equipmentTitleWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8 },
+  equipmentNodeTitle: { flex: 1, fontFamily: "Jost_600SemiBold", fontSize: 15, color: "#111111" },
+  equipmentScorePill: { borderRadius: 999, backgroundColor: "#D8EAD7", paddingHorizontal: 10, paddingVertical: 4 },
+  equipmentScoreText: { fontFamily: "Jost_600SemiBold", fontSize: 12, color: "#36503A" },
+  partNodeList: { marginTop: 10, gap: 8, paddingLeft: 10, borderLeftWidth: 2, borderLeftColor: "#E5E7EB" },
+  partNode: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 12,
+    backgroundColor: "#FAFAFA",
+    padding: 10,
+  },
+  partNodeTextWrap: { flex: 1 },
+  partNodeTitle: { fontFamily: "Jost_600SemiBold", fontSize: 14, color: "#111111" },
+  partNodeMeta: { fontFamily: "Jost_400Regular", fontSize: 12, color: "#626781", marginTop: 2 },
+  partNodeEmpty: { fontFamily: "Jost_400Regular", fontSize: 12, color: "#626781", marginTop: 8 },
   sectionTitle: {
     fontFamily: "Jost_600SemiBold",
     fontSize: 18,

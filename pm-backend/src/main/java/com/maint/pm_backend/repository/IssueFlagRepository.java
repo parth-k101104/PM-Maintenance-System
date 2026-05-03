@@ -81,6 +81,22 @@ public interface IssueFlagRepository extends JpaRepository<IssueFlag, Long> {
     List<IssueFlagProjection> findFlagsBySupervisorId(@Param("supervisorId") Long supervisorId);
 
     @Query(value =
+        "SELECT COUNT(*) > 0 " +
+        "FROM issue_flags f " +
+        "JOIN pm_schedule_execution se ON f.schedule_execution_id = se.schedule_execution_id " +
+        "JOIN pm_task_schedules ts     ON se.task_schedule_id = ts.task_schedule_id " +
+        "JOIN pm_std_tasks st          ON ts.std_task_id = st.std_task_id " +
+        "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
+        "LEFT JOIN equipments eq       ON ee.equipment_id = eq.equipment_id " +
+        "JOIN lines l                  ON eq.line_id = l.line_id " +
+        "WHERE f.flag_id = :flagId " +
+        "  AND l.supervisor_user_id = :supervisorId",
+        nativeQuery = true)
+    boolean existsByFlagIdAndSupervisorLine(
+            @Param("flagId") Long flagId,
+            @Param("supervisorId") Long supervisorId);
+
+    @Query(value =
         "SELECT f.flag_id             AS flagId, " +
         "       se.schedule_execution_id AS scheduleExecutionId, " +
         "       ep.part_id            AS partId, " +

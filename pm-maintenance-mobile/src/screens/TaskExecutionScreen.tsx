@@ -403,23 +403,6 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
 
             {manualIssueEnabled ? (
               <View style={styles.manualIssueBody}>
-                <View style={styles.segmentedControl}>
-                  {(["POTENTIAL_REPLACEMENT", "REPLACEMENT_REQUIRED"] as const).map((status) => {
-                    const selected = manualFlagStatus === status;
-                    return (
-                      <Pressable
-                        key={status}
-                        style={[styles.segmentButton, selected && styles.segmentButtonActive]}
-                        onPress={() => setManualFlagStatus(status)}
-                        disabled={isLoading}
-                      >
-                        <Text style={[styles.segmentButtonText, selected && styles.segmentButtonTextActive]}>
-                          {status === "POTENTIAL_REPLACEMENT" ? "Potential" : "Required"}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
                 <TextInput
                   value={manualIssueDetails}
                   onChangeText={setManualIssueDetails}

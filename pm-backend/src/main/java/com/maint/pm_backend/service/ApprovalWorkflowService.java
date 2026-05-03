@@ -65,6 +65,10 @@ public class ApprovalWorkflowService {
         PmScheduleExecution execution = executionRepository.findById(request.getScheduleExecutionId())
                 .orElseThrow(() -> new RuntimeException("Task execution not found: " + request.getScheduleExecutionId()));
 
+        if (request.getEvidenceRejectedFlag() != null) {
+            execution.setEvidenceRejectedFlag(request.getEvidenceRejectedFlag());
+        }
+
         boolean isApprove = request.getAction().equalsIgnoreCase("APPROVE");
         currentApproval.setApprovalStatus(isApprove ? TaskApprovalStatus.APPROVED : TaskApprovalStatus.REJECTED);
         currentApproval.setApprovedDttm(LocalDateTime.now());
