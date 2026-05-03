@@ -512,36 +512,7 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
             nativeQuery = true)
         int countRejectedTasksForLineManager(@Param("lineManagerId") Long lineManagerId);
 
-    @Query(value = "SELECT st.uom AS uom, " +
-            "st.tolerance_min AS toleranceMin, " +
-            "st.tolerance_max AS toleranceMax, " +
-            "st.standard_value AS standardValue, " +
-            "se.actual_value AS actualValue, " +
-            "se.deviation_flag AS deviationFlag, " +
-            "se.time_taken AS timeTaken, " +
-            "se.notes AS notes, " +
-            "st.estimated_req_time AS estimatedReqTime, " +
-            "st.std_task_id AS stdTaskId " +
-            "FROM pm_schedule_execution se " +
-            "JOIN pm_schedule_approval sa ON se.schedule_execution_id = sa.schedule_execution_id " +
-            "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
-            "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
-            "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
-            "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
-            "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
-            "WHERE sa.approver_id = :supervisorId " +
-            "  AND sa.approval_level = 1 " +
-            "  AND sa.approval_status = 'APPROVAL_REQUESTED' " +
-            "  AND se.schedule_execution_id = :scheduleExecutionId " +
-            "  AND (CAST(:equipmentId AS bigint) IS NULL OR eq.equipment_id = :equipmentId) " +
-            "  AND (CAST(:elementId AS bigint) IS NULL OR ee.element_id = :elementId) " +
-            "  AND (CAST(:partId AS bigint) IS NULL OR ep.part_id = :partId)", nativeQuery = true)
-    java.util.Optional<com.maint.pm_backend.dto.SupervisorTaskValidationProjection> validateAndFetchSupervisorTaskMetadata(
-            @Param("scheduleExecutionId") Long scheduleExecutionId,
-            @Param("supervisorId") Long supervisorId,
-            @Param("equipmentId") Long equipmentId,
-            @Param("elementId") Long elementId,
-            @Param("partId") Long partId);
+
         @Query(value =
             "SELECT COUNT(DISTINCT eq.equipment_id) " +
             "FROM equipments eq " +

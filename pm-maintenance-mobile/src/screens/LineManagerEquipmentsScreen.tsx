@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import { fetchLineManagerEquipments } from "../api/client";
+import { fetchLineManagerEquipments, runAnalyticsSyncJob } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { LineEquipment } from "../types/api";
@@ -16,6 +16,7 @@ export function LineManagerEquipmentsScreen() {
   const { authState } = useAuth();
   const [equipments, setEquipments] = useState<LineEquipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     async function loadEquipments() {
@@ -40,6 +41,22 @@ export function LineManagerEquipmentsScreen() {
     return { elements, parts };
   }, [equipments]);
 
+  async function handleSync() {
+    if (!authState.session?.token || syncing) return;
+    setSyncing(true);
+    try {
+      await runAnalyticsSyncJob(authState.session.token);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  function navigateToPart(part: { partId: number; partName: string }, equipmentName: string, equipmentId: number) {
+    navigation.navigate("LineManagerPartAnalytics", {
+      part: { partId: part.partId, partName: part.partName, equipmentName, equipmentId },
+    });
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -57,6 +74,17 @@ export function LineManagerEquipmentsScreen() {
           <Ionicons name="arrow-back-outline" size={28} color="#111111" />
         </Pressable>
         <Text style={styles.headerTitle}>Line equipments</Text>
+        <Pressable
+          style={[styles.syncBtn, syncing && styles.syncBtnDisabled]}
+          onPress={handleSync}
+          disabled={syncing}
+        >
+          {syncing ? (
+            <ActivityIndicator size="small" color="#111111" />
+          ) : (
+            <Ionicons name="sync-outline" size={19} color="#111111" />
+          )}
+        </Pressable>
       </View>
 
       <View style={styles.summaryBand}>
@@ -97,9 +125,14 @@ export function LineManagerEquipmentsScreen() {
                 <View style={styles.partsWrap}>
                   {(element.parts ?? []).length ? (
                     element.parts.map((part) => (
-                      <View key={part.partId} style={styles.partPill}>
+                      <Pressable
+                        key={part.partId}
+                        style={({ pressed }) => [styles.partPill, pressed && styles.partPillPressed]}
+                        onPress={() => navigateToPart(part, item.equipmentName, item.equipmentId)}
+                      >
                         <Text style={styles.partText}>{part.partName}</Text>
-                      </View>
+                        <Ionicons name="analytics-outline" size={12} color="#4B6FA8" style={styles.partIcon} />
+                      </Pressable>
                     ))
                   ) : (
                     <Text style={styles.noPartsText}>No parts mapped</Text>
@@ -125,8 +158,18 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
+    gap: 12,
   },
-  headerTitle: { fontFamily: "Jost_500Medium", fontSize: 22, flex: 1, marginLeft: 16, color: "#111111" },
+  headerTitle: { fontFamily: "Jost_500Medium", fontSize: 22, flex: 1, color: "#111111" },
+  syncBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: "#F5E4C9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  syncBtnDisabled: { opacity: 0.7 },
   summaryBand: {
     flexDirection: "row",
     backgroundColor: "#F5F6FA",
@@ -154,8 +197,20 @@ const styles = StyleSheet.create({
   elementBlock: { borderTopWidth: 1, borderTopColor: "#E0E2EA", paddingTop: 12, marginTop: 12 },
   elementName: { fontFamily: "Jost_500Medium", fontSize: 15, color: "#2F3448", marginBottom: 8 },
   partsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  partPill: { borderRadius: 999, backgroundColor: "#FFFFFF", paddingHorizontal: 10, paddingVertical: 5 },
-  partText: { fontFamily: "Jost_400Regular", fontSize: 12, color: "#4A4F68" },
+  partPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#D0D6E8",
+  },
+  partPillPressed: { backgroundColor: "#E8EDF8", opacity: 0.85 },
+  partText: { fontFamily: "Jost_400Regular", fontSize: 12, color: "#2C346F" },
+  partIcon: { marginTop: 1 },
   noPartsText: { fontFamily: "Jost_400Regular", fontSize: 12, color: "#7A7A8D" },
   emptyText: { fontFamily: "Jost_400Regular", textAlign: "center", marginTop: 36, fontSize: 15, color: "#666" },
 });

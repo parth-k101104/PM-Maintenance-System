@@ -1,6 +1,5 @@
 package com.maint.pm_backend.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.maint.pm_backend.config.AnalyticsServiceProperties;
 import org.springframework.stereotype.Service;
@@ -48,7 +47,7 @@ public class AnalyticsJobTokenService {
     private byte[] toJson(Map<String, Object> payload) {
         try {
             return objectMapper.writeValueAsBytes(payload);
-        } catch (JsonProcessingException ex) {
+        } catch (Exception ex) {
             throw new IllegalStateException("Failed to serialize analytics job token payload.", ex);
         }
     }

@@ -1,14 +1,17 @@
 import type {
-  LoginRequest,
-  LoginResponse,
+  AnalyticsDashboardResponse,
   ApprovalActionRequest,
   ApprovalActionResponse,
   FlagReplacementRequest,
   FlagScanRequest,
   FlagScanResponse,
   IssueFlag,
-  OperatorDashboardResponse,
+  JobRunResponse,
+  LineEquipment,
   LineManagerDashboardResponse,
+  LoginRequest,
+  LoginResponse,
+  OperatorDashboardResponse,
   QRScanRequest,
   QRScanResponse,
   SupervisorDashboardResponse,
@@ -16,31 +19,18 @@ import type {
   SupervisorQRScanResponse,
   TaskCompletionRequest,
   TaskCompletionResponse,
+  TaskDetails,
   TaskDocumentUrls,
 } from "../types/api";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// API base URL
-//
-// Set EXPO_PUBLIC_API_BASE_URL in your .env file (copy from .env.example).
-// Expo inlines EXPO_PUBLIC_* vars at bundle time, so a restart is required
-// whenever you change .env.
-// ─────────────────────────────────────────────────────────────────────────────
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 
 if (!API_BASE_URL) {
   console.warn(
-    "[api/client] EXPO_PUBLIC_API_BASE_URL is not set. " +
-      "Copy .env.example → .env and set the correct backend URL."
+    "[api/client] EXPO_PUBLIC_API_BASE_URL is not set. Copy .env.example to .env and set the backend URL.",
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Base HTTP helper
-//
-// `...init` is spread FIRST so the explicit `headers` block below always wins,
-// ensuring Content-Type: application/json is never overwritten by the caller.
-// ─────────────────────────────────────────────────────────────────────────────
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -64,12 +54,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(message || "Request failed");
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Auth
-// ─────────────────────────────────────────────────────────────────────────────
 
 export async function login(payload: LoginRequest) {
   return request<LoginResponse>("/api/auth/login", {
@@ -77,10 +67,6 @@ export async function login(payload: LoginRequest) {
     body: JSON.stringify(payload),
   });
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Dashboard
-// ─────────────────────────────────────────────────────────────────────────────
 
 export async function fetchOperatorDashboard(token: string) {
   return request<OperatorDashboardResponse>("/api/v1/dashboard/operator", {
@@ -103,33 +89,29 @@ export async function fetchLineManagerDashboard(token: string) {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Task lists
-// ─────────────────────────────────────────────────────────────────────────────
-
 export async function fetchTasksForToday(token: string) {
-  return request<import("../types/api").TaskDetails[]>("/api/v1/tasks/today", {
+  return request<TaskDetails[]>("/api/v1/tasks/today", {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
 export async function fetchSupervisorTodaysApprovals(token: string) {
-  return request<import("../types/api").TaskDetails[]>("/api/v1/tasks/supervisor/approvals/today", {
+  return request<TaskDetails[]>("/api/v1/tasks/supervisor/approvals/today", {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
 export async function fetchLineManagerTodaysApprovals(token: string) {
-  return request<import("../types/api").TaskDetails[]>("/api/v1/line-manager/approvals/today", {
+  return request<TaskDetails[]>("/api/v1/line-manager/approvals/today", {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
 export async function fetchLineManagerBacklogApprovals(token: string) {
-  return request<import("../types/api").TaskDetails[]>("/api/v1/line-manager/approvals/backlog", {
+  return request<TaskDetails[]>("/api/v1/line-manager/approvals/backlog", {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -143,16 +125,38 @@ export async function fetchLineManagerFlags(token: string) {
 }
 
 export async function fetchLineManagerActiveTasks(token: string) {
-  return request<import("../types/api").TaskDetails[]>("/api/v1/line-manager/tasks/active", {
+  return request<TaskDetails[]>("/api/v1/line-manager/tasks/active", {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
 export async function fetchLineManagerEquipments(token: string) {
-  return request<import("../types/api").LineEquipment[]>("/api/v1/line-manager/equipments", {
+  return request<LineEquipment[]>("/api/v1/line-manager/equipments", {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchLineManagerAnalyticsDashboard(token: string) {
+  return request<AnalyticsDashboardResponse>("/api/v1/line-manager/analytics/dashboard", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function acknowledgeLineManagerInsight(token: string, insightId: number) {
+  return request<void>(`/api/v1/line-manager/analytics/insights/${insightId}/acknowledge`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function runAnalyticsSyncJob(token: string) {
+  return request<JobRunResponse>("/api/system-jobs/NIGHTLY_PHM_ANALYTICS_SYNC/run", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ persist: true, triggerType: "MANUAL_UI" }),
   });
 }
 
@@ -164,22 +168,18 @@ export async function fetchCompletedTasks(token: string) {
 }
 
 export async function fetchBacklogTasks(token: string) {
-  return request<import("../types/api").TaskDetails[]>("/api/v1/tasks/backlog", {
+  return request<TaskDetails[]>("/api/v1/tasks/backlog", {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
 }
 
 export async function fetchUpcomingTasks(token: string) {
-  return request<import("../types/api").TaskDetails[]>("/api/v1/tasks/upcoming", {
+  return request<TaskDetails[]>("/api/v1/tasks/upcoming", {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Documents
-// ─────────────────────────────────────────────────────────────────────────────
 
 export async function fetchTaskDocuments(token: string, scheduleExecutionId: number) {
   return request<TaskDocumentUrls>(`/api/v1/documents/task/${scheduleExecutionId}`, {
@@ -188,31 +188,8 @@ export async function fetchTaskDocuments(token: string, scheduleExecutionId: num
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Task execution
-// ─────────────────────────────────────────────────────────────────────────────
-
 export async function scanTaskQr(token: string, payload: QRScanRequest) {
   return request<QRScanResponse>("/api/v1/task-execution/scan", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-  });
-}
-
-export interface SupervisorApprovalResponse {
-  status: string;
-  message: string;
-  executionStatus?: string;
-  nextApproverId?: number;
-  rescheduledExecutionId?: number;
-}
-
-export async function processSupervisorApproval(
-  token: string,
-  payload: { scheduleExecutionId: number; action: "APPROVE" | "REJECT"; remarks?: string }
-) {
-  return request<SupervisorApprovalResponse>("/api/v1/supervisor/approvals/action", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
@@ -275,11 +252,7 @@ export async function completeTask(token: string, payload: TaskCompletionRequest
   });
 }
 
-
-export async function fetchEmployeeApprovalSummary(
-  token: string,
-  period: "CURRENT_MONTH" | "YEAR"
-) {
+export async function fetchEmployeeApprovalSummary(token: string, period: "CURRENT_MONTH" | "YEAR") {
   return request<
     {
       employeeId: number;
@@ -295,10 +268,14 @@ export async function fetchEmployeeApprovalSummary(
       rejected: number;
     }[]
   >(`/api/v1/supervisor/approvals/employees/summary?period=${period}`, {
-// --- Flags ---
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
 
 export async function fetchMyFlags(token: string) {
   return request<IssueFlag[]>("/api/v1/issues/operator", {
+    method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
 }
@@ -326,7 +303,11 @@ export async function fetchSupervisorFlags(token: string) {
   });
 }
 
-export async function reviewFlagAsLineManager(token: string, flagId: number, payload: { newStatus: string, criticality?: string, notes?: string, closureReason?: string }) {
+export async function reviewFlagAsLineManager(
+  token: string,
+  flagId: number,
+  payload: { newStatus: string; criticality?: string; notes?: string; closureReason?: string },
+) {
   return request<IssueFlag>(`/api/v1/issues/${flagId}/review`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
@@ -334,14 +315,26 @@ export async function reviewFlagAsLineManager(token: string, flagId: number, pay
   });
 }
 
-export async function reviewFlagAsSupervisor(token: string, flagId: number, payload: { newStatus: string, notes?: string }) {
+export async function reviewFlagAsSupervisor(
+  token: string,
+  flagId: number,
+  payload: { newStatus: string; notes?: string },
+) {
   return request<IssueFlag>(`/api/v1/issues/${flagId}/review`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
   });
+}
+
+export async function fetchPartAnalytics(token: string, partId: number) {
+  return request<import("../types/api").PartAnalyticsResponse>(
+    `/api/v1/line-manager/analytics/parts/${partId}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 }
 
 export { API_BASE_URL };
-
-

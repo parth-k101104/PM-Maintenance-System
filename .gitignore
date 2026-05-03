@@ -1,0 +1,65 @@
+# --- General / OS ---
+.DS_Store
+Thumbs.db
+.env
+.vscode/
+.idea/
+*.swp
+
+# --- Node / Mobile (pm-maintenance-mobile) ---
+node_modules/
+**/node_modules/
+.expo/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Python / Analytics (pm-analytics-service) ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+build/
+develop-eggs/
+downloads/
+eggs/
+.lib/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Java / Spring Boot (pm-backend) ---
+target/
+!.mvn/wrapper/maven-wrapper.jar
+.mtj.tmp/
+*.class
+*.bluej
+*.jar
+*.war
+*.ear
+*.nar
+*.cacerts
+*.p12
+*.jks
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+build/
+
+# --- System Specifics ---
+.history/

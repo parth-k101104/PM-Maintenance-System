@@ -1,4 +1,4 @@
-import type { QRScanResponse, ScannedEquipmentDetails, SupervisorQRScanResponse, TaskDetails, IssueFlag } from "./api";
+import type { QRScanResponse, ScannedEquipmentDetails, SupervisorQRScanResponse, TaskDetails, IssueFlag, LineEquipment } from "./api";
 
 export type RootStackParamList = {
   Dashboard: undefined;
@@ -8,6 +8,9 @@ export type RootStackParamList = {
   LineManagerBacklogApprovals: undefined;
   LineManagerFlags: undefined;
   LineManagerEquipments: undefined;
+  LineManagerAnalyticsDashboard: undefined;
+  LineManagerEquipmentParts: { equipment: LineEquipment };
+  LineManagerPartAnalytics: { part: { partId: number; partName: string; equipmentName: string; equipmentId: number } };
   BacklogTasks: undefined;
   TaskApproval: undefined;
   UpcomingTasks: undefined;
