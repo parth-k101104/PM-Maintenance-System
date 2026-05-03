@@ -19,6 +19,8 @@ import { LineManagerTodayApprovalsScreen } from "./src/screens/LineManagerTodayA
 import { LineManagerBacklogApprovalsScreen } from "./src/screens/LineManagerBacklogApprovalsScreen";
 import { LineManagerFlagsScreen } from "./src/screens/LineManagerFlagsScreen";
 import { LineManagerEquipmentsScreen } from "./src/screens/LineManagerEquipmentsScreen";
+import { LineManagerAnalyticsDashboardScreen } from "./src/screens/LineManagerAnalyticsDashboardScreen";
+import { LineManagerPartAnalyticsScreen } from "./src/screens/LineManagerPartAnalyticsScreen";
 import { SupervisorTaskReviewScreen } from "./src/screens/SupervisorTaskReviewScreen";
 import { BacklogTasksScreen } from "./src/screens/BacklogTasksScreen";
 import { UpcomingTasksScreen } from "./src/screens/UpcomingTasksScreen";
@@ -60,6 +62,8 @@ function RootNavigator() {
         <Stack.Screen name="LineManagerBacklogApprovals" component={LineManagerBacklogApprovalsScreen} />
         <Stack.Screen name="LineManagerFlags" component={LineManagerFlagsScreen} />
         <Stack.Screen name="LineManagerEquipments" component={LineManagerEquipmentsScreen} />
+        <Stack.Screen name="LineManagerAnalyticsDashboard" component={LineManagerAnalyticsDashboardScreen} />
+        <Stack.Screen name="LineManagerPartAnalytics" component={LineManagerPartAnalyticsScreen} />
         <Stack.Screen name="BacklogTasks" component={BacklogTasksScreen} />
         <Stack.Screen name="TaskApproval" component={TaskApprovalScreen} />
         <Stack.Screen name="UpcomingTasks" component={UpcomingTasksScreen} />
@@ -111,4 +115,3 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
 });
-

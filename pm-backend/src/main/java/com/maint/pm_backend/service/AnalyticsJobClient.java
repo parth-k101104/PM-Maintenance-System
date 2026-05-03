@@ -1,8 +1,9 @@
 package com.maint.pm_backend.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.maint.pm_backend.config.AnalyticsServiceProperties;
+import com.maint.pm_backend.entity.SystemJob;
+import com.maint.pm_backend.entity.enums.SystemJobTriggerType;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -17,7 +18,6 @@ import java.util.Map;
 @Service
 public class AnalyticsJobClient {
 
-    private static final String NIGHTLY_JOB_CODE = "NIGHTLY_PHM_ANALYTICS_SYNC";
     private static final String RUN_NIGHTLY_PATH = "/api/v1/batch/run-nightly";
 
     private final AnalyticsServiceProperties properties;
@@ -39,13 +39,29 @@ public class AnalyticsJobClient {
     }
 
     public String runNightlyAnalytics(boolean persist) {
-        String token = tokenService.generateJobToken(NIGHTLY_JOB_CODE);
+        return runAnalyticsJob(null, SystemJobTriggerType.MANUAL_API, null, persist);
+    }
+
+    public String runAnalyticsJob(
+            SystemJob job,
+            SystemJobTriggerType triggerType,
+            Long triggeredByEmployeeId,
+            boolean persist
+    ) {
+        String jobCode = job != null ? job.getJobCode() : "NIGHTLY_PHM_ANALYTICS_SYNC";
+        String targetEndpoint = job != null ? job.getTargetApiEndpoint() : RUN_NIGHTLY_PATH;
+        String token = tokenService.generateJobToken(jobCode);
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(properties.getBaseUrl() + RUN_NIGHTLY_PATH))
+                .uri(resolveTargetUri(targetEndpoint))
+                .version(HttpClient.Version.HTTP_1_1)
                 .timeout(Duration.ofMinutes(10))
                 .header("Content-Type", "application/json")
                 .header("X-Analytics-Job-Token", token)
-                .POST(HttpRequest.BodyPublishers.ofString(toJson(Map.of("persist", persist))))
+                .POST(HttpRequest.BodyPublishers.ofString(toJson(buildRequestBody(
+                        persist,
+                        triggerType,
+                        triggeredByEmployeeId
+                ))))
                 .build();
 
         try {
@@ -67,8 +83,33 @@ public class AnalyticsJobClient {
     private String toJson(Map<String, Object> input) {
         try {
             return objectMapper.writeValueAsString(new LinkedHashMap<>(input));
-        } catch (JsonProcessingException ex) {
+        } catch (Exception ex) {
             throw new IllegalStateException("Failed to serialize analytics request.", ex);
         }
+    }
+
+    private Map<String, Object> buildRequestBody(
+            boolean persist,
+            SystemJobTriggerType triggerType,
+            Long triggeredByEmployeeId
+    ) {
+        Map<String, Object> requestBody = new LinkedHashMap<>();
+        requestBody.put("persist", persist);
+        requestBody.put("trigger_type", triggerType.name());
+        if (triggeredByEmployeeId != null) {
+            requestBody.put("triggered_by_employee_id", triggeredByEmployeeId);
+        }
+        return requestBody;
+    }
+
+    private URI resolveTargetUri(String targetEndpoint) {
+        if (targetEndpoint == null || targetEndpoint.isBlank()) {
+            return URI.create(properties.getBaseUrl() + RUN_NIGHTLY_PATH);
+        }
+        if (targetEndpoint.startsWith("http://") || targetEndpoint.startsWith("https://")) {
+            return URI.create(targetEndpoint);
+        }
+        String separator = targetEndpoint.startsWith("/") ? "" : "/";
+        return URI.create(properties.getBaseUrl() + separator + targetEndpoint);
     }
 }

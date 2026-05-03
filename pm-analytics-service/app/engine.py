@@ -62,6 +62,15 @@ def run_nightly(
                     "degradation_velocity": result.degradation_velocity,
                     "risk_score": result.risk_score,
                     "lifecycle_ratio": result.lifecycle_ratio,
+                    "chart_data_payload": {
+                        "status": result.status,
+                        "velocity_ratio": result.velocity_ratio,
+                        "thresholds": result.thresholds.model_dump(),
+                        "current_cycle": [p.model_dump() for p in result.current_cycle],
+                        "historical_cycles": [c.model_dump() for c in result.historical_cycles],
+                        "simulated_failure_curve": [p.model_dump() for p in result.simulated_failure_curve],
+                        "master_curve": [p.model_dump() for p in result.master_curve],
+                    },
                 },
                 evaluation_date,
             )
@@ -117,7 +126,12 @@ def evaluate_task(conn, task: dict[str, Any], evaluation_date: date) -> tuple[Pr
 
     master_points = build_master_curve(completed_cycles)
     historical_velocity = mean([abs(slope_per_day(to_series_points(c.points, c.start))) for c in completed_cycles]) if completed_cycles else 0.0
-    velocity_ratio = abs(current_slope) / historical_velocity if historical_velocity > 0 else None
+    
+    # Flaw 2 Fix: Only penalize velocity if moving toward the boundary
+    if moving_toward_boundary(current_slope, boundary) and historical_velocity > 0:
+        velocity_ratio = abs(current_slope) / historical_velocity
+    else:
+        velocity_ratio = 1.0 # Safe baseline for stable or healing parts
 
     lifecycle_ratio = calculate_lifecycle_ratio(
         current_cycle=current_cycle,
@@ -140,9 +154,20 @@ def evaluate_task(conn, task: dict[str, Any], evaluation_date: date) -> tuple[Pr
     if status in {"LINEAR_REGRESSION", "MASTER_CURVE"} and prediction_threshold is not None and moving_toward_boundary(current_slope, boundary):
         if crossed_failure(current_value, prediction_threshold, boundary):
             days_to_threshold = 0
+        elif status == "MASTER_CURVE" and master_points:
+            # Flaw 1 Fix: Use Master Curve for non-linear prediction
+            days_to_threshold = predict_days_to_threshold_from_master(
+                current_value=current_value,
+                threshold=prediction_threshold,
+                master_points=master_points,
+                boundary=boundary,
+                current_slope=current_slope
+            )
         else:
+            # Fallback to Linear Regression
             distance = abs(prediction_threshold - current_value)
             days_to_threshold = max(0, ceil(distance / abs(current_slope)))
+            
         predicted_failure_date = current_points[-1].date + timedelta(days=days_to_threshold)
         days_remaining = max(0, (predicted_failure_date - evaluation_date).days)
         if status == "LINEAR_REGRESSION":
@@ -313,22 +338,50 @@ def health_contribution(audit: dict[str, Any]) -> float:
 
 
 def build_cycles(executions: list[dict[str, Any]], replacements: list[datetime]) -> list[Cycle]:
+    """
+    Flaw 3 Fix: Properly anchors cycles to replacements and handles the implicit 'Cycle 0'.
+    """
     if not executions:
         return []
 
-    boundaries = [dt for dt in replacements if executions[0]["completed_dttm"] < dt]
-    starts = [executions[0]["completed_dttm"], *boundaries]
-    cycles: list[Cycle] = []
+    # Sort replacements to ensure order
+    all_replacements = sorted(replacements)
+    
+    # Determine the absolute start of the first observed cycle
+    # If there's a replacement BEFORE the first execution, that's our start.
+    # Otherwise, we assume the machine was in service at least 1 day before the first reading.
+    first_execution_time = executions[0]["completed_dttm"]
+    
+    starts: list[datetime] = []
+    
+    # 1. Handle the very first cycle anchor
+    if not all_replacements or first_execution_time < all_replacements[0]:
+        # No replacement before first execution: anchor 1 day before
+        starts.append(first_execution_time - timedelta(days=1))
+    else:
+        # Use the replacement that was in effect when the first reading was taken
+        prior_replacements = [r for r in all_replacements if r <= first_execution_time]
+        if prior_replacements:
+            starts.append(prior_replacements[-1])
+        else:
+            starts.append(first_execution_time - timedelta(days=1))
 
+    # 2. Add all subsequent replacements as cycle boundaries
+    starts.extend([r for r in all_replacements if r > starts[0]])
+    
+    # Remove duplicates and re-sort (in case a replacement exactly matched the anchor)
+    starts = sorted(list(set(starts)))
+    
+    cycles: list[Cycle] = []
     for index, start in enumerate(starts):
-        end = starts[index + 1] if index + 1 < len(starts) else None
+        next_start = starts[index + 1] if index + 1 < len(starts) else None
         points = [
             row
             for row in executions
-            if row["completed_dttm"] >= start and (end is None or row["completed_dttm"] < end)
+            if row["completed_dttm"] >= start and (next_start is None or row["completed_dttm"] < next_start)
         ]
         if points:
-            cycles.append(Cycle(start=start, end=end, points=points))
+            cycles.append(Cycle(start=start, end=next_start, points=points))
 
     return cycles
 
@@ -591,3 +644,67 @@ def crossed_failure(current_value: float, threshold: float, boundary: str) -> bo
 
 def bound_projected_value(value: float, threshold: float, slope: float) -> float:
     return min(threshold, value) if slope > 0 else max(threshold, value)
+
+
+def predict_days_to_threshold_from_master(
+    current_value: float, 
+    threshold: float, 
+    master_points: list[SeriesPoint], 
+    boundary: str,
+    current_slope: float
+) -> int:
+    """
+    Flaw 1 Implementation: Calculates days to failure by locating current position on the master curve.
+    Includes extrapolation if the curve does not reach the threshold.
+    """
+    if not master_points:
+        return 0
+
+    # 1. Find the point on the master curve closest to current_value
+    start_day = None
+    for p in master_points:
+        if (boundary == "UPPER" and p.value >= current_value) or \
+           (boundary == "LOWER" and p.value <= current_value):
+            start_day = p.day
+            break
+            
+    # If current_value is beyond the master curve, fallback to linear regression
+    if start_day is None:
+        if current_slope == 0:
+            return 9999
+        distance = abs(threshold - current_value)
+        return max(0, ceil(distance / abs(current_slope)))
+
+    # 2. Find the point on the master curve that crosses the threshold
+    end_day = None
+    for p in master_points:
+        if (boundary == "UPPER" and p.value >= threshold) or \
+           (boundary == "LOWER" and p.value <= threshold):
+            end_day = p.day
+            break
+            
+    if end_day is not None:
+        return max(0, end_day - start_day)
+        
+    # Extrapolate if master curve doesn't reach threshold
+    last_p = master_points[-1]
+    
+    # Calculate tail slope (last 5 points or fewer)
+    tail = master_points[-5:] if len(master_points) >= 5 else master_points
+    if len(tail) < 2:
+        tail_slope = current_slope
+    else:
+        tail_slope = slope_per_day(tail)
+        
+    # If tail slope is pointing away or flat, use current slope as fallback
+    if not moving_toward_boundary(tail_slope, boundary) or tail_slope == 0:
+        tail_slope = current_slope
+        
+    if tail_slope == 0:
+        return 9999
+
+    distance = abs(threshold - last_p.value)
+    extrapolated_days = ceil(distance / abs(tail_slope))
+    
+    return max(0, (last_p.day + extrapolated_days) - start_day)
+
