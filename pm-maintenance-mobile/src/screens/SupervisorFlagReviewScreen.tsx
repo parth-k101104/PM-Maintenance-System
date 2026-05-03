@@ -25,11 +25,6 @@ import { getBackendMessage } from "../utils/messages";
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type RoutePropType = RouteProp<RootStackParamList, "SupervisorFlagReview">;
 
-const STATUS_OPTIONS = [
-  { label: "Potential Replacement", value: "POTENTIAL_REPLACEMENT" },
-  { label: "Replacement Required", value: "REPLACEMENT_REQUIRED" },
-];
-
 export function SupervisorFlagReviewScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RoutePropType>();
@@ -40,7 +35,9 @@ export function SupervisorFlagReviewScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [flagDetails, setFlagDetails] = useState<FlagScanResponse | null>(null);
 
-  const [status, setStatus] = useState(flag.status);
+  const [status, setStatus] = useState(
+    flag.status === "POTENTIAL_REPLACEMENT" ? "REPLACEMENT_REQUIRED" : flag.status === "UNDER_REVIEW" ? "CLOSED" : flag.status,
+  );
   const [notes, setNotes] = useState("");
 
   const [messageModal, setMessageModal] = useState<{
@@ -56,7 +53,8 @@ export function SupervisorFlagReviewScreen() {
     message: "",
   });
 
-  const canEdit = flag.status === "POTENTIAL_REPLACEMENT";
+  const canEscalate = flag.status === "POTENTIAL_REPLACEMENT";
+  const canApproveClosure = flag.status === "UNDER_REVIEW";
 
   useEffect(() => {
     async function loadDetails() {
@@ -85,7 +83,7 @@ export function SupervisorFlagReviewScreen() {
         visible: true,
         type: "success",
         title: "Success",
-        message: "Flag status escalated successfully.",
+        message: canApproveClosure ? "Flag approved and closed successfully." : "Flag status escalated successfully.",
         goBackOnClose: true,
       });
     } catch (e: any) {
@@ -163,22 +161,14 @@ export function SupervisorFlagReviewScreen() {
               )}
             </View>
 
-            {canEdit ? (
+            {canEscalate ? (
               <>
                 <View style={styles.notesSection}>
                   <Text style={styles.sectionTitle}>Change Status</Text>
                   <View style={styles.optionGrid}>
-                    {STATUS_OPTIONS.map((option) => (
-                      <Pressable
-                        key={option.value}
-                        style={[styles.optionChip, status === option.value && styles.optionChipSelected]}
-                        onPress={() => setStatus(option.value)}
-                      >
-                        <Text style={[styles.optionText, status === option.value && styles.optionTextSelected]}>
-                          {option.label}
-                        </Text>
-                      </Pressable>
-                    ))}
+                    <Pressable style={[styles.optionChip, styles.optionChipSelected]} onPress={() => setStatus("REPLACEMENT_REQUIRED")}>
+                      <Text style={[styles.optionText, styles.optionTextSelected]}>Replacement Required</Text>
+                    </Pressable>
                   </View>
                 </View>
 
@@ -200,11 +190,38 @@ export function SupervisorFlagReviewScreen() {
                   </Pressable>
                 </View>
               </>
+            ) : canApproveClosure ? (
+              <>
+                <View style={styles.notesSection}>
+                  <Text style={styles.sectionTitle}>Supervisor Approval</Text>
+                  <Text style={styles.reviewCopy}>
+                    The operator has completed the replacement or inspection. Approve this review to close the flag.
+                  </Text>
+                </View>
+
+                <View style={styles.notesSection}>
+                  <Text style={styles.sectionTitle}>Notes (Optional)</Text>
+                  <TextInput
+                    style={styles.notesInput}
+                    multiline
+                    numberOfLines={3}
+                    placeholder="Add closure remarks..."
+                    value={notes}
+                    onChangeText={setNotes}
+                  />
+                </View>
+
+                <View style={styles.actionRow}>
+                  <Pressable style={styles.primaryBtn} onPress={submitReview} disabled={submitting}>
+                    {submitting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryBtnText}>APPROVE & CLOSE</Text>}
+                  </Pressable>
+                </View>
+              </>
             ) : (
               <View style={styles.readOnlyBox}>
                 <Ionicons name="information-circle-outline" size={24} color="#2563EB" style={{ marginBottom: 8 }} />
                 <Text style={styles.readOnlyText}>
-                  This flag has progressed beyond "Potential Replacement" and can no longer be edited by a supervisor.
+                  This flag is visible for supervisor tracking. Only Potential Replacement and Under Review flags can be acted on here.
                 </Text>
               </View>
             )}
@@ -277,6 +294,7 @@ const styles = StyleSheet.create({
 
   notesSection: { marginBottom: 24 },
   sectionTitle: { fontFamily: "Jost_600SemiBold", fontSize: 16, color: "#111111", marginBottom: 12 },
+  reviewCopy: { fontFamily: "Jost_400Regular", fontSize: 14, lineHeight: 20, color: "#4B5563" },
   optionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   optionChip: {
     borderWidth: 1,

@@ -4,19 +4,39 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { fetchSupervisorFlags } from "../api/client";
+import { FlagListCard } from "../components/FlagListCard";
 import { useAuth } from "../context/AuthContext";
 import { IssueFlag } from "../types/api";
 import { RootStackParamList } from "../types/navigation";
+
+const STATUS_FILTERS = [
+  "ALL",
+  "POTENTIAL_REPLACEMENT",
+  "REPLACEMENT_REQUIRED",
+  "REPLACEMENT_INITIATED",
+  "UNDER_REVIEW",
+  "CLOSED",
+] as const;
+
+const STATUS_PRIORITY: Record<string, number> = {
+  UNDER_REVIEW: 0,
+  POTENTIAL_REPLACEMENT: 1,
+  REPLACEMENT_REQUIRED: 2,
+  REPLACEMENT_INITIATED: 3,
+  REPLACEMENT_DONE: 4,
+  CLOSED: 5,
+};
 
 export function SupervisorFlagsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -25,6 +45,7 @@ export function SupervisorFlagsScreen() {
   const [flags, setFlags] = useState<IssueFlag[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<(typeof STATUS_FILTERS)[number]>("ALL");
 
   async function loadFlags(isRefresh = false) {
     if (!authState.session) return;
@@ -44,30 +65,35 @@ export function SupervisorFlagsScreen() {
     loadFlags();
   }, [authState.session]);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      loadFlags(true);
+    }, [authState.session]),
+  );
+
   const sortedFlags = useMemo(() => {
     return [...flags].sort((a, b) => {
-      if (a.status === "POTENTIAL_REPLACEMENT" && b.status !== "POTENTIAL_REPLACEMENT") return -1;
-      if (a.status !== "POTENTIAL_REPLACEMENT" && b.status === "POTENTIAL_REPLACEMENT") return 1;
+      const statusDelta = (STATUS_PRIORITY[a.status] ?? 99) - (STATUS_PRIORITY[b.status] ?? 99);
+      if (statusDelta !== 0) return statusDelta;
       return new Date(b.raisedDttm).getTime() - new Date(a.raisedDttm).getTime();
     });
   }, [flags]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "POTENTIAL_REPLACEMENT":
-        return "#D97706"; // Amber
-      case "REPLACEMENT_REQUIRED":
-        return "#DC2626"; // Red
-      case "REPLACEMENT_INITIATED":
-        return "#2563EB"; // Blue
-      case "REPLACEMENT_DONE":
-        return "#16A34A"; // Green
-      case "CLOSED":
-        return "#4B5563"; // Gray
-      default:
-        return "#4B5563";
-    }
-  };
+  const visibleFlags = useMemo(
+    () => sortedFlags.filter((flag) => selectedStatus === "ALL" || flag.status === selectedStatus),
+    [selectedStatus, sortedFlags],
+  );
+
+  const statusCounts = useMemo(() => {
+    return flags.reduce<Record<string, number>>(
+      (acc, flag) => {
+        acc.ALL = (acc.ALL ?? 0) + 1;
+        acc[flag.status] = (acc[flag.status] ?? 0) + 1;
+        return acc;
+      },
+      { ALL: 0 },
+    );
+  }, [flags]);
 
   if (loading) {
     return (
@@ -88,54 +114,41 @@ export function SupervisorFlagsScreen() {
         <Text style={styles.headerTitle}>Line Flags (Supervisor)</Text>
       </View>
 
+      <View style={styles.statusTabsWrap}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statusTabs}>
+          {STATUS_FILTERS.map((status) => {
+            const selected = selectedStatus === status;
+            return (
+              <Pressable
+                key={status}
+                style={[styles.statusTab, selected && styles.statusTabSelected]}
+                onPress={() => setSelectedStatus(status)}
+              >
+                <Text style={[styles.statusTabText, selected && styles.statusTabTextSelected]}>
+                  {status === "ALL" ? "All" : status.replace(/_/g, " ")}
+                </Text>
+                <Text style={[styles.statusTabCount, selected && styles.statusTabTextSelected]}>
+                  {statusCounts[status] ?? 0}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       <FlatList
-        data={sortedFlags}
+        data={visibleFlags}
         keyExtractor={(item) => item.flagId.toString()}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadFlags(true)} />}
-        ListEmptyComponent={<Text style={styles.emptyText}>No flags found on your lines.</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>No flags found for this status.</Text>}
         renderItem={({ item }) => {
-          const statusColor = getStatusColor(item.status);
           return (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <View style={styles.partInfo}>
-                  <Text style={styles.partName}>{item.partName}</Text>
-                  <Text style={styles.equipmentName}>{item.equipmentName}</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
-                  <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                  <Text style={[styles.statusText, { color: statusColor }]}>
-                    {item.status.replace(/_/g, ' ')}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.cardBody}>
-                <View style={styles.metaRow}>
-                  <Ionicons name="location-outline" size={14} color="#6B7280" />
-                  <Text style={styles.metaText}>{item.location}</Text>
-                </View>
-                <View style={styles.metaRow}>
-                  <Ionicons name="person-outline" size={14} color="#6B7280" />
-                  <Text style={styles.metaText}>Raised by: {item.attendantName}</Text>
-                </View>
-                <View style={styles.metaRow}>
-                  <Ionicons name="warning-outline" size={14} color={item.criticality === "CRITICAL" ? "#DC2626" : "#D97706"} />
-                  <Text style={[styles.metaText, item.criticality === "CRITICAL" && { color: "#DC2626", fontFamily: "Jost_500Medium" }]}>
-                    Priority: {item.criticality}
-                  </Text>
-                </View>
-                <View style={styles.actionRow}>
-                  <Pressable
-                    style={styles.reviewBtn}
-                    onPress={() => navigation.navigate("SupervisorFlagReview", { flag: item })}
-                  >
-                    <Text style={styles.reviewBtnText}>Review</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
+            <FlagListCard
+              flag={item}
+              actionLabel={item.status === "POTENTIAL_REPLACEMENT" || item.status === "UNDER_REVIEW" ? "Review" : "View"}
+              onPress={() => navigation.navigate("SupervisorFlagReview", { flag: item })}
+            />
           );
         }}
       />
@@ -162,32 +175,41 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     color: "#111111",
   },
-  listContent: { padding: 16, paddingBottom: 40 },
-  card: {
+  statusTabsWrap: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
   },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
-  partInfo: { flex: 1, paddingRight: 12 },
-  partName: { fontFamily: "Jost_600SemiBold", fontSize: 16, color: "#111111", marginBottom: 2 },
-  equipmentName: { fontFamily: "Jost_400Regular", fontSize: 13, color: "#4B5563" },
-  statusBadge: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
-  statusText: { fontFamily: "Jost_500Medium", fontSize: 11 },
-  cardBody: { paddingTop: 12, borderTopWidth: 1, borderTopColor: "#F3F4F6", gap: 8 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  metaText: { fontFamily: "Jost_400Regular", fontSize: 13, color: "#4B5563" },
+  statusTabs: {
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  statusTab: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  statusTabSelected: {
+    backgroundColor: "#111111",
+  },
+  statusTabText: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 12,
+    color: "#4B5563",
+  },
+  statusTabCount: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 12,
+    color: "#4B5563",
+  },
+  statusTabTextSelected: {
+    color: "#FFFFFF",
+  },
+  listContent: { padding: 16, paddingBottom: 40 },
   emptyText: { fontFamily: "Jost_400Regular", textAlign: "center", marginTop: 36, fontSize: 15, color: "#666" },
-  actionRow: { marginTop: 14, borderTopWidth: 1, borderTopColor: "#E5E7EB", paddingTop: 12, alignItems: "flex-end" },
-  reviewBtn: { backgroundColor: "#111111", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  reviewBtnText: { fontFamily: "Jost_500Medium", fontSize: 13, color: "#FFFFFF" },
 });

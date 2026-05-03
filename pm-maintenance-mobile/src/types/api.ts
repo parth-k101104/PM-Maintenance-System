@@ -293,6 +293,7 @@ export type ApprovalActionRequest = {
   scheduleExecutionId: number;
   action: "APPROVE" | "REJECT";
   remarks?: string;
+  evidenceRejectedFlag?: boolean;
 };
 
 export type ApprovalActionResponse = {

@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRoute, useNavigation } from "@react-navigation/native";
+import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import { LineChart } from "react-native-gifted-charts";
 import Slider from "@react-native-community/slider";
@@ -129,6 +129,12 @@ export function LineManagerPartAnalyticsScreen() {
   }, [authState.session?.token, part.partId]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
   const handleSync = async () => {
     if (!authState.session?.token || syncing) return;

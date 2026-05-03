@@ -1,0 +1,17 @@
+services:
+  qr-generator:
+    build: .
+    container_name: pm-qr-generator
+    ports:
+      - "8081:8000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=pm_db
+      - DB_USER=postgres
+      - DB_PASS=root
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+    restart: unless-stopped

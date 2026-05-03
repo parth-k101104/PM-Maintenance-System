@@ -100,6 +100,7 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
   const { task, scanResponse, scannedEquipment } = route.params;
   const { authState } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [evidenceRejected, setEvidenceRejected] = React.useState(false);
   const [messageModal, setMessageModal] = React.useState<{
     visible: boolean;
     type: "success" | "failure";
@@ -148,6 +149,7 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
       const payload = {
         scheduleExecutionId: task.scheduleExecutionId,
         action,
+        evidenceRejectedFlag: evidenceRejected,
       };
       const response =
         roleId === 2
@@ -195,6 +197,12 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
         </Pressable>
         <View style={styles.headerTextWrap}>
           <Text style={styles.headerTitle}>{task.taskName}</Text>
+          {(task.rescheduleFlag || !!task.parentScheduleExecutionId) && (
+            <View style={[styles.tagBadge, styles.rescheduledBadge]}>
+              <Ionicons name="refresh-outline" size={12} color="#8A3D00" />
+              <Text style={[styles.tagText, styles.rescheduledText]}>Rescheduled</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -263,6 +271,15 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
               style={styles.photo}
               resizeMode="cover"
             />
+            <Pressable
+              style={styles.evidenceToggleRow}
+              onPress={() => setEvidenceRejected((prev) => !prev)}
+            >
+              <View style={[styles.checkbox, evidenceRejected && styles.checkboxActive]}>
+                {evidenceRejected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+              </View>
+              <Text style={styles.evidenceToggleText}>Reject photo evidence</Text>
+            </Pressable>
           </View>
         )}
 
@@ -422,6 +439,27 @@ const styles = StyleSheet.create({
     color: "#5A5F75",
     marginTop: 3,
   },
+  tagBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    marginTop: 8,
+    alignSelf: "flex-start",
+  },
+  rescheduledBadge: {
+    backgroundColor: "#FFF2DC",
+  },
+  tagText: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  rescheduledText: {
+    color: "#8A3D00",
+  },
   content: { paddingHorizontal: 16, paddingBottom: 42, gap: 14 },
 
   // Success banner
@@ -516,6 +554,30 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 16,
     backgroundColor: "#E0E0E0",
+  },
+  evidenceToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 12,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#B42318",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  checkboxActive: {
+    backgroundColor: "#B42318",
+  },
+  evidenceToggleText: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 14,
+    color: "#B42318",
   },
 
   // Bar chart

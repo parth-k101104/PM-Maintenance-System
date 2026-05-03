@@ -52,6 +52,9 @@ public class PmScheduleExecution {
     @JoinColumn(name = "parent_schedule_execution_id")
     private PmScheduleExecution parentScheduleExecution;
 
+    @Column(name = "evidence_rejected_flag")
+    private Boolean evidenceRejectedFlag;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 }

@@ -8,4 +8,5 @@ public class SupervisorApprovalRequest {
     /** "APPROVE" or "REJECT" */
     private String action;
     private String remarks;
+    private Boolean evidenceRejectedFlag;
 }
