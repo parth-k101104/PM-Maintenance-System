@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -8,8 +8,6 @@ import {
   StyleSheet,
   Text,
   View,
-  Alert,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,8 +24,6 @@ import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { HistoricalDataPoint } from "../types/api";
 import { RootStackParamList } from "../types/navigation";
-import { useAuth } from "../context/AuthContext";
-import { processSupervisorApproval } from "../api/client";
 import { getBackendMessage, getResponseMessage } from "../utils/messages";
 
 type Props = NativeStackScreenProps<RootStackParamList, "SupervisorTaskReview">;
@@ -121,46 +117,6 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
   const roleId = authState.session?.roleId;
   const reviewTitle =
     roleId === 2 ? "Line Manager Review" : roleId === 1 ? "Maintenance Review" : "Supervisor Review";
-
-  const { authState } = useAuth();
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleAction = (action: "APPROVE" | "REJECT") => {
-    Alert.alert(
-      `Confirm ${action === "APPROVE" ? "Approval" : "Rejection"}`,
-      `Are you sure you want to ${action.toLowerCase()} this task?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: action === "APPROVE" ? "Approve" : "Reject",
-          style: action === "APPROVE" ? "default" : "destructive",
-          onPress: async () => {
-            if (!authState.session) return;
-            setIsProcessing(true);
-            try {
-              const payload = {
-                scheduleExecutionId: task.scheduleExecutionId,
-                action,
-              };
-              console.log("Submitting supervisor action:", payload);
-              const res = await processSupervisorApproval(authState.session.token, payload);
-              if (res.status === "error") {
-                Alert.alert("Error", res.message || "Failed to process action");
-              } else {
-                Alert.alert("Success", `Task ${action.toLowerCase()}d successfully!`, [
-                  { text: "OK", onPress: () => navigation.goBack() }
-                ]);
-              }
-            } catch (error: any) {
-              Alert.alert("Error", error.message || "An error occurred");
-            } finally {
-              setIsProcessing(false);
-            }
-          }
-        }
-      ]
-    );
-  };
 
   const combinedData = [
     {
@@ -416,19 +372,19 @@ export function SupervisorTaskReviewScreen({ navigation, route }: Props) {
         {/* ── Approve / Reject buttons ── */}
         <View style={styles.actionsRow}>
           <Pressable 
-            style={[styles.actionBtn, styles.rejectBtn, isProcessing && { opacity: 0.5 }]}
-            onPress={() => handleAction("REJECT")}
-            disabled={isProcessing}
+            style={[styles.actionBtn, styles.rejectBtn, isSubmitting && { opacity: 0.5 }]}
+            onPress={() => submitDecision("REJECT")}
+            disabled={isSubmitting}
           >
             <Ionicons name="close-circle-outline" size={20} color="#B42318" />
             <Text style={styles.rejectBtnText}>Reject</Text>
           </Pressable>
           <Pressable 
-            style={[styles.actionBtn, styles.approveBtn, isProcessing && { opacity: 0.5 }]}
-            onPress={() => handleAction("APPROVE")}
-            disabled={isProcessing}
+            style={[styles.actionBtn, styles.approveBtn, isSubmitting && { opacity: 0.5 }]}
+            onPress={() => submitDecision("APPROVE")}
+            disabled={isSubmitting}
           >
-            {isProcessing ? (
+            {isSubmitting ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />

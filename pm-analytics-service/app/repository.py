@@ -1,7 +1,15 @@
+import json
 from datetime import date, datetime
 from typing import Any
 
 from psycopg.types.json import Jsonb
+
+def _json_dumps(obj: Any) -> str:
+    def serial(o):
+        if isinstance(o, (date, datetime)):
+            return o.isoformat()
+        raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
+    return json.dumps(obj, default=serial)
 
 JOB_CODE = "NIGHTLY_PHM_ANALYTICS_SYNC"
 
@@ -94,6 +102,7 @@ def persist_prediction(conn, prediction: dict[str, Any], evaluation_date: date) 
                 degradation_velocity,
                 risk_score,
                 lifecycle_ratio,
+                chart_data_payload,
                 is_active
             )
             VALUES (
@@ -107,10 +116,15 @@ def persist_prediction(conn, prediction: dict[str, Any], evaluation_date: date) 
                 %(degradation_velocity)s,
                 %(risk_score)s,
                 %(lifecycle_ratio)s,
+                %(chart_data_payload)s,
                 TRUE
             )
             """,
-            {**prediction, "evaluation_date": evaluation_date},
+            {
+                **prediction,
+                "evaluation_date": evaluation_date,
+                "chart_data_payload": Jsonb(prediction.get("chart_data_payload"), dumps=_json_dumps) if prediction.get("chart_data_payload") else None
+            },
         )
 
 
@@ -148,7 +162,7 @@ def persist_insights(conn, insights: list[dict[str, Any]]) -> None:
                       AND created_at::date = CURRENT_DATE
                 )
                 """,
-                {**insight, "metadata": Jsonb(insight["metadata"])},
+                {**insight, "metadata": Jsonb(insight["metadata"], dumps=_json_dumps)},
             )
 
 
@@ -211,7 +225,7 @@ def complete_job_execution(
                 "execution_id": execution_id,
                 "status": status,
                 "duration_ms": duration_ms,
-                "response_payload": Jsonb(response_payload) if response_payload is not None else None,
+                "response_payload": Jsonb(response_payload, dumps=_json_dumps) if response_payload is not None else None,
                 "error_message": error_message,
             },
         )
@@ -264,7 +278,7 @@ def persist_evaluation_audits(conn, audits: list[dict[str, Any]]) -> None:
                     %(metadata)s
                 )
                 """,
-                {**audit, "metadata": Jsonb(audit["metadata"])},
+                {**audit, "metadata": Jsonb(audit["metadata"], dumps=_json_dumps)},
             )
 
 
@@ -282,7 +296,7 @@ def persist_health_scores(conn, evaluation_date: date, scores: list[dict[str, An
                   FROM jsonb_to_recordset(%(scores)s) AS s(entity_type text, entity_id bigint)
               )
             """,
-            {"evaluation_date": evaluation_date, "scores": Jsonb(scores)},
+            {"evaluation_date": evaluation_date, "scores": Jsonb(scores, dumps=_json_dumps)},
         )
 
         for score in scores:
@@ -330,7 +344,7 @@ def fetch_previous_health_scores(conn, evaluation_date: date, entity_keys: list[
             WHERE h.evaluation_date < %(evaluation_date)s
             ORDER BY h.entity_type, h.entity_id, h.evaluation_date DESC
             """,
-            {"evaluation_date": evaluation_date, "entities": Jsonb(payload)},
+            {"evaluation_date": evaluation_date, "entities": Jsonb(payload, dumps=_json_dumps)},
         )
         return {
             (row["entity_type"], row["entity_id"]): float(row["health_score"])

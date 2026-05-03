@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Modal,
   Pressable,
@@ -14,20 +15,22 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 
+import {
+  acknowledgeLineManagerInsight,
+  fetchLineManagerAnalyticsDashboard,
+  runAnalyticsSyncJob,
+} from "../api/client";
+import { AppMessageModal } from "../components/AppMessageModal";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import { RootStackParamList } from "../types/navigation";
-import type { DashboardItem, LineManagerDashboardResponse, OperatorDashboardResponse, SupervisorDashboardResponse } from "../types/api";
-
-const drawerItems = [
-  "Dashboard",
-  "Plant layout",
-  "Machine manuals",
-  "Backlogs",
-  "Flags raised",
-  "Raise issue",
-  "Profile",
-];
+import type {
+  ActionInsight,
+  DashboardItem,
+  LineManagerDashboardResponse,
+  OperatorDashboardResponse,
+  SupervisorDashboardResponse,
+} from "../types/api";
 
 function formatGreeting(shift?: string) {
   const normalized = shift?.toLowerCase() ?? "";
@@ -79,7 +82,8 @@ type DashboardRouteTarget =
   | "UpcomingTasks"
   | "FlagsRaised"
   | "LineManagerActiveTasks"
-  | "EmployeeApprovalChart";
+  | "EmployeeApprovalChart"
+  | "LineManagerAnalyticsDashboard";
 
 type DashboardViewModel = {
   greetingShift?: string;
@@ -322,6 +326,15 @@ export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const { authState, signOut, refreshDashboard } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [syncingAnalytics, setSyncingAnalytics] = useState(false);
+  const [syncModal, setSyncModal] = useState<{
+    visible: boolean;
+    type: "success" | "failure";
+    title: string;
+    message: string;
+  }>({ visible: false, type: "success", title: "", message: "" });
+  const [lineInsights, setLineInsights] = useState<ActionInsight[]>([]);
+  const [closingInsightId, setClosingInsightId] = useState<number | null>(null);
   const translateX = useRef(new Animated.Value(-300)).current;
   const session = authState.session;
   const dashboard = session?.dashboard;
@@ -363,6 +376,42 @@ export function DashboardScreen() {
   const contentMaxWidth = isTablet ? 920 : 560;
   const drawerWidth = Math.min(width * 0.78, 360);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const isLineManager = session?.dashboardKind === "lineManager" || isLineManagerDashboard(dashboard);
+
+  const loadLineInsights = useCallback(async () => {
+    if (!session?.token || !isLineManager) {
+      setLineInsights([]);
+      return;
+    }
+    try {
+      const analytics = await fetchLineManagerAnalyticsDashboard(session.token);
+      setLineInsights(analytics.actionInsights ?? []);
+    } catch {
+      setLineInsights([]);
+    }
+  }, [isLineManager, session?.token]);
+
+  const drawerItems = useMemo(
+    () =>
+      isLineManager
+        ? [
+            { label: "Dashboard", target: undefined },
+            { label: "Analytics dashboard", target: "LineManagerAnalyticsDashboard" as DashboardRouteTarget },
+            { label: "Line equipments", target: "LineManagerEquipments" as DashboardRouteTarget },
+            { label: "Flags raised", target: "LineManagerFlags" as DashboardRouteTarget },
+            { label: "Backlogs", target: "LineManagerBacklogApprovals" as DashboardRouteTarget },
+            { label: "Active tasks", target: "LineManagerActiveTasks" as DashboardRouteTarget },
+          ]
+        : [
+            { label: "Dashboard", target: undefined },
+            { label: "Plant layout", target: undefined },
+            { label: "Machine manuals", target: undefined },
+            { label: "Backlogs", target: "BacklogTasks" as DashboardRouteTarget },
+            { label: "Flags raised", target: "FlagsRaised" as DashboardRouteTarget },
+            { label: "Profile", target: undefined },
+          ],
+    [isLineManager],
+  );
 
   useEffect(() => {
     Animated.timing(translateX, {
@@ -371,6 +420,10 @@ export function DashboardScreen() {
       useNativeDriver: true,
     }).start();
   }, [menuOpen, drawerWidth]);
+
+  useEffect(() => {
+    loadLineInsights();
+  }, [loadLineInsights]);
 
   function navigateToDashboardTarget(target?: DashboardRouteTarget) {
     if (!target) {
@@ -407,14 +460,54 @@ export function DashboardScreen() {
         break;
       case "EmployeeApprovalChart":
         navigation.navigate("EmployeeApprovalChart");
+        break;
       case "FlagsRaised":
         navigation.navigate("FlagsRaised");
         break;
       case "LineManagerActiveTasks":
         navigation.navigate("LineManagerActiveTasks");
         break;
+      case "LineManagerAnalyticsDashboard":
+        navigation.navigate("LineManagerAnalyticsDashboard");
+        break;
       default:
         break;
+    }
+  }
+
+  async function handleAnalyticsSync() {
+    if (!session?.token || syncingAnalytics) return;
+    setSyncingAnalytics(true);
+    try {
+      await runAnalyticsSyncJob(session.token);
+      await refreshDashboard();
+      await loadLineInsights();
+      setSyncModal({
+        visible: true,
+        type: "success",
+        title: "Analytics sync done",
+        message: "Predictive maintenance analytics were refreshed. Check results in the analytics dashboard.",
+      });
+    } catch (error) {
+      setSyncModal({
+        visible: true,
+        type: "failure",
+        title: "Sync failed",
+        message: error instanceof Error ? error.message : "Analytics sync could not be completed.",
+      });
+    } finally {
+      setSyncingAnalytics(false);
+    }
+  }
+
+  async function handleCloseInsight(insightId: number) {
+    if (!session?.token) return;
+    setClosingInsightId(insightId);
+    try {
+      await acknowledgeLineManagerInsight(session.token, insightId);
+      setLineInsights((current) => current.filter((insight) => insight.insightId !== insightId));
+    } finally {
+      setClosingInsightId(null);
     }
   }
 
@@ -432,14 +525,93 @@ export function DashboardScreen() {
                 <Ionicons name="menu-outline" size={isTablet ? 40 : 34} color="#525252" />
               </Pressable>
 
-              <View style={styles.profileIcon}>
-                <Ionicons name="person-circle-outline" size={isTablet ? 64 : 56} color="#676767" />
+              <View style={styles.headerActions}>
+                {isLineManager ? (
+                  <Pressable
+                    style={[styles.syncButton, syncingAnalytics && styles.syncButtonDisabled]}
+                    onPress={handleAnalyticsSync}
+                    disabled={syncingAnalytics}
+                  >
+                    {syncingAnalytics ? (
+                      <ActivityIndicator size="small" color="#111111" />
+                    ) : (
+                      <Ionicons name="sync-outline" size={20} color="#111111" />
+                    )}
+                  </Pressable>
+                ) : null}
+                <View style={styles.profileIcon}>
+                  <Ionicons name="person-circle-outline" size={isTablet ? 64 : 56} color="#676767" />
+                </View>
               </View>
             </View>
 
             <Text style={[styles.greetingText, isTablet && styles.greetingTextTablet]}>
               {greeting} {userName}
             </Text>
+
+            {isLineManager ? (
+              <View style={styles.dashboardInsights}>
+                <Text style={styles.dashboardInsightsTitle}>Actionable insights</Text>
+                <View style={styles.dashboardInsightsCard}>
+                  {lineInsights.length ? (
+                    <>
+                      <ScrollView
+                        style={styles.dashboardInsightsScroll}
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.dashboardInsightsScrollContent}
+                      >
+                        {lineInsights.map((insight) => (
+                          <View
+                            key={insight.insightId}
+                            style={[
+                              styles.dashboardInsightCard,
+                              insight.severity === "CRITICAL"
+                                ? styles.dashboardInsightCritical
+                                : styles.dashboardInsightWarning,
+                            ]}
+                          >
+                            <View style={styles.dashboardInsightTop}>
+                              <View style={styles.dashboardInsightTextWrap}>
+                                <Text style={styles.dashboardInsightSeverity}>{insight.severity || "INFO"}</Text>
+                                <Text style={styles.dashboardInsightMessage}>{insight.message}</Text>
+                              </View>
+                              <Pressable
+                                style={styles.dashboardInsightClose}
+                                onPress={() => handleCloseInsight(insight.insightId)}
+                                disabled={closingInsightId === insight.insightId}
+                              >
+                                {closingInsightId === insight.insightId ? (
+                                  <ActivityIndicator size="small" color="#111111" />
+                                ) : (
+                                  <Ionicons name="checkmark-outline" size={18} color="#111111" />
+                                )}
+                              </Pressable>
+                            </View>
+                            <Text style={styles.dashboardInsightMeta}>
+                              Risk {Math.round(insight.riskScore ?? 0)}% | Confidence{" "}
+                              {Math.round(insight.confidenceScore ?? 0)}%
+                            </Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                      {lineInsights.length > 2 && (
+                        <View style={styles.dashboardInsightsHint}>
+                          <Ionicons name="chevron-down-outline" size={13} color="#626781" />
+                          <Text style={styles.dashboardInsightsHintText}>Scroll for more</Text>
+                        </View>
+                      )}
+                    </>
+                  ) : (
+                    <View style={styles.dashboardInsightEmpty}>
+                      <Text style={styles.dashboardInsightEmptyText}>
+                        No actionable insights. Sync to get some insights.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            ) : null}
 
             <View style={styles.cardsWrapper}>
               {Array.from({ length: Math.ceil(dashboardView.cards.length / 2) }).map((_, rowIndex) => {
@@ -538,9 +710,18 @@ export function DashboardScreen() {
 
           <View style={styles.drawerItems}>
             {drawerItems.map((item) => (
-              <Text key={item} style={styles.drawerItemText}>
-                {item}
-              </Text>
+              <Pressable
+                key={item.label}
+                onPress={() => {
+                  setMenuOpen(false);
+                  navigateToDashboardTarget(item.target);
+                }}
+                disabled={!item.target}
+              >
+                <Text style={[styles.drawerItemText, !item.target && styles.drawerItemMuted]}>
+                  {item.label}
+                </Text>
+              </Pressable>
             ))}
           </View>
 
@@ -554,6 +735,20 @@ export function DashboardScreen() {
           </View>
         </Animated.View>
       </View>
+      <AppMessageModal
+        visible={syncModal.visible}
+        type={syncModal.type}
+        title={syncModal.title}
+        message={syncModal.message}
+        primaryActionLabel={syncModal.type === "success" ? "Open analytics" : "OK"}
+        onPrimaryAction={() => {
+          const shouldOpenAnalytics = syncModal.type === "success";
+          setSyncModal((current) => ({ ...current, visible: false }));
+          if (shouldOpenAnalytics) {
+            navigation.navigate("LineManagerAnalyticsDashboard");
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -595,6 +790,22 @@ const styles = StyleSheet.create({
     height: 56,
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  syncButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "#F5E4C9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  syncButtonDisabled: {
+    opacity: 0.7,
   },
   greetingText: {
     fontFamily: "Jost_500Medium",
@@ -887,6 +1098,101 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     paddingTop: 2,
     color: "#2F2F2F",
+  },
+  dashboardInsights: {
+    gap: 10,
+    marginBottom: 22,
+    paddingHorizontal: 2,
+  },
+  dashboardInsightsTitle: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 17,
+    color: "#111111",
+  },
+  dashboardInsightCard: {
+    borderRadius: 18,
+    backgroundColor: "#FDE8E7",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  dashboardInsightTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  dashboardInsightTextWrap: {
+    flex: 1,
+  },
+  dashboardInsightSeverity: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 11,
+    color: "#B42318",
+    marginBottom: 2,
+  },
+  dashboardInsightMessage: {
+    fontFamily: "Jost_400Regular",
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#333747",
+  },
+  dashboardInsightClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dashboardInsightMeta: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 12,
+    color: "#6B3440",
+    marginTop: 8,
+  },
+  dashboardInsightEmpty: {
+    borderRadius: 16,
+    backgroundColor: "#F5F6FA",
+    padding: 14,
+  },
+  dashboardInsightEmptyText: {
+    fontFamily: "Jost_400Regular",
+    fontSize: 13,
+    color: "#626781",
+  },
+  dashboardInsightsCard: {
+    borderRadius: 20,
+    backgroundColor: "#F5F6FA",
+    overflow: "hidden",
+  },
+  dashboardInsightsScroll: {
+    maxHeight: 280,
+  },
+  dashboardInsightsScrollContent: {
+    padding: 10,
+    gap: 10,
+  },
+  dashboardInsightsHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: 7,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  dashboardInsightsHintText: {
+    fontFamily: "Jost_400Regular",
+    fontSize: 11,
+    color: "#626781",
+  },
+  dashboardInsightCritical: {
+    backgroundColor: "#FDE8E7",
+  },
+  dashboardInsightWarning: {
+    backgroundColor: "#F5E4C9",
+  },
+  drawerItemMuted: {
+    color: "#565656",
   },
   drawerFooter: {
     flex: 1,

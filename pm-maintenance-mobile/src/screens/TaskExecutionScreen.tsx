@@ -55,6 +55,11 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
 
   const [actualValue, setActualValue] = useState("");
   const [notes, setNotes] = useState("");
+  const [manualIssueEnabled, setManualIssueEnabled] = useState(false);
+  const [manualFlagStatus, setManualFlagStatus] = useState<"POTENTIAL_REPLACEMENT" | "REPLACEMENT_REQUIRED">(
+    "POTENTIAL_REPLACEMENT"
+  );
+  const [manualIssueDetails, setManualIssueDetails] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -161,6 +166,11 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
       return;
     }
 
+    if (manualIssueEnabled && !manualIssueDetails.trim()) {
+      Alert.alert("Issue details required", "Please describe why you are raising this manual issue.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // 1. Upload photo to S3 if taken and URL is available
@@ -177,6 +187,9 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
         timeTaken: timeTakenMins,
         actualValue: requiresValue ? Number(actualValue.trim()) : null,
         notes: notes.trim() || undefined,
+        manualDeviation: manualIssueEnabled,
+        manualFlagStatus: manualIssueEnabled ? manualFlagStatus : undefined,
+        manualIssueDetails: manualIssueEnabled ? manualIssueDetails.trim() : undefined,
       });
 
       setMessageModal({
@@ -371,6 +384,55 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
               textAlignVertical="top"
               editable={!isLoading}
             />
+          </View>
+
+          <View style={styles.manualIssueCard}>
+            <Pressable
+              style={styles.manualIssueHeader}
+              onPress={() => setManualIssueEnabled((current) => !current)}
+              disabled={isLoading}
+            >
+              <View style={[styles.checkbox, manualIssueEnabled && styles.checkboxActive]}>
+                {manualIssueEnabled ? <Ionicons name="checkmark" size={16} color="#FFFFFF" /> : null}
+              </View>
+              <View style={styles.manualIssueTextWrap}>
+                <Text style={styles.manualIssueTitle}>Raise issue flag</Text>
+                <Text style={styles.manualIssueSubtitle}>Mark this execution for replacement review</Text>
+              </View>
+            </Pressable>
+
+            {manualIssueEnabled ? (
+              <View style={styles.manualIssueBody}>
+                <View style={styles.segmentedControl}>
+                  {(["POTENTIAL_REPLACEMENT", "REPLACEMENT_REQUIRED"] as const).map((status) => {
+                    const selected = manualFlagStatus === status;
+                    return (
+                      <Pressable
+                        key={status}
+                        style={[styles.segmentButton, selected && styles.segmentButtonActive]}
+                        onPress={() => setManualFlagStatus(status)}
+                        disabled={isLoading}
+                      >
+                        <Text style={[styles.segmentButtonText, selected && styles.segmentButtonTextActive]}>
+                          {status === "POTENTIAL_REPLACEMENT" ? "Potential" : "Required"}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <TextInput
+                  value={manualIssueDetails}
+                  onChangeText={setManualIssueDetails}
+                  placeholder="Describe the issue observed"
+                  placeholderTextColor="#9296AA"
+                  style={styles.issueInput}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  editable={!isLoading}
+                />
+              </View>
+            ) : null}
           </View>
 
           {/* ── Submit button ────────────────────────────────────── */}
@@ -666,6 +728,82 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#111111",
     lineHeight: 22,
+  },
+  manualIssueCard: {
+    borderRadius: 24,
+    backgroundColor: "#FDE8E7",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+  },
+  manualIssueHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: "#B42318",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  checkboxActive: {
+    backgroundColor: "#B42318",
+  },
+  manualIssueTextWrap: { flex: 1 },
+  manualIssueTitle: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 16,
+    color: "#111111",
+  },
+  manualIssueSubtitle: {
+    fontFamily: "Jost_400Regular",
+    fontSize: 13,
+    color: "#6B3440",
+    marginTop: 2,
+  },
+  manualIssueBody: {
+    marginTop: 14,
+    gap: 12,
+  },
+  segmentedControl: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 4,
+    gap: 4,
+  },
+  segmentButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  segmentButtonActive: {
+    backgroundColor: "#B42318",
+  },
+  segmentButtonText: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 13,
+    color: "#6B3440",
+  },
+  segmentButtonTextActive: {
+    color: "#FFFFFF",
+  },
+  issueInput: {
+    minHeight: 88,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    fontFamily: "Jost_400Regular",
+    fontSize: 14,
+    color: "#111111",
+    lineHeight: 20,
   },
 
   // Submit button

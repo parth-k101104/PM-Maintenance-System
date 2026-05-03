@@ -279,6 +279,9 @@ export type TaskCompletionRequest = {
   timeTaken: number;
   actualValue?: number | null;
   notes?: string;
+  manualDeviation?: boolean;
+  manualFlagStatus?: "POTENTIAL_REPLACEMENT" | "REPLACEMENT_REQUIRED";
+  manualIssueDetails?: string;
 };
 
 export type TaskCompletionResponse = {
@@ -305,4 +308,113 @@ export type ScannedEquipmentDetails = {
   equipmentId?: number;
   equipmentElementId?: number;
   equipmentPartId?: number;
+};
+
+export type HealthScore = {
+  healthId: number;
+  evaluationDate: string;
+  entityType: "LINE" | "EQUIPMENT" | string;
+  entityId: number;
+  entityName?: string;
+  healthScore?: number;
+  criticalFlagsCount?: number;
+  pmComplianceRate?: number;
+  trend?: string;
+};
+
+export type PartPrediction = {
+  predictionId: number;
+  lineId?: number;
+  lineName?: string;
+  equipmentId?: number;
+  equipmentName?: string;
+  partId: number;
+  partName: string;
+  taskScheduleId?: number;
+  evaluationDate: string;
+  currentValue?: number;
+  predictedFailureDate?: string;
+  confidenceScore?: number;
+  daysRemaining?: number;
+  degradationVelocity?: number;
+  riskScore?: number;
+  lifecycleRatio?: number;
+};
+
+export type ActionInsight = {
+  insightId: number;
+  lineId?: number;
+  equipmentId?: number;
+  equipmentName?: string;
+  partId?: number;
+  partName?: string;
+  insightType?: string;
+  insightCode: string;
+  severity?: "CRITICAL" | "WARNING" | "INFO" | string;
+  status: string;
+  createdAt?: string;
+  message: string;
+  currentValue?: number;
+  predictedFailureDate?: string;
+  confidenceScore?: number;
+  daysRemaining?: number;
+  riskScore?: number;
+  velocityIncreasePercent?: number;
+};
+
+export type AnalyticsDashboardResponse = {
+  healthScores: HealthScore[];
+  predictions: PartPrediction[];
+  actionInsights: ActionInsight[];
+};
+
+export type JobRunResponse = {
+  jobCode: string;
+  status: string;
+  responsePayload?: string;
+};
+
+export type SeriesPoint = {
+  day: number;
+  date: string;
+  value: number;
+};
+
+export type HistoricalCycle = {
+  cycleIndex: number;
+  startDate: string;
+  endDate?: string | null;
+  velocity: number;
+  points: SeriesPoint[];
+};
+
+export type PartThresholds = {
+  standardValue?: number | null;
+  toleranceMin?: number | null;
+  toleranceMax?: number | null;
+  warningValue?: number | null;
+  uom?: string | null;
+};
+
+export type PartAnalyticsResponse = {
+  partId: number;
+  partName: string;
+  equipmentId: number;
+  equipmentName: string;
+  status?: string | null;
+  currentValue?: number | null;
+  riskScore?: number | null;
+  confidenceScore?: number | null;
+  degradationVelocity?: number | null;
+  lifecycleRatio?: number | null;
+  velocityRatio?: number | null;
+  daysRemaining?: number | null;
+  predictedFailureDate?: string | null;
+  evaluationDate?: string | null;
+  thresholds?: PartThresholds | null;
+  currentCycle?: SeriesPoint[];
+  historicalCycles?: HistoricalCycle[];
+  simulatedFailureCurve?: SeriesPoint[];
+  masterCurve?: SeriesPoint[];
+  actionInsights?: ActionInsight[];
 };
