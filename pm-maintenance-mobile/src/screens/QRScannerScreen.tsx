@@ -295,7 +295,8 @@ export function QRScannerScreen({ navigation, route }: Props) {
               <Text style={styles.validatingText}>Validating...</Text>
             </View>
           ) : (
-            (task.taskCriticality === "LOW" || task.taskCriticality === "MEDIUM") && (
+            ((authState.session?.roleId === 1 || authState.session?.roleId === 2) || 
+             (authState.session?.roleId === 3 && task.taskCriticality === "LOW")) && (
               <Pressable
                 style={styles.skipButton}
                 onPress={handleSkipQR}

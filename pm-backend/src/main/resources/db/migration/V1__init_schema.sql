@@ -260,6 +260,7 @@ CREATE TABLE pm_schedule_execution (
     deviation_flag BOOLEAN,
     reschedule_flag BOOLEAN,
     parent_schedule_execution_id BIGINT,
+    evidence_rejected_flag BOOLEAN DEFAULT FALSE,
     notes TEXT,
 
     FOREIGN KEY (task_schedule_id)

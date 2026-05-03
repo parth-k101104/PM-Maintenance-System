@@ -137,7 +137,7 @@ export function FlagDetailScreen() {
         visible: true,
         type: "success",
         title: "Success",
-        message: getResponseMessage(response, "Issue flag has been addressed and closed."),
+        message: getResponseMessage(response, "Issue flag has been submitted for supervisor review."),
         goBackOnClose: true,
       });
     } catch (e: any) {

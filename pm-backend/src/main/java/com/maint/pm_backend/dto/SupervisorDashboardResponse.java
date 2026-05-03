@@ -22,6 +22,9 @@ public class SupervisorDashboardResponse {
     /** Active issue flags (not CLOSED) on lines supervised by this supervisor. */
     private int activeFlags;
 
+    /** Open deviation executions still under review in this supervisor's approval scope. */
+    private int openDeviations;
+
     /** Tasks assigned to employees under this supervisor that are still
      *  ASSIGNED or IN_PROGRESS — i.e. employee has not performed the task yet. */
     private int pendingEmployeeTasks;
@@ -36,4 +39,7 @@ public class SupervisorDashboardResponse {
     /** Tasks approved by this supervisor (level-1 APPROVED) that have passed
      *  line manager and are now waiting for maintenance manager (UNDER_MAINT_MANAGER_REVIEW). */
     private int approvedUnderMaintManagerReview;
+
+    /** Tasks already approved by the supervisor and still moving through higher review. */
+    private int tasksInPipeline;
 }

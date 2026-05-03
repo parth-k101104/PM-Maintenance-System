@@ -158,7 +158,6 @@ def persist_insights(conn, insights: list[dict[str, Any]]) -> None:
                     FROM phm_action_insights
                     WHERE part_id = %(part_id)s
                       AND insight_code = %(insight_code)s
-                      AND status = 'UNREAD'
                       AND created_at::date = CURRENT_DATE
                 )
                 """,

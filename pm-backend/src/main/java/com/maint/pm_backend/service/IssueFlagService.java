@@ -41,10 +41,6 @@ public class IssueFlagService {
     private static final Set<Long> SUPERVISOR_ROLES     = Set.of(3L);
     private static final Set<Long> SENIOR_MANAGER_ROLES = Set.of(1L, 2L, 6L);
 
-    // Statuses that a supervisor is allowed to toggle between
-    private static final Set<IssueFlagStatus> SUPERVISOR_ALLOWED_STATUSES =
-            Set.of(IssueFlagStatus.POTENTIAL_REPLACEMENT, IssueFlagStatus.REPLACEMENT_REQUIRED);
-
     @Transactional
     public IssueFlag raiseIndependentIssue(IndependentIssueRequest request, Long employeeId) {
         Employee employee = employeeRepository.findById(employeeId)
@@ -114,17 +110,26 @@ public class IssueFlagService {
         IssueFlagStatus targetStatus = IssueFlagStatus.fromValue(request.getNewStatus());
 
         if (isSupervisor) {
-            // Supervisors can only toggle between POTENTIAL_REPLACEMENT and REPLACEMENT_REQUIRED
-            if (!SUPERVISOR_ALLOWED_STATUSES.contains(flag.getFlagStatus())) {
+            if (!issueFlagRepository.existsByFlagIdAndSupervisorLine(flagId, actorEmployeeId)) {
+                throw new RuntimeException("Access denied: this flag is not assigned to this supervisor's line");
+            }
+
+            if (flag.getFlagStatus() == IssueFlagStatus.POTENTIAL_REPLACEMENT) {
+                if (targetStatus != IssueFlagStatus.REPLACEMENT_REQUIRED) {
+                    throw new RuntimeException("Supervisor can only change POTENTIAL_REPLACEMENT to REPLACEMENT_REQUIRED");
+                }
+                flag.setFlagStatus(targetStatus);
+            } else if (flag.getFlagStatus() == IssueFlagStatus.UNDER_REVIEW) {
+                if (targetStatus != IssueFlagStatus.CLOSED) {
+                    throw new RuntimeException("Supervisor can only approve UNDER_REVIEW flags by closing them");
+                }
+                flag.setFlagStatus(IssueFlagStatus.CLOSED);
+                flag.setAddressedDttm(DateUtils.getNow());
+            } else {
                 throw new RuntimeException(
-                        "Supervisor can only act on flags in POTENTIAL_REPLACEMENT or REPLACEMENT_REQUIRED status. " +
+                        "Supervisor can only act on POTENTIAL_REPLACEMENT or UNDER_REVIEW flags. " +
                         "Current status: " + flag.getFlagStatus());
             }
-            if (!SUPERVISOR_ALLOWED_STATUSES.contains(targetStatus)) {
-                throw new RuntimeException(
-                        "Supervisor can only set status to POTENTIAL_REPLACEMENT or REPLACEMENT_REQUIRED");
-            }
-            flag.setFlagStatus(targetStatus);
         }
 
         if (isSeniorManager) {
@@ -189,6 +194,11 @@ public class IssueFlagService {
 
         if (!isAttendant && !isReviewer) {
             throw new RuntimeException("Access denied: this flag is not assigned to you");
+        }
+
+        if (SUPERVISOR_ROLES.contains(roleId)
+                && !issueFlagRepository.existsByFlagIdAndSupervisorLine(flagId, employeeId)) {
+            throw new RuntimeException("Access denied: this flag is not assigned to this supervisor's line");
         }
 
         // Operators can perform replacement only once replacement has been initiated.
@@ -296,10 +306,10 @@ public class IssueFlagService {
             });
         }
 
-        // Close the flag
-        flag.setFlagStatus(IssueFlagStatus.CLOSED);
-        flag.setAddressedDttm(DateUtils.getNow());
-        String closureNote = request.isReplacementDone() ? "Replaced by operator." : "Inspected — no replacement done.";
+        flag.setFlagStatus(IssueFlagStatus.UNDER_REVIEW);
+        String closureNote = request.isReplacementDone()
+                ? "Replacement completed by operator. Pending supervisor review."
+                : "Inspection completed by operator. Pending supervisor review.";
         String existingNotes = flag.getNotes() != null ? flag.getNotes() + "\n" : "";
         flag.setNotes(existingNotes + closureNote
                 + (request.getNotes() != null ? " Notes: " + request.getNotes() : ""));
