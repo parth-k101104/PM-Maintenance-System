@@ -17,15 +17,16 @@ CREATE TABLE phm_health_scores (
     pm_compliance_rate NUMERIC(5,2),     -- 0 to 100.00
     employee_efficiency NUMERIC(5,2),    -- 0 to 100.00
     task_rejection_rate NUMERIC(5,2),    -- 0 to 100.00
-    approval_turnaround_time NUMERIC(10,2), -- e.g., Time in hours/minutes
+    approval_turnaround_time VARCHAR(50), -- e.g., '1d 4h'
     evidence_compliance_rate NUMERIC(5,2),  -- 0 to 100.00
 
     trend VARCHAR(20),                   -- 'IMPROVING', 'STABLE', 'DEGRADING'
+    window_days INTEGER DEFAULT 365,     -- Number of days in the rolling window
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Index for fast daily dashboard loading
-CREATE INDEX idx_phm_health_lookup ON phm_health_scores(entity_type, entity_id, evaluation_date);
+CREATE INDEX idx_phm_health_lookup ON phm_health_scores(entity_type, entity_id, evaluation_date, window_days);
 
 
 -- ------------------------------------------------------------------------
@@ -149,8 +150,17 @@ VALUES (
     'NIGHTLY_PHM_ANALYTICS_SYNC', 
     'Nightly Predictive Analytics Batch', 
     'Triggers the Python microservice to recalculate all machine degradation curves and generate new action insights.', 
-    'http://analytics-service:8000/api/v1/batch/run-nightly', 
+    'http://analytics-service:8000/api/v1/batch/run-nightly?window_days=365', 
     '0 0 2 * * ?' -- Runs at 2:00 AM daily
+);
+
+INSERT INTO system_jobs (job_code, job_name, description, target_api_endpoint, cron_expression)
+VALUES (
+    'SHORT_TERM_PHM_ANALYTICS_SYNC', 
+    'Short Term Predictive Analytics Sync', 
+    'Triggers the Python microservice to recalculate short term compliance metrics (30 days window).', 
+    'http://analytics-service:8000/api/v1/batch/run-nightly?window_days=30', 
+    '0 30 2 * * ?' -- Runs at 2:30 AM daily
 );
 
 

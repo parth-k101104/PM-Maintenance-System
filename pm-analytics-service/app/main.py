@@ -46,8 +46,10 @@ def database_health() -> dict[str, str]:
     response_model=RunNightlyResponse,
     dependencies=[Depends(require_analytics_key)],
 )
-def run_nightly_batch(request: RunNightlyRequest) -> RunNightlyResponse:
+def run_nightly_batch(request: RunNightlyRequest, window_days: int | None = None) -> RunNightlyResponse:
     evaluation_date = request.evaluation_date or date.today()
+    actual_window_days = window_days if window_days is not None else request.window_days
+    
     try:
         with connection() as conn:
             execution_id = create_job_execution(
@@ -65,6 +67,7 @@ def run_nightly_batch(request: RunNightlyRequest) -> RunNightlyResponse:
                     part_ids=request.part_ids,
                     persist=request.persist,
                     execution_id=execution_id,
+                    window_days=actual_window_days,
                 )
                 response.job_execution_id = execution_id
                 response.status = "COMPLETED_SUCCESS"

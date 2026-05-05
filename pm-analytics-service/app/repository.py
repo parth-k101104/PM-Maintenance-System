@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 from datetime import date, datetime
 from typing import Any
 
@@ -8,6 +9,8 @@ def _json_dumps(obj: Any) -> str:
     def serial(o):
         if isinstance(o, (date, datetime)):
             return o.isoformat()
+        if isinstance(o, Decimal):
+            return float(o)
         raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
     return json.dumps(obj, default=serial)
 
@@ -58,6 +61,33 @@ WHERE task_schedule_id = %(task_schedule_id)s
 ORDER BY completed_dttm
 """
 
+OPERATIONAL_METRICS_SQL = """
+SELECT
+    eq.plant_id,
+    eq.department_id,
+    eq.line_id,
+    ee.equipment_id,
+    SUM(pst.estimated_req_time) AS total_estimated_time,
+    SUM(e.time_taken) AS total_time_taken,
+    COUNT(*) AS total_completed,
+    COUNT(CASE WHEN e.status = 'REJECTED' THEN 1 END) AS total_rejected,
+    COUNT(CASE WHEN e.evidence_rejected_flag = FALSE THEN 1 END) AS total_evidence_accepted,
+    SUM(EXTRACT(EPOCH FROM (a.approved_dttm - e.completed_dttm))/3600) AS sum_turnaround_hours,
+    COUNT(a.approved_dttm) AS count_approved
+FROM pm_schedule_execution e
+JOIN pm_task_schedules pts ON pts.task_schedule_id = e.task_schedule_id
+JOIN pm_std_tasks pst ON pst.std_task_id = pts.std_task_id
+JOIN equipment_parts ep ON ep.part_id = pst.part_id
+LEFT JOIN equipment_element ee ON ee.element_id = ep.equipment_element_id
+LEFT JOIN equipments eq ON eq.equipment_id = ee.equipment_id
+LEFT JOIN pm_schedule_approval a ON a.schedule_execution_id = e.schedule_execution_id 
+    AND a.approval_status = 'APPROVED'
+WHERE e.completed_dttm IS NOT NULL
+  AND e.completed_dttm >= %(start_date)s
+  AND e.completed_dttm <= %(end_date)s
+GROUP BY eq.plant_id, eq.department_id, eq.line_id, ee.equipment_id
+"""
+
 
 def fetch_target_tasks(conn, part_ids: list[int] | None) -> list[dict[str, Any]]:
     with conn.cursor() as cur:
@@ -74,6 +104,14 @@ def fetch_replacements(conn, part_id: int) -> list[datetime]:
 def fetch_executions(conn, task_schedule_id: int) -> list[dict[str, Any]]:
     with conn.cursor() as cur:
         cur.execute(EXECUTIONS_SQL, {"task_schedule_id": task_schedule_id})
+        return list(cur.fetchall())
+
+def fetch_operational_metrics(conn, evaluation_date: date, window_days: int) -> list[dict[str, Any]]:
+    from datetime import timedelta
+    start_date = evaluation_date - timedelta(days=window_days)
+    end_date = evaluation_date
+    with conn.cursor() as cur:
+        cur.execute(OPERATIONAL_METRICS_SQL, {"start_date": start_date, "end_date": end_date})
         return list(cur.fetchall())
 
 
@@ -281,7 +319,7 @@ def persist_evaluation_audits(conn, audits: list[dict[str, Any]]) -> None:
             )
 
 
-def persist_health_scores(conn, evaluation_date: date, scores: list[dict[str, Any]]) -> None:
+def persist_health_scores(conn, evaluation_date: date, scores: list[dict[str, Any]], window_days: int) -> None:
     if not scores:
         return
 
@@ -290,12 +328,13 @@ def persist_health_scores(conn, evaluation_date: date, scores: list[dict[str, An
             """
             DELETE FROM phm_health_scores
             WHERE evaluation_date = %(evaluation_date)s
+              AND window_days = %(window_days)s
               AND (entity_type, entity_id) IN (
                   SELECT entity_type, entity_id
                   FROM jsonb_to_recordset(%(scores)s) AS s(entity_type text, entity_id bigint)
               )
             """,
-            {"evaluation_date": evaluation_date, "scores": Jsonb(scores, dumps=_json_dumps)},
+            {"evaluation_date": evaluation_date, "window_days": window_days, "scores": Jsonb(scores, dumps=_json_dumps)},
         )
 
         for score in scores:
@@ -308,7 +347,12 @@ def persist_health_scores(conn, evaluation_date: date, scores: list[dict[str, An
                     health_score,
                     critical_flags_count,
                     pm_compliance_rate,
-                    trend
+                    employee_efficiency,
+                    task_rejection_rate,
+                    approval_turnaround_time,
+                    evidence_compliance_rate,
+                    trend,
+                    window_days
                 )
                 VALUES (
                     %(evaluation_date)s,
@@ -317,14 +361,18 @@ def persist_health_scores(conn, evaluation_date: date, scores: list[dict[str, An
                     %(health_score)s,
                     %(critical_flags_count)s,
                     %(pm_compliance_rate)s,
-                    %(trend)s
+                    %(employee_efficiency)s,
+                    %(task_rejection_rate)s,
+                    %(approval_turnaround_time)s,
+                    %(evidence_compliance_rate)s,
+                    %(trend)s,
+                    %(window_days)s
                 )
                 """,
-                {**score, "evaluation_date": evaluation_date},
+                {**score, "evaluation_date": evaluation_date, "window_days": window_days},
             )
 
-
-def fetch_previous_health_scores(conn, evaluation_date: date, entity_keys: list[tuple[str, int]]) -> dict[tuple[str, int], float]:
+def fetch_previous_health_scores(conn, evaluation_date: date, entity_keys: list[tuple[str, int]], window_days: int) -> dict[tuple[str, int], float]:
     if not entity_keys:
         return {}
 
@@ -341,9 +389,10 @@ def fetch_previous_health_scores(conn, evaluation_date: date, entity_keys: list[
               ON e.entity_type = h.entity_type
              AND e.entity_id = h.entity_id
             WHERE h.evaluation_date < %(evaluation_date)s
+              AND h.window_days = %(window_days)s
             ORDER BY h.entity_type, h.entity_id, h.evaluation_date DESC
             """,
-            {"evaluation_date": evaluation_date, "entities": Jsonb(payload, dumps=_json_dumps)},
+            {"evaluation_date": evaluation_date, "window_days": window_days, "entities": Jsonb(payload, dumps=_json_dumps)},
         )
         return {
             (row["entity_type"], row["entity_id"]): float(row["health_score"])

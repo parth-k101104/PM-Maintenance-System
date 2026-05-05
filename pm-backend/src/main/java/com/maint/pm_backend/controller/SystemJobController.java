@@ -27,23 +27,17 @@ public class SystemJobController {
     @PostMapping("/{jobCode}/run")
     public ResponseEntity<SystemJobRunResponse> runJob(
             @PathVariable SystemJobCode jobCode,
-            @RequestBody(required = false) SystemJobRunRequest request,
             Principal principal
     ) {
         if (principal == null) return ResponseEntity.status(401).build();
         Employee employee = employeeRepository.findByEmail(principal.getName())
                 .orElseThrow(() -> new RuntimeException("Logged in user not found"));
-        SystemJobRunRequest safeRequest = request != null ? request : new SystemJobRunRequest();
-        SystemJobTriggerType triggerType = safeRequest.getTriggerType() != null
-                ? safeRequest.getTriggerType()
-                : SystemJobTriggerType.MANUAL_API;
-        boolean persist = safeRequest.getPersist() == null || safeRequest.getPersist();
 
         String payload = systemJobRunnerService.runJob(
                 jobCode,
-                triggerType,
+                SystemJobTriggerType.MANUAL_API,
                 employee.getEmployeeId(),
-                persist
+                true
         );
 
         return ResponseEntity.ok(new SystemJobRunResponse(jobCode.name(), "COMPLETED_SUCCESS", payload));

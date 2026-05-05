@@ -153,10 +153,9 @@ export async function acknowledgeLineManagerInsight(token: string, insightId: nu
 }
 
 export async function runAnalyticsSyncJob(token: string) {
-  return request<JobRunResponse>("/api/system-jobs/NIGHTLY_PHM_ANALYTICS_SYNC/run", {
+  return request<JobRunResponse>("/api/system-jobs/SHORT_TERM_PHM_ANALYTICS_SYNC/run", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ persist: true, triggerType: "MANUAL_UI" }),
   });
 }
 
