@@ -99,6 +99,7 @@ public class AnalyticsJobClient {
         if (triggeredByEmployeeId != null) {
             requestBody.put("triggered_by_employee_id", triggeredByEmployeeId);
         }
+        requestBody.put("evaluation_date", com.maint.pm_backend.util.DateUtils.getToday().toString());
         return requestBody;
     }
 

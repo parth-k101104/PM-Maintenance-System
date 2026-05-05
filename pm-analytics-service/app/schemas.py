@@ -10,6 +10,7 @@ class RunNightlyRequest(BaseModel):
     persist: bool = True
     trigger_type: Literal["CRON", "MANUAL_UI", "MANUAL_API"] = "MANUAL_API"
     triggered_by_employee_id: int | None = None
+    window_days: int = 365
 
 
 class SeriesPoint(BaseModel):
