@@ -84,7 +84,8 @@ type DashboardRouteTarget =
   | "FlagsRaised"
   | "LineManagerActiveTasks"
   | "EmployeeApprovalChart"
-  | "LineManagerAnalyticsDashboard";
+  | "LineManagerAnalyticsDashboard"
+  | "ConfigParams";
 
 type DashboardViewModel = {
   greetingShift?: string;
@@ -243,6 +244,7 @@ function buildLineManagerDashboardViewModel(
   const metrics = dashboard?.rollingWindows?.[windowDays];
   const lineHealth = metrics?.lineHealth;
   const pmComplianceRate = metrics?.pmComplianceRate;
+  const employeeEfficiency = metrics?.employeeEfficiency;
   
   return {
     userName: fallbackName,
@@ -261,6 +263,13 @@ function buildLineManagerDashboardViewModel(
         value: pmComplianceRate != null ? `${Math.round(pmComplianceRate)}%` : "N/A",
         footnote: "rolling window",
         variant: "status",
+        size: "small",
+      },
+      {
+        title: "Employee efficiency-",
+        value: employeeEfficiency != null ? `${Math.round(employeeEfficiency)}%` : "N/A",
+        footnote: "rolling window",
+        variant: "other",
         size: "small",
       },
       {
@@ -417,6 +426,7 @@ export function DashboardScreen() {
             { label: "Flags raised", target: "LineManagerFlags" as DashboardRouteTarget },
             { label: "Backlogs", target: "LineManagerBacklogApprovals" as DashboardRouteTarget },
             { label: "Active tasks", target: "LineManagerActiveTasks" as DashboardRouteTarget },
+            { label: "Config parameters", target: "ConfigParams" as DashboardRouteTarget },
           ]
         : [
             { label: "Dashboard", target: undefined },
@@ -494,6 +504,9 @@ export function DashboardScreen() {
         break;
       case "LineManagerAnalyticsDashboard":
         navigation.navigate("LineManagerAnalyticsDashboard");
+        break;
+      case "ConfigParams":
+        navigation.navigate("ConfigParams");
         break;
       default:
         break;

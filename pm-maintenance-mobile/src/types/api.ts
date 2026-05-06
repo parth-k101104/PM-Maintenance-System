@@ -108,6 +108,7 @@ export type LineManagerDashboardWindowMetrics = {
   taskRejectionRate?: number;
   approvalTurnaroundTimeHours?: number;
   evidenceComplianceRate?: number;
+  employeeEfficiency?: number;
 };
 
 export type LineManagerDashboardResponse = {
@@ -153,6 +154,7 @@ export type MaintenanceManagerDashboardWindowMetrics = {
   plantRejectionRate: number | null;
   plantApprovalTurnaroundTimeHours: number | null;
   plantEvidenceComplianceRate: number | null;
+  plantEmployeeEfficiency: number | null;
   lineWiseCompliance: {
     lineId: number;
     lineName: string;
@@ -161,6 +163,7 @@ export type MaintenanceManagerDashboardWindowMetrics = {
     rejectionRate: number | null;
     approvalTurnaroundTimeHours: number | null;
     evidenceComplianceRate: number | null;
+    employeeEfficiency: number | null;
   }[];
 };
 
@@ -173,6 +176,18 @@ export type DashboardKind = "operator" | "supervisor" | "lineManager" | "mainten
 export type AuthSession = LoginResponse & {
   dashboardKind?: DashboardKind;
   dashboard?: OperatorDashboardResponse | SupervisorDashboardResponse | LineManagerDashboardResponse | MaintenanceManagerDashboardResponse;
+};
+
+export type ConfigParam = {
+  paramId: number;
+  paramKey: string;
+  paramValue: string;
+  paramCategory: string;
+  description?: string | null;
+  dataType: "STRING" | "INTEGER" | "LONG" | "DOUBLE" | "BOOLEAN" | string;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type TaskDetails = {

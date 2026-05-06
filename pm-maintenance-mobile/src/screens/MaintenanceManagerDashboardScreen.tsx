@@ -228,6 +228,7 @@ export function MaintenanceManagerDashboardScreen() {
   const compliance = currentData?.overallPmComplianceRate;
   const cColor = complianceColor(compliance);
   const evidenceRate = currentData?.plantEvidenceComplianceRate;
+  const employeeEfficiency = currentData?.plantEmployeeEfficiency;
   const rejectionRate = currentData?.plantRejectionRate;
   const turnaroundHours = currentData?.plantApprovalTurnaroundTimeHours;
   const greeting = formatGreeting();
@@ -451,6 +452,15 @@ export function MaintenanceManagerDashboardScreen() {
                     <Ionicons name="arrow-forward-outline" size={30} color="#111111" style={s.smallCardArrow} />
                   </Pressable>
 
+                  <View style={[s.dashboardCard, s.efficiencyDashboardCard, s.flexSmall]}>
+                    <Text style={s.cardTitleSmall}>Employee efficiency-</Text>
+                    <Text style={[s.mediumNumber, { color: evidenceColor(employeeEfficiency) }]}>
+                      {employeeEfficiency != null ? `${employeeEfficiency.toFixed(1)}%` : "N/A"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={s.cardsRow}>
                   <Pressable
                     style={[s.dashboardCard, s.turnaroundDashboardCard, s.flexLarge]}
                     onPress={() =>
@@ -522,6 +532,15 @@ export function MaintenanceManagerDashboardScreen() {
                                   </Text>
                                   <Text style={s.lineMetricLabel}>Evidence</Text>
                                 </View>
+                                <View style={s.lineMetricItem}>
+                                  <Ionicons name="speedometer-outline" size={13}
+                                    color={line.employeeEfficiency != null ? evidenceColor(line.employeeEfficiency) : colors.textSoft} />
+                                  <Text style={[s.lineMetricVal,
+                                    { color: line.employeeEfficiency != null ? evidenceColor(line.employeeEfficiency) : colors.textSoft }]}>
+                                    {line.employeeEfficiency != null ? `${line.employeeEfficiency.toFixed(1)}%` : "N/A"}
+                                  </Text>
+                                  <Text style={s.lineMetricLabel}>Efficiency</Text>
+                                </View>
                               </View>
                             </View>
                           );
@@ -579,6 +598,14 @@ export function MaintenanceManagerDashboardScreen() {
               }}
             >
               <Text style={s.drawerItemText}>Evidence analytics</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setMenuOpen(false);
+                navigation.push("ConfigParams");
+              }}
+            >
+              <Text style={s.drawerItemText}>Config parameters</Text>
             </Pressable>
           </View>
 
@@ -718,6 +745,9 @@ const s = StyleSheet.create({
   },
   qualityDashboardCard: {
     backgroundColor: "#FBF794",
+  },
+  efficiencyDashboardCard: {
+    backgroundColor: "#D2E0D1",
   },
   turnaroundDashboardCard: {
     backgroundColor: "#FDE3C5",

@@ -37,6 +37,7 @@ public class MaintenanceManagerDashboardService {
                 .plantRejectionRate(selected.getPlantRejectionRate())
                 .plantApprovalTurnaroundTimeHours(selected.getPlantApprovalTurnaroundTimeHours())
                 .plantEvidenceComplianceRate(selected.getPlantEvidenceComplianceRate())
+                .plantEmployeeEfficiency(selected.getPlantEmployeeEfficiency())
                 .lineWiseCompliance(selected.getLineWiseCompliance())
                 .rollingWindows(rollingWindows)
                 .build();
@@ -73,7 +74,8 @@ public class MaintenanceManagerDashboardService {
                     hs.pm_compliance_rate                              AS pm_compliance,
                     hs.task_rejection_rate                             AS rejection,
                     CAST(NULLIF(REGEXP_REPLACE(hs.approval_turnaround_time, '[^0-9.]', '', 'g'), '') AS NUMERIC)       AS turnaround,
-                    hs.evidence_compliance_rate                        AS evidence
+                    hs.evidence_compliance_rate                        AS evidence,
+                    hs.employee_efficiency                             AS employee_efficiency
                 FROM phm_health_scores hs
                 WHERE hs.entity_type = 'PLANT'
                   AND hs.window_days = :windowDays
@@ -88,6 +90,7 @@ public class MaintenanceManagerDashboardService {
         Double plantRejectionRate = toDouble(plantLatest.get("rejection"));
         Double plantApprovalTurnaround = toDouble(plantLatest.get("turnaround"));
         Double plantEvidenceComplianceRate = toDouble(plantLatest.get("evidence"));
+        Double plantEmployeeEfficiency = toDouble(plantLatest.get("employee_efficiency"));
 
         String lineHealthSql = """
                 SELECT
@@ -96,14 +99,16 @@ public class MaintenanceManagerDashboardService {
                     latest.pm_compliance_rate,
                     latest.task_rejection_rate,
                     CAST(NULLIF(REGEXP_REPLACE(latest.approval_turnaround_time, '[^0-9.]', '', 'g'), '') AS NUMERIC) AS approval_turnaround_time,
-                    latest.evidence_compliance_rate
+                    latest.evidence_compliance_rate,
+                    latest.employee_efficiency
                 FROM lines l
                 LEFT JOIN LATERAL (
                     SELECT
                         hs.pm_compliance_rate,
                         hs.task_rejection_rate,
                         hs.approval_turnaround_time,
-                        hs.evidence_compliance_rate
+                        hs.evidence_compliance_rate,
+                        hs.employee_efficiency
                     FROM phm_health_scores hs
                     WHERE hs.entity_type = 'LINE'
                       AND hs.window_days = :windowDays
@@ -126,6 +131,7 @@ public class MaintenanceManagerDashboardService {
                             .rejectionRate(round1dp(toDouble(row.get("task_rejection_rate"))))
                             .approvalTurnaroundTimeHours(round1dp(toDouble(row.get("approval_turnaround_time"))))
                             .evidenceComplianceRate(round1dp(toDouble(row.get("evidence_compliance_rate"))))
+                            .employeeEfficiency(round1dp(toDouble(row.get("employee_efficiency"))))
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -137,6 +143,7 @@ public class MaintenanceManagerDashboardService {
                 .plantRejectionRate(round1dp(plantRejectionRate))
                 .plantApprovalTurnaroundTimeHours(round1dp(plantApprovalTurnaround))
                 .plantEvidenceComplianceRate(round1dp(plantEvidenceComplianceRate))
+                .plantEmployeeEfficiency(round1dp(plantEmployeeEfficiency))
                 .lineWiseCompliance(lineWiseData)
                 .build();
     }

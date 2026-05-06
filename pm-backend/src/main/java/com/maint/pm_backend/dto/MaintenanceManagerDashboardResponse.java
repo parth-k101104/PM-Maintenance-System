@@ -21,6 +21,7 @@ public class MaintenanceManagerDashboardResponse {
     private Double plantRejectionRate;
     private Double plantApprovalTurnaroundTimeHours;
     private Double plantEvidenceComplianceRate;
+    private Double plantEmployeeEfficiency;
 
     private List<LineWiseComplianceData> lineWiseCompliance;
     private Map<Integer, RollingWindowMetrics> rollingWindows;
@@ -36,6 +37,7 @@ public class MaintenanceManagerDashboardResponse {
         private Double plantRejectionRate;
         private Double plantApprovalTurnaroundTimeHours;
         private Double plantEvidenceComplianceRate;
+        private Double plantEmployeeEfficiency;
         private List<LineWiseComplianceData> lineWiseCompliance;
     }
 
@@ -63,5 +65,6 @@ public class MaintenanceManagerDashboardResponse {
         private Double rejectionRate;
         private Double approvalTurnaroundTimeHours;
         private Double evidenceComplianceRate;
+        private Double employeeEfficiency;
     }
 }

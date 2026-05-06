@@ -19,6 +19,7 @@ export type RootStackParamList = {
     windowDays: number;
     rollingWindows: any;
   };
+  ConfigParams: undefined;
   TaskList: undefined;
   SupervisorDueApprovals: undefined;
   LineManagerTodayApprovals: undefined;

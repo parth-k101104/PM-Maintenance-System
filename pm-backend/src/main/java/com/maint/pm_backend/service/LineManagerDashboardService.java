@@ -77,7 +77,8 @@ public class LineManagerDashboardService {
                     AVG(t.pm_compliance_rate) AS avg_compliance,
                     AVG(t.task_rejection_rate) AS avg_rejection,
                     AVG(CAST(NULLIF(REGEXP_REPLACE(t.approval_turnaround_time, '[^0-9.]', '', 'g'), '') AS NUMERIC)) AS avg_turnaround,
-                    AVG(t.evidence_compliance_rate) AS avg_evidence
+                    AVG(t.evidence_compliance_rate) AS avg_evidence,
+                    AVG(t.employee_efficiency) AS avg_employee_efficiency
                 FROM (
                     SELECT
                         hs.health_score,
@@ -85,6 +86,7 @@ public class LineManagerDashboardService {
                         hs.task_rejection_rate,
                         hs.approval_turnaround_time,
                         hs.evidence_compliance_rate,
+                        hs.employee_efficiency,
                         ROW_NUMBER() OVER (PARTITION BY hs.entity_id ORDER BY hs.evaluation_date DESC, hs.health_id DESC) as rn
                     FROM phm_health_scores hs
                     WHERE hs.entity_type = 'LINE'
@@ -107,6 +109,7 @@ public class LineManagerDashboardService {
                 .taskRejectionRate(toDouble(row.get("avg_rejection")))
                 .approvalTurnaroundTimeHours(toDouble(row.get("avg_turnaround")))
                 .evidenceComplianceRate(toDouble(row.get("avg_evidence")))
+                .employeeEfficiency(toDouble(row.get("avg_employee_efficiency")))
                 .build();
     }
 

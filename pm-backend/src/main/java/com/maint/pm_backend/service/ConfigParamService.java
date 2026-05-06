@@ -70,6 +70,45 @@ public class ConfigParamService {
         return java.util.Collections.unmodifiableMap(cache);
     }
 
+    public List<ConfigParam> getAllParams() {
+        return configParamRepository.findAll();
+    }
+
+    public ConfigParam updateParamValue(String paramKey, String paramValue) {
+        ConfigParam param = configParamRepository.findByParamKey(paramKey)
+                .orElseThrow(() -> new RuntimeException("Config parameter not found: " + paramKey));
+        validateValue(param.getDataType(), paramValue);
+        param.setParamValue(paramValue);
+        ConfigParam saved = configParamRepository.save(param);
+        refreshCache();
+        return saved;
+    }
+
+    private void validateValue(String dataType, String value) {
+        if (value == null || value.isBlank()) {
+            throw new RuntimeException("Config parameter value cannot be blank.");
+        }
+
+        try {
+            switch ((dataType == null ? "STRING" : dataType).toUpperCase()) {
+                case "INTEGER" -> Integer.parseInt(value);
+                case "LONG" -> Long.parseLong(value);
+                case "DOUBLE" -> Double.parseDouble(value);
+                case "BOOLEAN" -> {
+                    String normalized = value.toLowerCase();
+                    if (!normalized.equals("true") && !normalized.equals("false")) {
+                        throw new IllegalArgumentException("Expected true or false");
+                    }
+                }
+                default -> {
+                    // STRING accepts any non-blank value.
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid value for data type " + dataType + ": " + value);
+        }
+    }
+
     // ── Generic Getters ───────────────────────────────────────────────────────
 
     public String getString(ConfigParamKey key) {

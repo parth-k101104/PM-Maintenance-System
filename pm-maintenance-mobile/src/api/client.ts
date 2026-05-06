@@ -2,6 +2,7 @@ import type {
   AnalyticsDashboardResponse,
   ApprovalActionRequest,
   ApprovalActionResponse,
+  ConfigParam,
   FlagReplacementRequest,
   FlagScanRequest,
   FlagScanResponse,
@@ -129,6 +130,21 @@ export async function fetchApprovalTurnaroundTrend(token: string, windowDays: nu
   return request<{ evaluationDate: string; approvalTurnaroundTimeHours: number }[]>(`/api/v1/dashboard/maintenance-manager/approval-turnaround-trend?windowDays=${windowDays}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchConfigParams(token: string) {
+  return request<ConfigParam[]>("/api/v1/config-params", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function updateConfigParam(token: string, paramKey: string, paramValue: string) {
+  return request<ConfigParam>(`/api/v1/config-params/${encodeURIComponent(paramKey)}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ paramValue }),
   });
 }
 

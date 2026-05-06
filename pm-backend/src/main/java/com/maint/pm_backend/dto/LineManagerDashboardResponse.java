@@ -36,5 +36,6 @@ public class LineManagerDashboardResponse {
         private Double taskRejectionRate;
         private Double approvalTurnaroundTimeHours;
         private Double evidenceComplianceRate;
+        private Double employeeEfficiency;
     }
 }

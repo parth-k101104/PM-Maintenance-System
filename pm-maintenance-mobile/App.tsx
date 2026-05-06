@@ -38,6 +38,7 @@ import { MmTaskStatusListScreen } from "./src/screens/MmTaskStatusListScreen";
 import { MmComplianceAnalyticsScreen } from "./src/screens/MmComplianceAnalyticsScreen";
 import { MmEvidenceComplianceAnalyticsScreen } from "./src/screens/MmEvidenceComplianceAnalyticsScreen";
 import { MmMetricTrendScreen } from "./src/screens/MmMetricTrendScreen";
+import { ConfigParamsScreen } from "./src/screens/ConfigParamsScreen";
 
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -68,6 +69,7 @@ function RootNavigator() {
           <Stack.Screen name="MmComplianceAnalytics" component={MmComplianceAnalyticsScreen} />
           <Stack.Screen name="MmEvidenceComplianceAnalytics" component={MmEvidenceComplianceAnalyticsScreen} />
           <Stack.Screen name="MmMetricTrend" component={MmMetricTrendScreen} />
+          <Stack.Screen name="ConfigParams" component={ConfigParamsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     );
@@ -99,6 +101,7 @@ function RootNavigator() {
         <Stack.Screen name="LineManagerFlagDetail" component={LineManagerFlagDetailScreen} />
         <Stack.Screen name="SupervisorFlags" component={SupervisorFlagsScreen} />
         <Stack.Screen name="SupervisorFlagReview" component={SupervisorFlagReviewScreen} />
+        <Stack.Screen name="ConfigParams" component={ConfigParamsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
