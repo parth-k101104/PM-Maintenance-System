@@ -1,6 +1,5 @@
 package com.maint.pm_backend.service;
 
-import com.maint.pm_backend.config.AppWorkflowProperties;
 import com.maint.pm_backend.entity.Employee;
 import com.maint.pm_backend.repository.EmployeeRepository;
 import com.maint.pm_backend.repository.PmScheduleExecutionRepository;
@@ -18,7 +17,7 @@ public class TaskExecutionService {
     private final EmployeeRepository employeeRepository;
     private final com.maint.pm_backend.repository.PmScheduleApprovalRepository approvalRepository;
     private final AwsS3Service awsS3Service;
-    private final AppWorkflowProperties workflowProperties;
+    private final ConfigParamService configParamService;
     private final com.maint.pm_backend.repository.IssueFlagRepository issueFlagRepository;
 
     public com.maint.pm_backend.dto.QRScanResponse handleQRScan(com.maint.pm_backend.dto.QRScanRequest request, Long employeeId) {
@@ -45,10 +44,11 @@ public class TaskExecutionService {
             if (validation.isPresent()) {
                 // Check if the task was recently executed (less than a week ago)
                 java.time.LocalDateTime lastCompletion = executionRepository.findLastCompletionDateForScheduleOf(request.getScheduleExecutionId());
-                if (lastCompletion != null && lastCompletion.isAfter(today.atStartOfDay().minusDays(7))) {
+                long recentDays = configParamService.getTaskRecentCompletionThresholdDays();
+                if (lastCompletion != null && lastCompletion.isAfter(today.atStartOfDay().minusDays(recentDays))) {
                     return com.maint.pm_backend.dto.QRScanResponse.builder()
                             .status("recently_completed")
-                            .message("Last execution for the scanned task was done recently (less than a week ago).")
+                            .message("Last execution for the scanned task was done recently (less than " + recentDays + " days ago).")
                             .build();
                 }
 
@@ -210,7 +210,7 @@ public class TaskExecutionService {
             if (approvalOpt.isPresent()) {
                 com.maint.pm_backend.entity.PmScheduleApproval approval = approvalOpt.get();
                 approval.setApprovalStatus(com.maint.pm_backend.entity.enums.TaskApprovalStatus.APPROVAL_REQUESTED);
-                approval.setApprovalDueDate(com.maint.pm_backend.util.DateUtils.getNow().plusDays(workflowProperties.getApprovalDueDateOffsetDays()));
+                approval.setApprovalDueDate(com.maint.pm_backend.util.DateUtils.getNow().plusDays(configParamService.getApprovalDueDateOffsetDays()));
                 approvalRepository.save(approval);
             }
         }

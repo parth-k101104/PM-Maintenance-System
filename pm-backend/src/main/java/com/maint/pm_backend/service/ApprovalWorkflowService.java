@@ -1,6 +1,5 @@
 package com.maint.pm_backend.service;
 
-import com.maint.pm_backend.config.AppWorkflowProperties;
 import com.maint.pm_backend.dto.SupervisorApprovalRequest;
 import com.maint.pm_backend.dto.SupervisorApprovalResponse;
 import com.maint.pm_backend.entity.Employee;
@@ -26,7 +25,7 @@ public class ApprovalWorkflowService {
     private final PmScheduleExecutionRepository executionRepository;
     private final PmScheduleApprovalRepository approvalRepository;
     private final EmployeeRepository employeeRepository;
-    private final AppWorkflowProperties workflowProperties;
+    private final ConfigParamService configParamService;
 
     @Transactional
     public SupervisorApprovalResponse processApproval(
@@ -113,7 +112,7 @@ public class ApprovalWorkflowService {
                 .orElseThrow(() -> new RuntimeException("Next approver not found: " + nextApproverId));
         nextApproval.setApprover(nextApprover);
         nextApproval.setApprovalStatus(TaskApprovalStatus.APPROVAL_REQUESTED);
-        nextApproval.setApprovalDueDate(LocalDateTime.now().plusDays(workflowProperties.getApprovalDueDateOffsetDays()));
+        nextApproval.setApprovalDueDate(LocalDateTime.now().plusDays(configParamService.getApprovalDueDateOffsetDays()));
         approvalRepository.save(nextApproval);
 
         TaskExecutionStatus nextStatus = nextLevel == 2
@@ -161,7 +160,7 @@ public class ApprovalWorkflowService {
         rescheduled.setTaskSchedule(execution.getTaskSchedule());
         rescheduled.setEmployee(execution.getEmployee());
         rescheduled.setAssignedDttm(LocalDateTime.now());
-        rescheduled.setDueDate(LocalDateTime.now().plusDays(workflowProperties.getRescheduleDueDateOffsetDays()));
+        rescheduled.setDueDate(LocalDateTime.now().plusDays(configParamService.getRescheduleDueDateOffsetDays()));
         rescheduled.setStatus(TaskExecutionStatus.ASSIGNED);
         rescheduled.setRescheduleFlag(true);
         rescheduled.setParentScheduleExecution(execution);

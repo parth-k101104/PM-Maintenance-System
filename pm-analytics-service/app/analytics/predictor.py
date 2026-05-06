@@ -5,12 +5,12 @@ from math import ceil
 from statistics import mean, pstdev
 from typing import Any
 
-from app.config import get_settings
 from app.repository import (
     fetch_executions,
     fetch_replacements,
 )
 from app.schemas import EvaluationAuditResponse, HistoricalCycleResponse, PredictionResponse, SeriesPoint, Thresholds
+from .analytics_config import AnalyticsConfig
 from .insights import InsightGenerator
 
 @dataclass(frozen=True)
@@ -21,7 +21,7 @@ class Cycle:
 
 class DegradationPredictor:
     @staticmethod
-    def evaluate_task(conn: Any, task: dict[str, Any], evaluation_date: date) -> tuple[PredictionResponse | None, EvaluationAuditResponse]:
+    def evaluate_task(conn: Any, task: dict[str, Any], evaluation_date: date, config: AnalyticsConfig) -> tuple[PredictionResponse | None, EvaluationAuditResponse]:
         executions = fetch_executions(conn, task["task_schedule_id"])
         if len(executions) < 2:
             return None, DegradationPredictor.make_audit(task, "INSUFFICIENT_DATA", "LESS_THAN_TWO_READINGS", len(executions), len(executions), 0)
@@ -47,7 +47,7 @@ class DegradationPredictor:
         current_slope = DegradationPredictor.slope_per_day(current_points)
         boundary = DegradationPredictor.choose_boundary(current_slope, min_threshold, max_threshold)
         prediction_threshold = max_threshold if boundary == "UPPER" else min_threshold
-        warning_value = DegradationPredictor.calculate_warning_value(boundary, standard_value, min_threshold, max_threshold)
+        warning_value = DegradationPredictor.calculate_warning_value(boundary, standard_value, min_threshold, max_threshold, config)
 
         master_points = DegradationPredictor.build_master_curve(completed_cycles)
         historical_velocity = mean([abs(DegradationPredictor.slope_per_day(DegradationPredictor.to_series_points(c.points, c.start))) for c in completed_cycles]) if completed_cycles else 0.0
@@ -69,11 +69,11 @@ class DegradationPredictor:
         )
         risk_score = DegradationPredictor.clamp(lifecycle_ratio * 100, 0, 100)
 
-        status = DegradationPredictor.choose_status(current_slope, current_value, warning_value, prediction_threshold, boundary, completed_cycles)
+        status = DegradationPredictor.choose_status(current_slope, current_value, warning_value, prediction_threshold, boundary, completed_cycles, config)
         predicted_failure_date: date | None = None
         days_remaining: int | None = None
         days_to_threshold: int | None = None
-        confidence_score = DegradationPredictor.calculate_confidence(completed_cycles)
+        confidence_score = DegradationPredictor.calculate_confidence(completed_cycles, config)
 
         if status in {"LINEAR_REGRESSION", "MASTER_CURVE"} and prediction_threshold is not None and DegradationPredictor.moving_toward_boundary(current_slope, boundary):
             if DegradationPredictor.crossed_failure(current_value, prediction_threshold, boundary):
@@ -93,7 +93,7 @@ class DegradationPredictor:
             predicted_failure_date = current_points[-1].date + timedelta(days=days_to_threshold)
             days_remaining = max(0, (predicted_failure_date - evaluation_date).days)
             if status == "LINEAR_REGRESSION":
-                confidence_score = min(confidence_score, 55.0)
+                confidence_score = min(confidence_score, config.lr_confidence_cap)
 
         simulated_curve = DegradationPredictor.project_curve(current_points[-1], current_slope, prediction_threshold, days_to_threshold)
         insights = InsightGenerator.build_insights(
@@ -103,6 +103,7 @@ class DegradationPredictor:
             boundary=boundary,
             predicted_failure_date=predicted_failure_date,
             velocity_ratio=velocity_ratio,
+            config=config,
         )
 
         prediction = PredictionResponse(
@@ -316,10 +317,10 @@ class DegradationPredictor:
         prediction_threshold: float | None,
         boundary: str,
         completed_cycles: list[Cycle],
+        config: AnalyticsConfig,
     ) -> str:
-        settings = get_settings()
         warning_crossed = DegradationPredictor.crossed_warning(current_value, warning_value, boundary)
-        if abs(current_slope) <= settings.stable_slope_epsilon and not warning_crossed:
+        if abs(current_slope) <= config.stable_slope_epsilon and not warning_crossed:
             return "STABLE"
         if prediction_threshold is None:
             return "INSUFFICIENT_DATA"
@@ -359,17 +360,21 @@ class DegradationPredictor:
         return max(value_ratio, elapsed / adjusted_duration)
 
     @staticmethod
-    def calculate_confidence(completed_cycles: list[Cycle]) -> float:
+    def calculate_confidence(completed_cycles: list[Cycle], config: AnalyticsConfig) -> float:
         if len(completed_cycles) < 2:
-            return 50.0
+            return config.min_confidence_score
 
         durations = [(cycle.points[-1]["completed_dttm"].date() - cycle.start.date()).days for cycle in completed_cycles]
         avg_duration = mean(durations)
         if avg_duration <= 0:
-            return 60.0
+            return config.min_confidence_score
 
         coefficient_variance = pstdev(durations) / avg_duration
-        return DegradationPredictor.clamp(95.0 - coefficient_variance * 100.0, 60.0, 95.0)
+        return DegradationPredictor.clamp(
+            config.max_confidence_score - coefficient_variance * 100.0,
+            config.min_confidence_score,
+            config.max_confidence_score,
+        )
 
     @staticmethod
     def project_curve(last_point: SeriesPoint, slope: float, threshold: float | None, days_remaining: int | None) -> list[SeriesPoint]:
@@ -416,13 +421,13 @@ class DegradationPredictor:
         standard_value: float | None,
         min_threshold: float | None,
         max_threshold: float | None,
+        config: AnalyticsConfig,
     ) -> float | None:
-        settings = get_settings()
         if boundary == "UPPER" and max_threshold is not None:
-            return max_threshold * settings.warn_threshold_ratio
+            return max_threshold * config.warn_threshold_ratio
         if boundary == "LOWER" and min_threshold is not None:
             if standard_value is not None:
-                return min_threshold + (standard_value - min_threshold) * (1 - settings.warn_threshold_ratio)
+                return min_threshold + (standard_value - min_threshold) * (1 - config.warn_threshold_ratio)
             return min_threshold
         return None
 

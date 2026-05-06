@@ -2,14 +2,17 @@ from typing import Any
 from datetime import date, datetime
 from app.repository import (
     fetch_target_tasks,
+    fetch_analytics_config,
     persist_evaluation_audits,
     persist_health_scores,
     persist_insights,
     persist_prediction,
 )
 from app.schemas import PredictionResponse, EvaluationAuditResponse, RunNightlyResponse
+from .analytics_config import AnalyticsConfig
 from .predictor import DegradationPredictor
 from .evaluator import HealthEvaluator
+
 
 class AnalyticsOrchestrator:
     @staticmethod
@@ -19,16 +22,25 @@ class AnalyticsOrchestrator:
         part_ids: list[int] | None,
         persist: bool,
         execution_id: int | None = None,
-        window_days: int = 365
+        window_days: int | None = None,
     ) -> RunNightlyResponse:
         triggered_at = datetime.utcnow()
+
+        # ── Load analytics config from DB (with hard-coded defaults as fallback) ──
+        raw_config = fetch_analytics_config(conn)
+        config = AnalyticsConfig.from_db(raw_config)
+
+        # window_days param takes precedence if explicitly passed (e.g. from API request);
+        # otherwise use the DB-driven value.
+        effective_window_days = window_days if window_days is not None else config.window_days
+
         predictions: list[PredictionResponse] = []
         audits: list[EvaluationAuditResponse] = []
         audit_rows: list[dict[str, Any]] = []
         insight_count = 0
 
         for task in fetch_target_tasks(conn, part_ids):
-            result, audit = DegradationPredictor.evaluate_task(conn, task, evaluation_date)
+            result, audit = DegradationPredictor.evaluate_task(conn, task, evaluation_date, config)
             audits.append(audit)
             audit_rows.append(DegradationPredictor.build_audit_row(task, audit, evaluation_date, execution_id, result))
 
@@ -63,12 +75,12 @@ class AnalyticsOrchestrator:
                 )
                 persist_insights(conn, result.insights)
 
-        evaluator = HealthEvaluator(conn, evaluation_date, window_days)
+        evaluator = HealthEvaluator(conn, evaluation_date, effective_window_days, config)
         health_scores = evaluator.evaluate(audit_rows)
 
         if persist:
             persist_evaluation_audits(conn, audit_rows)
-            persist_health_scores(conn, evaluation_date, health_scores, window_days)
+            persist_health_scores(conn, evaluation_date, health_scores, effective_window_days)
 
         return RunNightlyResponse(
             triggered_at=triggered_at,
