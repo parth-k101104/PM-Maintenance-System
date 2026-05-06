@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { fetchLineManagerDashboard, fetchOperatorDashboard, fetchSupervisorDashboard, login } from "../api/client";
+import { fetchLineManagerDashboard, fetchMaintenanceManagerDashboard, fetchOperatorDashboard, fetchSupervisorDashboard, login } from "../api/client";
 import { AuthSession, DashboardKind, LoginResponse } from "../types/api";
 
 type AuthState = {
@@ -30,6 +30,10 @@ function getDashboardKind(session: LoginResponse): DashboardKind {
   const roleName = session.roleName?.toLowerCase() ?? "";
   const accessLevelName = session.accessLevelName?.toLowerCase() ?? "";
 
+  if (session.roleId === 1 || roleName.includes("maintenance manager") || accessLevelName.includes("maintenance manager")) {
+    return "maintenanceManager";
+  }
+
   if (session.roleId === 3 || roleName.includes("supervisor") || accessLevelName.includes("supervisor")) {
     return "supervisor";
   }
@@ -44,7 +48,9 @@ function getDashboardKind(session: LoginResponse): DashboardKind {
 async function fetchDashboardForSession(session: LoginResponse | AuthSession) {
   const dashboardKind = getDashboardKind(session);
   const dashboard =
-    dashboardKind === "supervisor"
+    dashboardKind === "maintenanceManager"
+      ? await fetchMaintenanceManagerDashboard(session.token)
+      : dashboardKind === "supervisor"
       ? await fetchSupervisorDashboard(session.token)
       : dashboardKind === "lineManager"
       ? await fetchLineManagerDashboard(session.token)

@@ -13,6 +13,9 @@ public interface ConfigParamRepository extends JpaRepository<ConfigParam, Long> 
     /** Load a single active param by its business key. */
     Optional<ConfigParam> findByParamKeyAndIsActiveTrue(String paramKey);
 
+    /** Load a single param by its business key regardless of active flag. */
+    Optional<ConfigParam> findByParamKey(String paramKey);
+
     /** Load all active params — called on cache refresh. */
     List<ConfigParam> findAllByIsActiveTrue();
 

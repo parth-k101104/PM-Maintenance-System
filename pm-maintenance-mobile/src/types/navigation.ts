@@ -2,6 +2,24 @@ import type { QRScanResponse, ScannedEquipmentDetails, SupervisorQRScanResponse,
 
 export type RootStackParamList = {
   Dashboard: undefined;
+  MaintenanceManagerDashboard: undefined;
+  MmTaskStatusList: { statusGroup: string; label: string; color: string; windowDays: number; rollingWindows: any };
+  MmComplianceAnalytics: { currentRate?: number | null; lineWiseData: any[]; windowDays: number; rollingWindows: any };
+  MmEvidenceComplianceAnalytics: {
+    currentRate?: number | null;
+    lineWiseData: { lineName: string; evidenceComplianceRate: number | null }[];
+    windowDays: number;
+    rollingWindows: any;
+  };
+  MmMetricTrend: {
+    metric: "rejection" | "approvalTurnaround";
+    title: string;
+    currentValue?: number | null;
+    unit: string;
+    windowDays: number;
+    rollingWindows: any;
+  };
+  ConfigParams: undefined;
   TaskList: undefined;
   SupervisorDueApprovals: undefined;
   LineManagerTodayApprovals: undefined;

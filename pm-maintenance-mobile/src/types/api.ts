@@ -94,10 +94,21 @@ export type FlagReplacementRequest = {
 
 export type SupervisorDashboardResponse = {
   todaysDueApprovals: number;
+  activeFlags: number;
   openDeviations: number;
   upcomingApprovalsThisMonth: number;
   supervisedEmployeeCount: number;
   tasksInPipeline: number;
+};
+
+export type LineManagerDashboardWindowMetrics = {
+  windowDays: number;
+  lineHealth?: number;
+  pmComplianceRate?: number;
+  taskRejectionRate?: number;
+  approvalTurnaroundTimeHours?: number;
+  evidenceComplianceRate?: number;
+  employeeEfficiency?: number;
 };
 
 export type LineManagerDashboardResponse = {
@@ -109,6 +120,7 @@ export type LineManagerDashboardResponse = {
   pendingReviewTasks?: number;
   rejectedTasks?: number;
   todayTasks?: TaskDetails[];
+  rollingWindows?: Record<string, LineManagerDashboardWindowMetrics>;
 };
 
 export type LinePart = {
@@ -128,11 +140,54 @@ export type LineEquipment = {
   elements: LineElement[];
 };
 
-export type DashboardKind = "operator" | "supervisor" | "lineManager";
+export type MaintenanceManagerDashboardWindowMetrics = {
+  windowDays: number;
+  taskStatusCounts: {
+    inProgress: number;
+    underReview: number;
+    overdue: number;
+    rejected: number;
+    approved: number;
+  };
+  overallPmComplianceRate: number | null;
+  // Orange metrics — plant-wide averages
+  plantRejectionRate: number | null;
+  plantApprovalTurnaroundTimeHours: number | null;
+  plantEvidenceComplianceRate: number | null;
+  plantEmployeeEfficiency: number | null;
+  lineWiseCompliance: {
+    lineId: number;
+    lineName: string;
+    complianceRate: number | null;
+    // Orange metrics — per line
+    rejectionRate: number | null;
+    approvalTurnaroundTimeHours: number | null;
+    evidenceComplianceRate: number | null;
+    employeeEfficiency: number | null;
+  }[];
+};
+
+export type MaintenanceManagerDashboardResponse = MaintenanceManagerDashboardWindowMetrics & {
+  rollingWindows?: Record<string, MaintenanceManagerDashboardWindowMetrics>;
+};
+
+export type DashboardKind = "operator" | "supervisor" | "lineManager" | "maintenanceManager";
 
 export type AuthSession = LoginResponse & {
   dashboardKind?: DashboardKind;
-  dashboard?: OperatorDashboardResponse | SupervisorDashboardResponse | LineManagerDashboardResponse;
+  dashboard?: OperatorDashboardResponse | SupervisorDashboardResponse | LineManagerDashboardResponse | MaintenanceManagerDashboardResponse;
+};
+
+export type ConfigParam = {
+  paramId: number;
+  paramKey: string;
+  paramValue: string;
+  paramCategory: string;
+  description?: string | null;
+  dataType: "STRING" | "INTEGER" | "LONG" | "DOUBLE" | "BOOLEAN" | string;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type TaskDetails = {
@@ -364,7 +419,7 @@ export type ActionInsight = {
 };
 
 export type AnalyticsDashboardResponse = {
-  healthScores: HealthScore[];
+  rollingHealthScores: Record<string, HealthScore[]>;
   predictions: PartPrediction[];
   actionInsights: ActionInsight[];
 };

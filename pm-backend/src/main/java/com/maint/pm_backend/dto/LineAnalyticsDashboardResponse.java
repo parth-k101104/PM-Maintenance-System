@@ -8,12 +8,13 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class LineAnalyticsDashboardResponse {
-    private List<HealthScore> healthScores;
+    private Map<Integer, List<HealthScore>> rollingHealthScores;
     private List<PartPrediction> predictions;
     private List<ActionInsight> actionInsights;
 

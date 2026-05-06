@@ -3,4 +3,5 @@ declare module "react-native-gifted-charts" {
 
   export const BarChart: ComponentType<any>;
   export const LineChart: ComponentType<any>;
+  export const PieChart: ComponentType<any>;
 }

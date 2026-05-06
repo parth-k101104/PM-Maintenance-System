@@ -84,7 +84,8 @@ type DashboardRouteTarget =
   | "FlagsRaised"
   | "LineManagerActiveTasks"
   | "EmployeeApprovalChart"
-  | "LineManagerAnalyticsDashboard";
+  | "LineManagerAnalyticsDashboard"
+  | "ConfigParams";
 
 type DashboardViewModel = {
   greetingShift?: string;
@@ -238,18 +239,38 @@ function buildSupervisorDashboardViewModel(
 function buildLineManagerDashboardViewModel(
   dashboard: LineManagerDashboardResponse | undefined,
   fallbackName: string,
+  windowDays: 30 | 365,
 ): DashboardViewModel {
+  const metrics = dashboard?.rollingWindows?.[windowDays];
+  const lineHealth = metrics?.lineHealth;
+  const pmComplianceRate = metrics?.pmComplianceRate;
+  const employeeEfficiency = metrics?.employeeEfficiency;
+  
   return {
     userName: fallbackName,
     cards: [
       {
         title: "Line health-",
-        value: `${Math.round(dashboard?.lineHealth ?? 0)}%`,
+        value: lineHealth != null ? `${Math.round(lineHealth)}%` : "N/A",
         footnote: "equipment health",
         variant: "health",
         size: "large",
         navigateTo: "LineManagerEquipments",
-        healthValue: dashboard?.lineHealth ?? 0,
+        healthValue: lineHealth,
+      },
+      {
+        title: "PM compliance-",
+        value: pmComplianceRate != null ? `${Math.round(pmComplianceRate)}%` : "N/A",
+        footnote: "rolling window",
+        variant: "status",
+        size: "small",
+      },
+      {
+        title: "Employee efficiency-",
+        value: employeeEfficiency != null ? `${Math.round(employeeEfficiency)}%` : "N/A",
+        footnote: "rolling window",
+        variant: "other",
+        size: "small",
       },
       {
         title: "Flags\nraised-",
@@ -304,6 +325,7 @@ function getCardStyle(variant: DashboardCard["variant"]) {
 }
 
 function getHealthCardStyle(value?: number) {
+  if (value == null) return styles.statusCard;
   const health = value ?? 0;
   if (health >= 90) return styles.healthGoodCard;
   if (health >= 70) return styles.healthWarningCard;
@@ -336,6 +358,7 @@ export function DashboardScreen() {
   }>({ visible: false, type: "success", title: "", message: "" });
   const [lineInsights, setLineInsights] = useState<ActionInsight[]>([]);
   const [closingInsightId, setClosingInsightId] = useState<number | null>(null);
+  const [windowDays, setWindowDays] = useState<30 | 365>(30);
   const translateX = useRef(new Animated.Value(-300)).current;
   const session = authState.session;
   const dashboard = session?.dashboard;
@@ -365,11 +388,12 @@ export function DashboardScreen() {
       return buildLineManagerDashboardViewModel(
         isLineManagerDashboard(dashboard) ? dashboard : undefined,
         fallbackName,
+        windowDays,
       );
     }
 
     return buildOperatorDashboardViewModel(isOperatorDashboard(dashboard) ? dashboard : undefined, fallbackName);
-  }, [dashboard, fallbackName, session?.dashboardKind]);
+  }, [dashboard, fallbackName, session?.dashboardKind, windowDays]);
   const greeting = formatGreeting(dashboardView.greetingShift);
   const userName = dashboardView.userName;
   const isTablet = width >= 768;
@@ -402,6 +426,7 @@ export function DashboardScreen() {
             { label: "Flags raised", target: "LineManagerFlags" as DashboardRouteTarget },
             { label: "Backlogs", target: "LineManagerBacklogApprovals" as DashboardRouteTarget },
             { label: "Active tasks", target: "LineManagerActiveTasks" as DashboardRouteTarget },
+            { label: "Config parameters", target: "ConfigParams" as DashboardRouteTarget },
           ]
         : [
             { label: "Dashboard", target: undefined },
@@ -479,6 +504,9 @@ export function DashboardScreen() {
         break;
       case "LineManagerAnalyticsDashboard":
         navigation.navigate("LineManagerAnalyticsDashboard");
+        break;
+      case "ConfigParams":
+        navigation.navigate("ConfigParams");
         break;
       default:
         break;
@@ -558,6 +586,23 @@ export function DashboardScreen() {
             <Text style={[styles.greetingText, isTablet && styles.greetingTextTablet]}>
               {greeting} {userName}
             </Text>
+
+            {isLineManager ? (
+              <View style={styles.toggleContainer}>
+                <Pressable
+                  style={[styles.toggleBtn, windowDays === 365 && styles.toggleBtnActive]}
+                  onPress={() => setWindowDays(365)}
+                >
+                  <Text style={[styles.toggleBtnText, windowDays === 365 && styles.toggleBtnTextActive]}>365 Days</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.toggleBtn, windowDays === 30 && styles.toggleBtnActive]}
+                  onPress={() => setWindowDays(30)}
+                >
+                  <Text style={[styles.toggleBtnText, windowDays === 30 && styles.toggleBtnTextActive]}>30 Days</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             {isLineManager ? (
               <View style={styles.dashboardInsights}>
@@ -789,6 +834,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 28,
     paddingHorizontal: 0,
+  },
+  toggleContainer: {
+    flexDirection: "row",
+    padding: 4,
+    backgroundColor: colors.primaryMuted,
+    borderRadius: 16,
+    gap: 12,
+    marginBottom: 16,
+  },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "transparent",
+    alignItems: "center",
+  },
+  toggleBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  toggleBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textMuted,
+  },
+  toggleBtnTextActive: {
+    color: "#fff",
   },
   headerIcon: {
     width: 44,
