@@ -1,6 +1,8 @@
 from typing import Any
 from datetime import date
 from app.config import get_settings
+from .analytics_config import AnalyticsConfig
+
 
 class InsightGenerator:
     @staticmethod
@@ -11,8 +13,8 @@ class InsightGenerator:
         boundary: str,
         predicted_failure_date: date | None,
         velocity_ratio: float | None,
+        config: AnalyticsConfig,
     ) -> list[dict[str, Any]]:
-        settings = get_settings()
         insights: list[dict[str, Any]] = []
 
         # Circular import protection: only import crossed_warning if needed
@@ -36,7 +38,8 @@ class InsightGenerator:
                 }
             )
 
-        if velocity_ratio is not None and velocity_ratio >= settings.anomaly_velocity_ratio:
+        # anomaly_velocity_ratio is now driven by config_param DB table via AnalyticsConfig
+        if velocity_ratio is not None and velocity_ratio >= config.anomaly_velocity_ratio:
             insights.append(
                 {
                     "line_id": task["line_id"],

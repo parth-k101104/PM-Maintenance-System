@@ -1,16 +1,11 @@
 package com.maint.pm_backend.service;
 
-import com.maint.pm_backend.config.AppWorkflowProperties;
 import com.maint.pm_backend.dto.DeviationTaskProjection;
 import com.maint.pm_backend.dto.EmployeeTaskProjection;
 import com.maint.pm_backend.dto.EmployeeTaskSummaryDto;
 import com.maint.pm_backend.dto.SupervisorApprovalRequest;
 import com.maint.pm_backend.dto.SupervisorApprovalResponse;
 import com.maint.pm_backend.entity.Employee;
-import com.maint.pm_backend.entity.PmScheduleApproval;
-import com.maint.pm_backend.entity.PmScheduleExecution;
-import com.maint.pm_backend.entity.enums.TaskApprovalStatus;
-import com.maint.pm_backend.entity.enums.TaskExecutionStatus;
 import com.maint.pm_backend.repository.EmployeeRepository;
 import com.maint.pm_backend.repository.PmScheduleApprovalRepository;
 import com.maint.pm_backend.repository.PmScheduleExecutionRepository;
@@ -20,9 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -40,7 +33,6 @@ public class SupervisorApprovalService {
     private final PmScheduleExecutionRepository executionRepository;
     private final PmScheduleApprovalRepository approvalRepository;
     private final EmployeeRepository employeeRepository;
-    private final AppWorkflowProperties workflowProperties;
     private final ApprovalWorkflowService approvalWorkflowService;
 
     // ─── Guards ───────────────────────────────────────────────────────────────
@@ -186,95 +178,4 @@ public class SupervisorApprovalService {
         return approvalWorkflowService.processApproval(request, supervisorId, 1, 3L, "Supervisor");
     }
 
-    // ─── Private helpers ──────────────────────────────────────────────────────
-
-    private SupervisorApprovalResponse handleApprove(PmScheduleExecution execution) {
-        Long executionId = execution.getScheduleExecutionId();
-
-        // 1. Read the workflow for this task
-        Long workflowId = approvalRepository.findWorkflowIdByExecution(executionId);
-        if (workflowId == null) workflowId = 1L; // default: supervisor only
-
-        // Workflow 1 → supervisor is the final approver
-        if (workflowId == 1L) {
-            execution.setStatus(TaskExecutionStatus.COMPLETED);
-            executionRepository.save(execution);
-            return SupervisorApprovalResponse.builder()
-                    .status("success")
-                    .message("Task approved and marked as completed (single-level workflow)")
-                    .executionStatus("COMPLETED")
-                    .build();
-        }
-
-        // Workflow 2 or 3 → line manager approval is needed next
-        Long lineManagerId = approvalRepository.findLineManagerIdByExecution(executionId);
-        if (lineManagerId == null) {
-            throw new RuntimeException(
-                    "Cannot advance workflow: no line_manager_id assigned to the line for execution " + executionId);
-        }
-
-        // Find or create the level-2 (line manager) approval row
-        PmScheduleApproval level2 = approvalRepository
-                .findByScheduleExecution_ScheduleExecutionIdAndApprovalLevel(executionId, 2)
-                .orElseGet(() -> {
-                    PmScheduleApproval newRow = new PmScheduleApproval();
-                    newRow.setScheduleExecution(execution);
-                    newRow.setApprovalLevel(2);
-                    newRow.setApprovalStatus(TaskApprovalStatus.PENDING);
-                    return newRow;
-                });
-
-        Employee lineManager = employeeRepository.findById(lineManagerId)
-                .orElseThrow(() -> new RuntimeException("Line manager not found: " + lineManagerId));
-
-        level2.setApprover(lineManager);
-        level2.setApprovalStatus(TaskApprovalStatus.APPROVAL_REQUESTED);
-        level2.setApprovalDueDate(
-                LocalDateTime.now().plusDays(workflowProperties.getApprovalDueDateOffsetDays()));
-        approvalRepository.save(level2);
-
-        // For workflow 3, level-3 (maintenance manager) row may already exist — leave it PENDING.
-        // It will be activated only when the line manager approves.
-
-        execution.setStatus(TaskExecutionStatus.UNDER_LINE_MANAGER_REVIEW);
-        executionRepository.save(execution);
-
-        String message = (workflowId == 3L)
-                ? "Task approved. Forwarded to Line Manager (Maintenance Manager review will follow after LM approval)"
-                : "Task approved and forwarded to Line Manager for review";
-
-        return SupervisorApprovalResponse.builder()
-                .status("success")
-                .message(message)
-                .executionStatus("UNDER_LINE_MANAGER_REVIEW")
-                .nextApproverId(lineManagerId)
-                .build();
-    }
-
-    private SupervisorApprovalResponse handleReject(PmScheduleExecution execution, String remarks) {
-        // Mark original execution as REJECTED
-        execution.setStatus(TaskExecutionStatus.REJECTED);
-        executionRepository.save(execution);
-
-        // Create a rescheduled execution assigned to the same employee
-        PmScheduleExecution rescheduled = new PmScheduleExecution();
-        rescheduled.setTaskSchedule(execution.getTaskSchedule());
-        rescheduled.setEmployee(execution.getEmployee());
-        rescheduled.setAssignedDttm(LocalDateTime.now());
-        rescheduled.setDueDate(
-                LocalDateTime.now().plusDays(workflowProperties.getRescheduleDueDateOffsetDays()));
-        rescheduled.setStatus(TaskExecutionStatus.ASSIGNED);
-        rescheduled.setRescheduleFlag(true);
-        rescheduled.setParentScheduleExecution(execution);
-        rescheduled.setNotes("Rescheduled after supervisor rejection. Supervisor remarks: "
-                + (remarks != null ? remarks : "N/A"));
-        executionRepository.save(rescheduled);
-
-        return SupervisorApprovalResponse.builder()
-                .status("success")
-                .message("Task rejected and rescheduled for the same employee")
-                .executionStatus("REJECTED")
-                .rescheduledExecutionId(rescheduled.getScheduleExecutionId())
-                .build();
-    }
 }

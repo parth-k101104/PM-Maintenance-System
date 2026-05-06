@@ -5,12 +5,15 @@ from app.repository import (
     fetch_previous_health_scores,
     fetch_operational_metrics,
 )
+from .analytics_config import AnalyticsConfig
+
 
 class HealthEvaluator:
-    def __init__(self, conn: Any, evaluation_date: date, window_days: int):
+    def __init__(self, conn: Any, evaluation_date: date, window_days: int, config: AnalyticsConfig):
         self.conn = conn
         self.evaluation_date = evaluation_date
         self.window_days = window_days
+        self.config = config
 
     def evaluate(self, audit_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         buckets: dict[tuple[str, int], list[dict[str, Any]]] = {}
@@ -33,16 +36,19 @@ class HealthEvaluator:
         previous_scores = fetch_previous_health_scores(self.conn, self.evaluation_date, list(buckets.keys()), self.window_days)
         health_scores: list[dict[str, Any]] = []
 
+        critical_threshold = self.config.critical_risk_threshold
+        trend_threshold = self.config.trend_stability_threshold
+
         for key, rows in buckets.items():
             entity_type, entity_id = key
             contribution_scores = [self._health_contribution(row) for row in rows]
             health_score = round(mean(contribution_scores), 2) if contribution_scores else 100.0
-            critical_flags_count = sum(1 for row in rows if (row.get("risk_score") or 0) >= 90)
+            critical_flags_count = sum(1 for row in rows if (row.get("risk_score") or 0) >= critical_threshold)
             complete_count = sum(1 for row in rows if row["evaluation_status"] in {"PREDICTED", "STABLE"})
             coverage_rate = round((complete_count / len(rows)) * 100, 2) if rows else 100.0
             previous = previous_scores.get(key)
 
-            if previous is None or abs(health_score - previous) < 1:
+            if previous is None or abs(health_score - previous) < trend_threshold:
                 trend = "STABLE"
             elif health_score > previous:
                 trend = "IMPROVING"
@@ -85,7 +91,7 @@ class HealthEvaluator:
                     matching_rows.append(r)
                 elif etype == "PLANT" and r["plant_id"] == eid:
                     matching_rows.append(r)
-            
+
             if not matching_rows:
                 continue
 
@@ -126,14 +132,17 @@ class HealthEvaluator:
             parts.append(f"{h}h")
         return " ".join(parts)
 
-    @staticmethod
-    def _health_contribution(audit: dict[str, Any]) -> float:
+    def _health_contribution(self, audit: dict[str, Any]) -> float:
+        """
+        Returns a 0-100 health contribution for a single audit row.
+        Fallback scores are driven by AnalyticsConfig (from config_param DB table).
+        """
         from .predictor import DegradationPredictor
         if audit["evaluation_status"] == "CONFIG_MISSING":
-            return 60.0
+            return self.config.health_config_missing_score
         if audit["evaluation_status"] == "INSUFFICIENT_DATA":
-            return 70.0
+            return self.config.health_insufficient_data_score
         risk_score = audit.get("risk_score")
         if risk_score is None:
-            return 75.0
+            return self.config.health_no_risk_fallback_score
         return DegradationPredictor.clamp(100.0 - float(risk_score), 0.0, 100.0)

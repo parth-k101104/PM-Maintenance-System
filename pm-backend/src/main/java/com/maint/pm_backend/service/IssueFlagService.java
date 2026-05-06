@@ -35,6 +35,7 @@ public class IssueFlagService {
     private final SparePartRepository sparePartRepository;
     private final SparePartReplacementRepository replacementRepository;
     private final AwsS3Service awsS3Service;
+    private final ConfigParamService configParamService;
 
     // role_id reference from V5__insert_roles.sql:
     // 1 = Maintenance Manager, 2 = Line Manager, 3 = Line Supervisor, 6 = Maintenance Engineer
@@ -152,13 +153,9 @@ public class IssueFlagService {
                 if (request.getDueDate() != null) {
                     flag.setDueDate(request.getDueDate());
                 } else if (flag.getDueDate() == null) {
-                    // Auto-calculate due date based on criticality
+                    // Auto-calculate due date based on criticality (values driven by CONFIG_PARAM table)
                     IssueFlagCriticality crit = flag.getCriticality() != null ? flag.getCriticality() : IssueFlagCriticality.MEDIUM;
-                    int daysToAdd = switch (crit) {
-                        case CRITICAL, HIGH -> 1;
-                        case MEDIUM -> 2;
-                        default -> 7;
-                    };
+                    int daysToAdd = configParamService.getFlagDueDateDays(crit);
                     flag.setDueDate(DateUtils.getNow().plusDays(daysToAdd));
                 }
             }

@@ -115,6 +115,30 @@ def fetch_operational_metrics(conn, evaluation_date: date, window_days: int) -> 
         return list(cur.fetchall())
 
 
+def fetch_analytics_config(conn) -> dict[str, str]:
+    """
+    Reads all active rows from ``config_param`` where
+    ``param_category = 'ANALYTICS'`` and returns a plain ``{key: value}`` dict.
+
+    Returns an empty dict (causing callers to use their hard-coded defaults)
+    if the table doesn't exist yet or the query fails for any reason.
+    """
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT param_key, param_value
+                FROM config_param
+                WHERE param_category = 'ANALYTICS'
+                  AND is_active = TRUE
+                """
+            )
+            return {row["param_key"]: row["param_value"] for row in cur.fetchall()}
+    except Exception:
+        # Silently fall back to defaults — pipeline must never break on missing config
+        return {}
+
+
 def persist_prediction(conn, prediction: dict[str, Any], evaluation_date: date) -> None:
     with conn.cursor() as cur:
         cur.execute(

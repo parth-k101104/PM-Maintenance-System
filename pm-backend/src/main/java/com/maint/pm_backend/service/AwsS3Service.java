@@ -23,18 +23,21 @@ import java.time.Duration;
 public class AwsS3Service {
 
     private final S3Presigner s3Presigner;
+    private final ConfigParamService configParamService;
 
+    // Bucket names and AWS credentials stay in application.properties — they are
+    // infrastructure/security concerns, not tunable business-logic params.
     @Value("${aws.s3.bucket}")
     private String documentsBucketName;
 
     @Value("${aws.s3.observations-bucket}")
     private String observationsBucketName;
 
+    // Expiry durations are now driven by CONFIG_PARAM (S3_GET_URL_EXPIRY_MINUTES
+    // and S3_PUT_URL_EXPIRY_MINUTES). The @Value fallback is kept only as a
+    // last-resort default in case the DB is unreachable during a cold start.
     @Value("${aws.s3.upload-expiry-minutes:15}")
-    private long uploadExpiryMinutes;
-
-    /** Presigned GET URL expiry - 15 minutes */
-    private static final Duration GET_URL_EXPIRY = Duration.ofMinutes(15);
+    private long uploadExpiryMinutesFallback;
 
     // ──────────────────────────────────────────────────────────────
     // READ: Presigned GET URL (for manuals / task SOPs)
@@ -55,7 +58,7 @@ public class AwsS3Service {
                 .build();
 
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                .signatureDuration(GET_URL_EXPIRY)
+                .signatureDuration(Duration.ofMinutes(configParamService.getS3GetUrlExpiryMinutes()))
                 .getObjectRequest(getObjectRequest)
                 .build();
 
@@ -120,14 +123,14 @@ public class AwsS3Service {
                 .build();
 
         PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-                .signatureDuration(Duration.ofMinutes(uploadExpiryMinutes))
+                .signatureDuration(Duration.ofMinutes(configParamService.getS3PutUrlExpiryMinutes()))
                 .putObjectRequest(putObjectRequest)
                 .build();
 
         String presignedUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
         log.debug("Generated presigned PUT URL for key={}", key);
 
-        return new ObservationUploadResult(presignedUrl, key, uploadExpiryMinutes);
+        return new ObservationUploadResult(presignedUrl, key, configParamService.getS3PutUrlExpiryMinutes());
     }
 
     /**
@@ -158,7 +161,7 @@ public class AwsS3Service {
                 .build();
 
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                .signatureDuration(GET_URL_EXPIRY)
+                .signatureDuration(Duration.ofMinutes(configParamService.getS3GetUrlExpiryMinutes()))
                 .getObjectRequest(getObjectRequest)
                 .build();
 
@@ -196,14 +199,14 @@ public class AwsS3Service {
                 .build();
 
         PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-                .signatureDuration(Duration.ofMinutes(uploadExpiryMinutes))
+                .signatureDuration(Duration.ofMinutes(configParamService.getS3PutUrlExpiryMinutes()))
                 .putObjectRequest(putObjectRequest)
                 .build();
 
         String presignedUrl = s3Presigner.presignPutObject(presignRequest).url().toString();
         log.debug("Generated presigned PUT URL for flag photo key={}", key);
 
-        return new ObservationUploadResult(presignedUrl, key, uploadExpiryMinutes);
+        return new ObservationUploadResult(presignedUrl, key, configParamService.getS3PutUrlExpiryMinutes());
     }
 
     // ──────────────────────────────────────────────────────────────
