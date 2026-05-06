@@ -33,6 +33,12 @@ import { SupervisorFlagReviewScreen } from "./src/screens/SupervisorFlagReviewSc
 import { colors } from "./src/theme/colors";
 import { RootStackParamList } from "./src/types/navigation";
 import EmployeeApprovalChartScreen from "src/screens/EmployeeApprovalChartScreen";
+import { MaintenanceManagerDashboardScreen } from "./src/screens/MaintenanceManagerDashboardScreen";
+import { MmTaskStatusListScreen } from "./src/screens/MmTaskStatusListScreen";
+import { MmComplianceAnalyticsScreen } from "./src/screens/MmComplianceAnalyticsScreen";
+import { MmEvidenceComplianceAnalyticsScreen } from "./src/screens/MmEvidenceComplianceAnalyticsScreen";
+import { MmMetricTrendScreen } from "./src/screens/MmMetricTrendScreen";
+
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -50,6 +56,21 @@ function RootNavigator() {
 
   if (!authState.session) {
     return <LoginScreen />;
+  }
+
+  // Route maintenance managers directly to their dedicated screen
+  if (authState.session.dashboardKind === "maintenanceManager") {
+    return (
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="MaintenanceManagerDashboard" component={MaintenanceManagerDashboardScreen} />
+          <Stack.Screen name="MmTaskStatusList" component={MmTaskStatusListScreen} />
+          <Stack.Screen name="MmComplianceAnalytics" component={MmComplianceAnalyticsScreen} />
+          <Stack.Screen name="MmEvidenceComplianceAnalytics" component={MmEvidenceComplianceAnalyticsScreen} />
+          <Stack.Screen name="MmMetricTrend" component={MmMetricTrendScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    );
   }
 
   return (

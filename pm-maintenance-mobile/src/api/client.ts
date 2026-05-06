@@ -11,6 +11,7 @@ import type {
   LineManagerDashboardResponse,
   LoginRequest,
   LoginResponse,
+  MaintenanceManagerDashboardResponse,
   OperatorDashboardResponse,
   QRScanRequest,
   QRScanResponse,
@@ -84,6 +85,48 @@ export async function fetchSupervisorDashboard(token: string) {
 
 export async function fetchLineManagerDashboard(token: string) {
   return request<LineManagerDashboardResponse>("/api/v1/dashboard/line-manager", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchMaintenanceManagerDashboard(token: string, windowDays: number = 365) {
+  return request<MaintenanceManagerDashboardResponse>(`/api/v1/dashboard/maintenance-manager?windowDays=${windowDays}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchMmTasksByStatusGroup(token: string, statusGroup: string, windowDays: number = 30) {
+  return request<TaskDetails[]>(`/api/v1/dashboard/maintenance-manager/tasks?statusGroup=${statusGroup}&windowDays=${windowDays}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchComplianceTrend(token: string, windowDays: number = 365) {
+  return request<{ evaluationDate: string; complianceRate: number }[]>(`/api/v1/dashboard/maintenance-manager/compliance-trend?windowDays=${windowDays}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchEvidenceTrend(token: string, windowDays: number = 365) {
+  return request<{ evaluationDate: string; evidenceComplianceRate: number }[]>(`/api/v1/dashboard/maintenance-manager/evidence-trend?windowDays=${windowDays}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchRejectionTrend(token: string, windowDays: number = 365) {
+  return request<{ evaluationDate: string; rejectionRate: number }[]>(`/api/v1/dashboard/maintenance-manager/rejection-trend?windowDays=${windowDays}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchApprovalTurnaroundTrend(token: string, windowDays: number = 365) {
+  return request<{ evaluationDate: string; approvalTurnaroundTimeHours: number }[]>(`/api/v1/dashboard/maintenance-manager/approval-turnaround-trend?windowDays=${windowDays}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });

@@ -246,6 +246,7 @@ export function LineManagerAnalyticsDashboardScreen() {
   const [closingInsightId, setClosingInsightId] = useState<number | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [selectedHealthKey, setSelectedHealthKey] = useState<string | null>(null);
+  const [windowDays, setWindowDays] = useState<number>(30);
 
   const loadDashboard = useCallback(
     async (asRefresh = false) => {
@@ -272,12 +273,24 @@ export function LineManagerAnalyticsDashboardScreen() {
     }, [loadDashboard]),
   );
 
-  const latestLineHealth = useMemo(() => {
-    const lineScores = data?.healthScores.filter((score) => score.entityType === "LINE") ?? [];
-    return lineScores[0];
-  }, [data?.healthScores]);
+  const currentHealthScores = data?.rollingHealthScores?.[String(windowDays)] ?? [];
 
-  const healthGroups = useMemo(() => buildHealthGroups(data?.healthScores ?? []), [data?.healthScores]);
+  const healthGroups = useMemo(() => buildHealthGroups(currentHealthScores), [currentHealthScores]);
+
+  const latestLineHealth = useMemo(() => {
+    const latestLineGroups = healthGroups.filter((group) => group.latest.entityType === "LINE");
+    const scores = latestLineGroups
+      .map((group) => group.latest.healthScore)
+      .filter((score): score is number => score !== undefined && score !== null);
+    const healthScore = scores.length
+      ? scores.reduce((sum, score) => sum + score, 0) / scores.length
+      : undefined;
+
+    return {
+      healthScore,
+      trend: latestLineGroups[0]?.latest.trend,
+    };
+  }, [healthGroups]);
 
   const selectedHealthGroup = useMemo(() => {
     if (!healthGroups.length) return undefined;
@@ -401,6 +414,21 @@ export function LineManagerAnalyticsDashboardScreen() {
                 <Text style={styles.healthMetaLabel}>Trend</Text>
                 <Text style={styles.healthMetaValue}>{latestLineHealth?.trend || "N/A"}</Text>
               </View>
+            </View>
+
+            <View style={styles.toggleContainer}>
+              <Pressable
+                style={[styles.toggleBtn, windowDays === 365 && styles.toggleBtnActive]}
+                onPress={() => setWindowDays(365)}
+              >
+                <Text style={[styles.toggleBtnText, windowDays === 365 && styles.toggleBtnTextActive]}>365 Days</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.toggleBtn, windowDays === 30 && styles.toggleBtnActive]}
+                onPress={() => setWindowDays(30)}
+              >
+                <Text style={[styles.toggleBtnText, windowDays === 30 && styles.toggleBtnTextActive]}>30 Days</Text>
+              </Pressable>
             </View>
 
             {/* ── Actionable insights inside scrollable card ── */}
@@ -564,6 +592,32 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   healthLabel: { fontFamily: "Jost_500Medium", fontSize: 14, color: "#36503A" },
+  toggleContainer: {
+    flexDirection: "row",
+    padding: 4,
+    backgroundColor: colors.primaryMuted,
+    borderRadius: 16,
+    gap: 12,
+    marginBottom: 20,
+  },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "transparent",
+    alignItems: "center",
+  },
+  toggleBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  toggleBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textMuted,
+  },
+  toggleBtnTextActive: {
+    color: "#fff",
+  },
   healthValue: { fontFamily: "Jost_600SemiBold", fontSize: 42, color: "#111111", marginTop: 2 },
   healthMetaBox: { alignItems: "flex-end" },
   healthMetaLabel: { fontFamily: "Jost_400Regular", fontSize: 12, color: "#36503A" },
