@@ -25,9 +25,10 @@ type Props = {
   onTaskPress?: (task: TaskDetails) => void;
   onSkipQrPress?: (task: TaskDetails) => void;
   showTabs?: boolean;
+  isLineManager?: boolean;
 };
 
-export function TaskListView({ tasks, emptyMessage, onTaskPress, onSkipQrPress, showTabs = true }: Props) {
+export function TaskListView({ tasks, emptyMessage, onTaskPress, onSkipQrPress, showTabs = true, isLineManager = false }: Props) {
   const zones = useMemo(() => Array.from(new Set(tasks.map((task) => task.zone || "All"))).sort(), [tasks]);
   const [selectedZone, setSelectedZone] = useState<string | null>(zones[0] ?? null);
   const horizontalListRef = useRef<FlatList>(null);
@@ -169,7 +170,7 @@ export function TaskListView({ tasks, emptyMessage, onTaskPress, onSkipQrPress, 
                           ) : (
                             <View />
                           )}
-                          {onSkipQrPress && item.taskCriticality === "LOW" && (
+                          {onSkipQrPress && (isLineManager || item.taskCriticality === "LOW") && (
                             <Pressable
                               style={styles.skipButton}
                               onPress={(e) => {
@@ -350,11 +351,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     marginTop: 5,
+    flex: 1,
   },
   employeeName: {
     fontFamily: "Jost_500Medium",
     fontSize: 12,
     color: "#4A4F68",
+    flexShrink: 1,
   },
   reviewBadge: {
     flexDirection: "row",

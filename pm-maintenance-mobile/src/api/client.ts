@@ -27,6 +27,8 @@ import type {
   TaskDetails,
   TaskDocumentUrls,
 } from "../types/api";
+import NetInfo from "@react-native-community/netinfo";
+import { SyncManager } from "./syncManager";
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 
@@ -36,34 +38,71 @@ if (!API_BASE_URL) {
   );
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+async function request<T>(path: string, init?: RequestInit, label?: string): Promise<T> {
+  const netInfo = await NetInfo.fetch();
+  const isOffline = netInfo.isConnected === false || netInfo.isInternetReachable === false;
+  
+  const method = init?.method || "GET";
+  const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase());
 
-  if (!response.ok) {
-    const text = await response.text();
-    let message = text;
+  if (isOffline && isMutation && label) {
+    console.log(`[api/client] Offline: Queueing ${method} ${path} (${label})`);
+    await SyncManager.addRequest(
+      path, 
+      method, 
+      init?.body, 
+      (init?.headers as Record<string, string>) || {}, 
+      label
+    );
+    // Return a placeholder/queued response if possible, or just a generic success
+    // This is tricky as we don't have the actual response T.
+    // For most of our mutations, we return success messages.
+    return { status: "QUEUED", message: "Request queued for offline sync" } as unknown as T;
+  }
 
-    try {
-      const parsed = JSON.parse(text);
-      message = parsed?.message || parsed?.error || text;
-    } catch {
-      message = text;
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      let message = text;
+
+      try {
+        const parsed = JSON.parse(text);
+        message = parsed?.message || parsed?.error || text;
+      } catch {
+        message = text;
+      }
+
+      throw new Error(message || "Request failed");
     }
 
-    throw new Error(message || "Request failed");
-  }
+    if (response.status === 204) {
+      return undefined as T;
+    }
 
-  if (response.status === 204) {
-    return undefined as T;
+    return response.json() as Promise<T>;
+  } catch (error) {
+    // If it's a network error and we are a mutation, we can still try to queue it
+    if (isMutation && label && error instanceof Error && (error.message.includes("Network request failed") || error.message.includes("Failed to fetch"))) {
+       console.log(`[api/client] Network error: Queueing ${method} ${path} (${label})`);
+       await SyncManager.addRequest(
+         path, 
+         method, 
+         init?.body, 
+         (init?.headers as Record<string, string>) || {}, 
+         label
+       );
+       return { status: "QUEUED", message: "Request queued for offline sync" } as unknown as T;
+    }
+    throw error;
   }
-
-  return response.json() as Promise<T>;
 }
 
 export async function login(payload: LoginRequest) {
@@ -240,7 +279,7 @@ export async function updateConfigParam(token: string, paramKey: string, paramVa
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ paramValue }),
-  });
+  }, `Update Parameter ${paramKey}`);
 }
 
 export async function fetchTasksForToday(token: string) {
@@ -303,14 +342,14 @@ export async function acknowledgeLineManagerInsight(token: string, insightId: nu
   return request<void>(`/api/v1/line-manager/analytics/insights/${insightId}/acknowledge`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }, `Acknowledge Insight #${insightId}`);
 }
 
 export async function runAnalyticsSyncJob(token: string) {
   return request<JobRunResponse>("/api/system-jobs/SHORT_TERM_PHM_ANALYTICS_SYNC/run", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }, "Sync Analytics");
 }
 
 export async function fetchCompletedTasks(token: string) {
@@ -378,7 +417,7 @@ export async function processSupervisorApproval(token: string, payload: Approval
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
-  });
+  }, `Approve Task #${payload.scheduleExecutionId}`);
 }
 
 export async function processLineManagerApproval(token: string, payload: ApprovalActionRequest) {
@@ -386,7 +425,7 @@ export async function processLineManagerApproval(token: string, payload: Approva
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
-  });
+  }, `Approve Task #${payload.scheduleExecutionId}`);
 }
 
 export async function processMaintenanceManagerApproval(token: string, payload: ApprovalActionRequest) {
@@ -394,7 +433,7 @@ export async function processMaintenanceManagerApproval(token: string, payload: 
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
-  });
+  }, `Approve Task #${payload.scheduleExecutionId}`);
 }
 
 export async function completeTask(token: string, payload: TaskCompletionRequest) {
@@ -402,7 +441,7 @@ export async function completeTask(token: string, payload: TaskCompletionRequest
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
-  });
+  }, `Complete Task #${payload.scheduleExecutionId}`);
 }
 
 export async function fetchEmployeeApprovalSummary(token: string, period: "CURRENT_MONTH" | "YEAR") {
@@ -446,7 +485,7 @@ export async function completeFlagReplacement(token: string, flagId: number, pay
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
-  });
+  }, `Flag Replacement #${flagId}`);
 }
 
 export async function fetchSupervisorFlags(token: string) {
@@ -465,7 +504,7 @@ export async function reviewFlagAsLineManager(
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
-  });
+  }, `Review Flag #${flagId} (LM)`);
 }
 
 export async function reviewFlagAsSupervisor(
@@ -477,7 +516,7 @@ export async function reviewFlagAsSupervisor(
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
-  });
+  }, `Review Flag #${flagId} (Sup)`);
 }
 
 export async function fetchPartAnalytics(token: string, partId: number) {

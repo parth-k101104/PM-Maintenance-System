@@ -35,6 +35,12 @@ public class TaskListService {
         LocalDate mockToday = com.maint.pm_backend.util.DateUtils.getToday();
         LocalDate endOfMonth = mockToday.withDayOfMonth(mockToday.lengthOfMonth());
         
+        // If supervisor, return their upcoming approvals instead of personal tasks
+        if (employee.getRoleId() != null && employee.getRoleId() == 3L) {
+            LocalDate monthStart = mockToday.withDayOfMonth(1);
+            return approvalRepository.findUpcomingApprovalsList(employeeId, monthStart, endOfMonth, mockToday);
+        }
+
         return executionRepository.findUpcomingTasksNative(employeeId, mockToday, endOfMonth);
     }
 

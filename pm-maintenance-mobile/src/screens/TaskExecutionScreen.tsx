@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import * as ImagePicker from "expo-image-picker";
+import NetInfo from "@react-native-community/netinfo";
 
 import { RootStackParamList } from "../types/navigation";
 import { useAuth } from "../context/AuthContext";
@@ -124,6 +125,12 @@ export function TaskExecutionScreen({ navigation, route }: Props) {
   // ─── S3 Upload ─────────────────────────────────────────────────────────────
 
   async function uploadPhotoToS3(uri: string, presignedUrl: string): Promise<void> {
+    const netInfo = await NetInfo.fetch();
+    if (netInfo.isConnected === false || netInfo.isInternetReachable === false) {
+      console.log("[TaskExecution] Offline: Skipping S3 upload for now.");
+      return; // Skip S3 upload if offline; the task completion itself will be queued.
+    }
+
     setIsUploading(true);
     try {
       const response = await fetch(uri);

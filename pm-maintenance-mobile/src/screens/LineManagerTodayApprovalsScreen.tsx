@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import { fetchLineManagerTodaysApprovals } from "../api/client";
+import { fetchLineManagerTodaysApprovals, scanLineManagerTaskQr } from "../api/client";
 import { TaskListView } from "../components/TaskListView";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
@@ -17,6 +17,7 @@ export function LineManagerTodayApprovalsScreen() {
   const { authState } = useAuth();
   const [tasks, setTasks] = useState<TaskDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSkipping, setIsSkipping] = useState(false);
 
   useEffect(() => {
     async function loadTasks() {
@@ -30,6 +31,32 @@ export function LineManagerTodayApprovalsScreen() {
 
     loadTasks();
   }, [authState.session]);
+
+  const handleSkipQr = async (task: TaskDetails) => {
+    if (!authState.session) return;
+    
+    setIsSkipping(true);
+    try {
+      const response = await scanLineManagerTaskQr(authState.session.token, {
+        scheduleExecutionId: task.scheduleExecutionId,
+      });
+
+      if (response.status?.toLowerCase() === "success") {
+        navigation.navigate("SupervisorTaskReview", {
+          task,
+          scanResponse: response,
+          scannedEquipment: { rawValue: "SKIPPED" },
+        });
+      } else {
+        // Fallback for LM skip failures if any
+        console.warn("LM Skip QR failed", response.message);
+      }
+    } catch (error) {
+      console.error("Error skipping QR", error);
+    } finally {
+      setIsSkipping(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -56,7 +83,16 @@ export function LineManagerTodayApprovalsScreen() {
         emptyMessage="No line manager approvals due for today."
         showTabs={tasks.some((task) => Boolean(task.zone))}
         onTaskPress={(task) => navigation.navigate("QRScanner", { task })}
+        onSkipQrPress={handleSkipQr}
+        isLineManager={true}
       />
+
+      {isSkipping && (
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.overlayText}>Validating...</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -80,4 +116,17 @@ const styles = StyleSheet.create({
     color: "#111111",
   },
   headerSpacer: { width: 28 },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  overlayText: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 16,
+    color: "#111111",
+    marginTop: 12,
+  },
 });

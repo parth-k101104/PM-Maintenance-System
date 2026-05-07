@@ -253,18 +253,16 @@ public class TaskExecutionService {
                     request.getScheduleApprovalId(),
                     approverId,
                     approvalLevel);
-        } else {
-            if (request.getEquipmentId() == null) {
-                return com.maint.pm_backend.dto.SupervisorQRScanResponse.builder()
-                        .status("error")
-                        .message("Missing equipment ID and schedule approval ID in QR scan.")
-                        .build();
-            }
+        } else if (request.getEquipmentId() != null) {
             validation = executionRepository.validateAndFetchApprovalTaskMetadata(
                     request.getScheduleExecutionId(), approverId, approvalLevel,
                     request.getEquipmentId(),
                     request.getEquipmentElementId(),
                     request.getEquipmentPartId());
+        } else {
+            // No equipment scan and no approval ID, but we have scheduleExecutionId (SKIP case)
+            validation = executionRepository.fetchApprovalTaskMetadataOnly(
+                    request.getScheduleExecutionId(), approverId, approvalLevel);
         }
 
         if (validation.isPresent()) {

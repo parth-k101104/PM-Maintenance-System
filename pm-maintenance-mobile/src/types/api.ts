@@ -317,6 +317,7 @@ export type TaskDetails = {
   activeFlagStatus?: string;
   rescheduleFlag?: boolean;
   parentScheduleExecutionId?: number;
+  approvalStatus?: string;
 };
 
 export type CompletedTask = {

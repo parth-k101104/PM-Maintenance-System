@@ -81,6 +81,7 @@ type DashboardRouteTarget =
   | "BacklogTasks"
   | "TaskApproval"
   | "UpcomingTasks"
+  | "UpcomingApprovals"
   | "FlagsRaised"
   | "LineManagerActiveTasks"
   | "EmployeeApprovalChart"
@@ -238,7 +239,7 @@ function buildSupervisorDashboardViewModel(
         footnote: "coming month",
         variant: "other",
         size: "large",
-        navigateTo: "TaskApproval",
+        navigateTo: "UpcomingApprovals",
       },
     ],
     ctaLabel: "Let's Start!",
@@ -548,6 +549,9 @@ export function DashboardScreen() {
         break;
       case "UpcomingTasks":
         navigation.navigate("UpcomingTasks");
+        break;
+      case "UpcomingApprovals":
+        navigation.navigate("UpcomingApprovals");
         break;
       case "EmployeeApprovalChart":
         navigation.navigate("EmployeeApprovalChart");

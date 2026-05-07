@@ -33,7 +33,7 @@ public class SupervisorDashboardService {
 
         int backlogApprovals  = approvalRepository.countBacklogApprovals(employeeId, today);
         int todaysDue         = approvalRepository.countTodaysDueApprovals(employeeId, today);
-        int upcoming          = approvalRepository.countUpcomingApprovalsThisMonth(employeeId, monthStart, monthEnd);
+        int upcoming          = approvalRepository.countUpcomingApprovalsThisMonth(employeeId, monthStart, monthEnd, today);
         int activeFlags       = approvalRepository.countActiveFlags(employeeId);
         int openDeviations    = approvalRepository.countOpenDeviations(employeeId);
         int pendingEmpTasks   = approvalRepository.countPendingEmployeeTasks(employeeId);

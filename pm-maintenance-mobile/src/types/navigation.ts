@@ -55,6 +55,7 @@ export type RootStackParamList = {
   BacklogTasks: undefined;
   TaskApproval: undefined;
   UpcomingTasks: undefined;
+  UpcomingApprovals: undefined;
   TaskDocuments: {
     task: TaskDetails;
   };
