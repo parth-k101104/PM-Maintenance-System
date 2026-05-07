@@ -399,4 +399,108 @@ public class LineManagerDashboardService {
     private LocalDateTime toLocalDateTime(Timestamp timestamp) {
         return timestamp != null ? timestamp.toLocalDateTime() : null;
     }
+
+    public List<Map<String, Object>> getComplianceTrend(Long lineManagerId, int windowDays, Long lineId) {
+        String sql = """
+                    SELECT
+                        evaluation_date         AS "evaluationDate",
+                        AVG(pm_operational_compliance) AS "complianceRate"
+                    FROM phm_health_scores
+                    WHERE entity_type = 'LINE'
+                      AND window_days  = :windowDays
+                      AND pm_operational_compliance IS NOT NULL
+                      AND entity_id IN (SELECT line_id FROM lines WHERE line_manager_id = :lineManagerId)
+                """;
+        
+        if (lineId != null) {
+            sql += " AND entity_id = :lineId ";
+        }
+        
+        sql += " GROUP BY evaluation_date ORDER BY evaluation_date ASC LIMIT 30 ";
+        
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("windowDays", windowDays);
+        params.put("lineManagerId", lineManagerId);
+        if (lineId != null) params.put("lineId", lineId);
+        
+        return jdbcTemplate.queryForList(sql, params);
+    }
+
+    public List<Map<String, Object>> getPhmCoverageTrend(Long lineManagerId, int windowDays, Long lineId) {
+        String sql = """
+                    SELECT
+                        evaluation_date         AS "evaluationDate",
+                        AVG(pm_compliance_rate) AS "phmCoverageRate"
+                    FROM phm_health_scores
+                    WHERE entity_type = 'LINE'
+                      AND window_days  = :windowDays
+                      AND pm_compliance_rate IS NOT NULL
+                      AND entity_id IN (SELECT line_id FROM lines WHERE line_manager_id = :lineManagerId)
+                """;
+        
+        if (lineId != null) {
+            sql += " AND entity_id = :lineId ";
+        }
+        
+        sql += " GROUP BY evaluation_date ORDER BY evaluation_date ASC LIMIT 30 ";
+        
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("windowDays", windowDays);
+        params.put("lineManagerId", lineManagerId);
+        if (lineId != null) params.put("lineId", lineId);
+
+        return jdbcTemplate.queryForList(sql, params);
+    }
+
+    public List<Map<String, Object>> getEmployeeEfficiencyTrend(Long lineManagerId, int windowDays, Long lineId) {
+        String sql = """
+                    SELECT
+                        evaluation_date         AS "evaluationDate",
+                        AVG(employee_efficiency) AS "efficiencyRate"
+                    FROM phm_health_scores
+                    WHERE entity_type = 'LINE'
+                      AND window_days  = :windowDays
+                      AND employee_efficiency IS NOT NULL
+                      AND entity_id IN (SELECT line_id FROM lines WHERE line_manager_id = :lineManagerId)
+                """;
+        
+        if (lineId != null) {
+            sql += " AND entity_id = :lineId ";
+        }
+        
+        sql += " GROUP BY evaluation_date ORDER BY evaluation_date ASC LIMIT 30 ";
+        
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("windowDays", windowDays);
+        params.put("lineManagerId", lineManagerId);
+        if (lineId != null) params.put("lineId", lineId);
+
+        return jdbcTemplate.queryForList(sql, params);
+    }
+
+    public List<Map<String, Object>> getEvidenceComplianceTrend(Long lineManagerId, int windowDays, Long lineId) {
+        String sql = """
+                    SELECT
+                        evaluation_date         AS "evaluationDate",
+                        AVG(evidence_compliance_rate) AS "evidenceComplianceRate"
+                    FROM phm_health_scores
+                    WHERE entity_type = 'LINE'
+                      AND window_days  = :windowDays
+                      AND evidence_compliance_rate IS NOT NULL
+                      AND entity_id IN (SELECT line_id FROM lines WHERE line_manager_id = :lineManagerId)
+                """;
+        
+        if (lineId != null) {
+            sql += " AND entity_id = :lineId ";
+        }
+        
+        sql += " GROUP BY evaluation_date ORDER BY evaluation_date ASC LIMIT 30 ";
+        
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("windowDays", windowDays);
+        params.put("lineManagerId", lineManagerId);
+        if (lineId != null) params.put("lineId", lineId);
+
+        return jdbcTemplate.queryForList(sql, params);
+    }
 }

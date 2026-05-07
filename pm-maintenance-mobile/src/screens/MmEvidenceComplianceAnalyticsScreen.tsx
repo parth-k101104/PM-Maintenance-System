@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Text,
   View,
+  Modal,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,7 +16,7 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { LineChart, BarChart } from "react-native-gifted-charts";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import { fetchEvidenceTrend } from "../api/client";
+import { fetchEvidenceTrend, fetchLmEvidenceTrend } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import type { RootStackParamList } from "../types/navigation";
@@ -76,12 +78,23 @@ const bar = StyleSheet.create({
 export function MmEvidenceComplianceAnalyticsScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const { rollingWindows } = route.params;
+  const { rollingWindows, isLineManager, lineId } = route.params;
   const [windowDays, setWindowDays] = useState(route.params.windowDays);
   const { authState } = useAuth();
 
   const currentData = rollingWindows?.[String(windowDays)];
-  const currentRate = currentData?.plantEvidenceComplianceRate;
+  const lineWiseDataRaw = currentData?.lineWiseCompliance || currentData?.lineMetrics || [];
+
+  const [lineSelectorVisible, setLineSelectorVisible] = useState(false);
+  const [currentLineId, setCurrentLineId] = useState<number | null>(lineId ?? null);
+
+  useEffect(() => {
+    setCurrentLineId(lineId ?? null);
+  }, [lineId]);
+
+  const activeLine = currentLineId != null ? lineWiseDataRaw.find((l: any) => l.lineId === currentLineId) : null;
+  const currentRate = activeLine ? activeLine.evidenceComplianceRate : (currentData?.plantEvidenceComplianceRate ?? currentData?.evidenceComplianceRate);
+  const activeTitle = activeLine ? activeLine.lineName : "Plant-wide";
   interface LineEvidenceStat {
     lineName: string;
     evidenceComplianceRate: number | null;
@@ -102,18 +115,25 @@ export function MmEvidenceComplianceAnalyticsScreen() {
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchEvidenceTrend(authState.session.token, windowDays);
-        const formatted = data
-          .filter((d) => d.evidenceComplianceRate != null)
-          .map((d) => ({
-            value: Number(d.evidenceComplianceRate),
-            label: new Date(d.evaluationDate).toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-            }),
-            dataPointText: `${Number(d.evidenceComplianceRate).toFixed(1)}%`,
-          }));
-        setTrendData(formatted);
+        const data = isLineManager
+          ? await fetchLmEvidenceTrend(authState.session.token, windowDays, currentLineId)
+          : await fetchEvidenceTrend(authState.session.token, windowDays);
+        
+        if (!data || data.length === 0) {
+          setTrendData([]);
+        } else {
+          const formatted = data
+            .filter((d) => d.evidenceComplianceRate != null)
+            .map((d) => ({
+              value: Number(d.evidenceComplianceRate),
+              label: new Date(d.evaluationDate).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              }),
+              dataPointText: `${Number(d.evidenceComplianceRate).toFixed(1)}%`,
+            }));
+          setTrendData(formatted);
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load trend data");
       } finally {
@@ -121,7 +141,7 @@ export function MmEvidenceComplianceAnalyticsScreen() {
       }
     }
     load();
-  }, [authState.session?.token, windowDays]);
+  }, [authState.session?.token, windowDays, currentLineId]);
 
   // Bar chart data from line-wise summary
   const barData = lineWiseData
@@ -149,7 +169,14 @@ export function MmEvidenceComplianceAnalyticsScreen() {
         <Pressable hitSlop={12} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back-outline" size={26} color="#111" />
         </Pressable>
-        <Text style={s.headerTitle}>Evidence Compliance ({windowDays}d)</Text>
+        <Pressable 
+          style={s.headerTitleContainer} 
+          onPress={() => isLineManager && setLineSelectorVisible(true)}
+          disabled={!isLineManager}
+        >
+          <Text style={s.headerTitle}>{activeTitle} Evidence ({windowDays}d)</Text>
+          {isLineManager && <Ionicons name="chevron-down" size={18} color="#111" style={{ marginLeft: 4 }} />}
+        </Pressable>
         <View style={{ width: 26 }} />
       </View>
 
@@ -158,10 +185,10 @@ export function MmEvidenceComplianceAnalyticsScreen() {
         <View style={[s.heroCard, { borderLeftColor: cColor }]}>
           <View style={s.heroLeft}>
             <Ionicons name="document-attach-outline" size={26} color={cColor} style={{ marginBottom: 4 }} />
-            <Text style={[s.heroValue, { color: cColor }]}>
+            <Text style={[s.heroValue, { color: cColor }, useWindowDimensions().width < 380 && { fontSize: 36 }]}>
               {currentRate != null ? `${currentRate.toFixed(1)}%` : "N/A"}
             </Text>
-            <Text style={s.heroLabel}>Plant-wide Evidence Compliance</Text>
+            <Text style={s.heroLabel}>{activeTitle} Evidence Compliance</Text>
           </View>
           <View style={s.heroBadge}>
             <Text style={[s.heroBadgeText, { color: cColor }]}>
@@ -207,7 +234,7 @@ export function MmEvidenceComplianceAnalyticsScreen() {
           {loading ? (
             <View style={s.center}>
               <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={s.loadingText}>Loading trend data…</Text>
+              <Text style={s.loadingText}>Loading trend data...</Text>
             </View>
           ) : error ? (
             <View style={s.center}>
@@ -352,6 +379,40 @@ export function MmEvidenceComplianceAnalyticsScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Line Selector Modal - Simplified style matching dashboard */}
+      <Modal visible={lineSelectorVisible} transparent animationType="fade" onRequestClose={() => setLineSelectorVisible(false)}>
+        <Pressable style={s.modalOverlay} onPress={() => setLineSelectorVisible(false)}>
+          <View style={s.pickerModalContent}>
+            <Text style={s.pickerModalTitle}>Select Line</Text>
+            <ScrollView style={s.lineList} showsVerticalScrollIndicator={false}>
+              <Pressable
+                style={[s.lineItem, currentLineId === null && s.lineItemActive]}
+                onPress={() => {
+                  setCurrentLineId(null);
+                  setLineSelectorVisible(false);
+                }}
+              >
+                <Text style={[s.lineItemText, currentLineId === null && s.lineItemTextActive]}>Plant-wide (All Lines)</Text>
+                {currentLineId === null && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+              </Pressable>
+              {lineWiseDataRaw.map((l: any) => (
+                <Pressable
+                  key={l.lineId}
+                  style={[s.lineItem, currentLineId === l.lineId && s.lineItemActive]}
+                  onPress={() => {
+                    setCurrentLineId(l.lineId);
+                    setLineSelectorVisible(false);
+                  }}
+                >
+                  <Text style={[s.lineItemText, currentLineId === l.lineId && s.lineItemTextActive]}>{l.lineName}</Text>
+                  {currentLineId === l.lineId && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -366,7 +427,7 @@ const s = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: colors.surface,
   },
-  headerTitle: { fontFamily: "Jost_600SemiBold", fontSize: 19, lineHeight: 24, color: "#111" },
+  headerTitle: { fontFamily: "Jost_500Medium", fontSize: 19, lineHeight: 24, color: "#111" },
   content: { padding: 18, paddingBottom: 48, gap: 20 },
 
   // Hero card
@@ -382,7 +443,7 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
   },
   heroLeft: { gap: 4 },
-  heroValue: { fontFamily: "Jost_600SemiBold", fontSize: 44, lineHeight: 50 },
+  heroValue: { fontFamily: "Jost_500Medium", fontSize: 44, lineHeight: 50 },
   heroLabel: { fontFamily: "Jost_400Regular", fontSize: 12, color: colors.textMuted },
   heroBadge: {
     backgroundColor: "#FFFFFF",
@@ -390,7 +451,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  heroBadgeText: { fontFamily: "Jost_600SemiBold", fontSize: 13 },
+  heroBadgeText: { fontFamily: "Jost_500Medium", fontSize: 13 },
 
   // Legend
   legendRow: {
@@ -406,7 +467,7 @@ const s = StyleSheet.create({
   // Sections
   section: { gap: 10 },
   sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
-  sectionTitle: { fontFamily: "Jost_600SemiBold", fontSize: 16, lineHeight: 22, color: "#111" },
+  sectionTitle: { fontFamily: "Jost_500Medium", fontSize: 16, lineHeight: 22, color: "#111" },
 
   // Charts
   chartCard: {
@@ -432,7 +493,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EBEBF5",
   },
-  emptyText: { fontFamily: "Jost_600SemiBold", fontSize: 14, color: colors.textMuted, marginTop: 4 },
+  emptyText: { fontFamily: "Jost_500Medium", fontSize: 14, color: colors.textMuted, marginTop: 4 },
   emptySubText: { fontFamily: "Jost_400Regular", fontSize: 12, color: colors.textMuted, textAlign: "center" },
 
   // List card
@@ -446,8 +507,8 @@ const s = StyleSheet.create({
   listRow: { paddingVertical: 12, gap: 4 },
   listRowBorder: { borderTopWidth: 1, borderTopColor: "#EBEBF5" },
   listTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  listLineName: { fontFamily: "Jost_600SemiBold", fontSize: 14, color: "#111", flex: 1 },
-  listRate: { fontFamily: "Jost_600SemiBold", fontSize: 14, flexShrink: 0 },
+  listLineName: { fontFamily: "Jost_500Medium", fontSize: 14, color: "#111", flex: 1 },
+  listRate: { fontFamily: "Jost_500Medium", fontSize: 14, flexShrink: 0 },
 
   center: { padding: 32, alignItems: "center", gap: 8 },
   loadingText: { fontFamily: "Jost_400Regular", fontSize: 13, color: colors.textMuted },
@@ -476,5 +537,61 @@ const s = StyleSheet.create({
   },
   toggleBtnTextActive: {
     color: "#fff",
+  },
+  // Selector Styles
+  headerTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    maxWidth: "80%",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pickerModalContent: {
+    width: "85%",
+    maxWidth: 320,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 24,
+    maxHeight: "70%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  pickerModalTitle: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 20,
+    color: "#111111",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  lineList: {
+    maxHeight: 300,
+  },
+  lineItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginBottom: 4,
+  },
+  lineItemActive: {
+    backgroundColor: colors.primaryMuted,
+  },
+  lineItemText: {
+    fontFamily: "Jost_400Regular",
+    fontSize: 17,
+    color: colors.text,
+  },
+  lineItemTextActive: {
+    fontFamily: "Jost_500Medium",
+    color: colors.primary,
   },
 });

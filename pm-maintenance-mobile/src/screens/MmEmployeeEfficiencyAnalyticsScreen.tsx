@@ -6,15 +6,15 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { LineChart, BarChart } from "react-native-gifted-charts";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import { fetchComplianceTrend, fetchLmComplianceTrend } from "../api/client";
+import { fetchEmployeeEfficiencyTrend, fetchLmEmployeeEfficiencyTrend } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import type { RootStackParamList } from "../types/navigation";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type Route = RouteProp<RootStackParamList, "MmComplianceAnalytics">;
+type Route = RouteProp<RootStackParamList, "MmEmployeeEfficiencyAnalytics">;
 
-export function MmComplianceAnalyticsScreen() {
+export function MmEmployeeEfficiencyAnalyticsScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { rollingWindows, isLineManager, lineId } = route.params;
@@ -24,7 +24,7 @@ export function MmComplianceAnalyticsScreen() {
 
   const currentData = rollingWindows?.[String(windowDays)];
   const lineWiseData = currentData?.lineWiseCompliance || currentData?.lineMetrics || [];
-  
+
   const [lineSelectorVisible, setLineSelectorVisible] = useState(false);
   const [currentLineId, setCurrentLineId] = useState<number | null>(lineId ?? null);
 
@@ -33,8 +33,7 @@ export function MmComplianceAnalyticsScreen() {
   }, [lineId]);
 
   const activeLine = currentLineId != null ? lineWiseData.find((l: any) => l.lineId === currentLineId) : null;
-  const currentRate = activeLine ? activeLine.pmComplianceRate : (currentData?.overallPmComplianceRate ?? currentData?.pmComplianceRate);
-  const phmCoverageRate = activeLine ? activeLine.phmCoverageRate : (currentData?.overallPhmCoverageRate ?? currentData?.phmCoverageRate);
+  const efficiency = activeLine ? activeLine.employeeEfficiency : (currentData?.plantEmployeeEfficiency ?? currentData?.employeeEfficiency);
   const activeTitle = activeLine ? activeLine.lineName : "Plant-wide";
 
   const [trendData, setTrendData] = useState<{ value: number; label: string }[]>([]);
@@ -47,15 +46,15 @@ export function MmComplianceAnalyticsScreen() {
       setLoading(true);
       setError(null);
       try {
-        const data = isLineManager 
-          ? await fetchLmComplianceTrend(authState.session.token, windowDays, currentLineId)
-          : await fetchComplianceTrend(authState.session.token, windowDays);
+        const data = isLineManager
+          ? await fetchLmEmployeeEfficiencyTrend(authState.session.token, windowDays, currentLineId)
+          : await fetchEmployeeEfficiencyTrend(authState.session.token, windowDays);
         
         if (!data || data.length === 0) {
           setTrendData([]);
         } else {
           const formatted = data.map((d: any) => ({
-            value: d.complianceRate,
+            value: d.efficiencyRate,
             label: new Date(d.evaluationDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
           }));
           setTrendData(formatted);
@@ -70,7 +69,7 @@ export function MmComplianceAnalyticsScreen() {
   }, [authState.session?.token, windowDays, isLineManager, currentLineId]);
 
   const barData = lineWiseData.map((l: any) => {
-    const rate = l.pmComplianceRate;
+    const rate = l.employeeEfficiency;
     return {
       value: rate ?? 0,
       label: l.lineName.length > 8 ? l.lineName.substring(0, 8) + "..." : l.lineName,
@@ -78,9 +77,8 @@ export function MmComplianceAnalyticsScreen() {
         rate == null ? "#626781" : rate >= 85 ? "#2E8B57" : rate >= 65 ? "#AD531A" : "#7D0000",
     };
   });
-  
-  const pmcColor = currentRate == null ? "#626781" : currentRate >= 85 ? "#2E8B57" : currentRate >= 65 ? "#AD531A" : "#7D0000";
-  const phmColor = phmCoverageRate == null ? "#626781" : phmCoverageRate >= 85 ? "#2E8B57" : phmCoverageRate >= 65 ? "#AD531A" : "#7D0000";
+
+  const efficiencyColor = efficiency == null ? "#626781" : efficiency >= 85 ? "#2E8B57" : efficiency >= 65 ? "#AD531A" : "#7D0000";
 
   return (
     <SafeAreaView style={s.safe}>
@@ -94,43 +92,25 @@ export function MmComplianceAnalyticsScreen() {
           onPress={() => isLineManager && setLineSelectorVisible(true)}
           disabled={!isLineManager}
         >
-          <Text style={s.headerTitle}>{activeTitle} Compliance ({windowDays}d)</Text>
+          <Text style={s.headerTitle}>{activeTitle} Efficiency ({windowDays}d)</Text>
           {isLineManager && <Ionicons name="chevron-down" size={18} color="#111" style={{ marginLeft: 4 }} />}
         </Pressable>
         <View style={{ width: 26 }} />
       </View>
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-        {/* PM Compliance summary — operational on-time completion rate — PRIMARY */}
-        <View style={[s.heroCard, { borderLeftColor: pmcColor }]}>
+        {/* Efficiency Hero */}
+        <View style={[s.heroCard, { borderLeftColor: efficiencyColor }]}>
           <View style={s.heroLeft}>
-            <Ionicons name="checkmark-circle-outline" size={26} color={pmcColor} style={{ marginBottom: 4 }} />
-            <Text style={[s.heroValue, { color: pmcColor }, width < 380 && { fontSize: 36 }]}>
-              {currentRate != null ? `${currentRate.toFixed(1)}%` : "N/A"}
+            <Ionicons name="speedometer-outline" size={26} color={efficiencyColor} style={{ marginBottom: 4 }} />
+            <Text style={[s.heroValue, { color: efficiencyColor }, width < 380 && { fontSize: 36 }]}>
+              {efficiency != null ? `${efficiency.toFixed(1)}%` : "N/A"}
             </Text>
-            <Text style={s.heroLabel}>{activeTitle} PM Compliance</Text>
-            <Text style={[s.heroLabel, { fontSize: 11, marginTop: 2, color: "#626781" }]}>
-              approved / (approved + rejected)
-            </Text>
+            <Text style={s.heroLabel}>{activeTitle} Efficiency</Text>
           </View>
           <View style={s.heroBadge}>
-            <Text style={[s.heroBadgeText, { color: pmcColor }]}>
-              {currentRate == null ? "N/A" : currentRate >= 85 ? "Good" : currentRate >= 65 ? "Warn" : "Critical"}
-            </Text>
-          </View>
-        </View>
-
-        <View style={[s.heroCard, { borderLeftColor: phmColor, marginTop: 10 }]}>
-          <View style={s.heroLeft}>
-            <Ionicons name="checkmark-done-circle-outline" size={26} color={phmColor} style={{ marginBottom: 4 }} />
-            <Text style={[s.heroValue, { color: phmColor }, width < 380 && { fontSize: 36 }]}>
-              {phmCoverageRate != null ? `${phmCoverageRate.toFixed(1)}%` : "N/A"}
-            </Text>
-            <Text style={s.heroLabel}>{activeTitle} PHM Coverage</Text>
-          </View>
-          <View style={s.heroBadge}>
-            <Text style={[s.heroBadgeText, { color: phmColor }]}>
-              {phmCoverageRate == null ? "N/A" : phmCoverageRate >= 85 ? "Good" : phmCoverageRate >= 65 ? "Warn" : "Critical"}
+            <Text style={[s.heroBadgeText, { color: efficiencyColor }]}>
+              {efficiency == null ? "N/A" : efficiency >= 85 ? "Good" : efficiency >= 65 ? "Warn" : "Critical"}
             </Text>
           </View>
         </View>
@@ -181,7 +161,7 @@ export function MmComplianceAnalyticsScreen() {
               <LineChart
                 data={trendData}
                 height={210}
-                color={pmcColor}
+                color={efficiencyColor}
                 thickness={3}
                 spacing={trendData.length > 10 ? 36 : 52}
                 initialSpacing={16}
@@ -196,21 +176,17 @@ export function MmComplianceAnalyticsScreen() {
                 yAxisSuffix="%"
                 maxValue={100}
                 noOfSections={5}
-                dataPointsColor={pmcColor}
+                dataPointsColor={efficiencyColor}
                 dataPointsRadius={5}
-                referenceLine1Config={{ color: "#2E8B57", dashWidth: 4, dashGap: 4, thickness: 1 }}
-                referenceLine1Position={85}
-                referenceLine2Config={{ color: "#AD531A", dashWidth: 4, dashGap: 4, thickness: 1 }}
-                referenceLine2Position={65}
                 areaChart
-                startFillColor={pmcColor}
+                startFillColor={efficiencyColor}
                 startOpacity={0.18}
-                endFillColor={pmcColor}
+                endFillColor={efficiencyColor}
                 endOpacity={0.01}
                 showValuesAsDataPointsText
                 textShiftY={-10}
                 textShiftX={-4}
-                textColor={pmcColor}
+                textColor={efficiencyColor}
                 textFontSize={9}
                 curved
               />
@@ -228,7 +204,7 @@ export function MmComplianceAnalyticsScreen() {
           <View style={s.section}>
             <View style={s.sectionHeader}>
               <Ionicons name="bar-chart-outline" size={18} color={colors.primary} />
-              <Text style={s.sectionTitle}>Line-wise PM Compliance</Text>
+              <Text style={s.sectionTitle}>Line-wise Efficiency</Text>
             </View>
             {barData.length > 0 ? (
               <View style={s.chartCard}>

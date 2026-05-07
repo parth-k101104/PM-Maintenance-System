@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.security.Principal;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/dashboard")
@@ -84,6 +83,62 @@ public class DashboardController {
             }
             throw e;
         }
+    }
+
+    @GetMapping("/line-manager/compliance-trend")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getLineManagerComplianceTrend(
+            Principal principal,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "365") int windowDays,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long lineId) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+        String email = principal.getName();
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
+        return ResponseEntity.ok(lineManagerDashboardService.getComplianceTrend(employee.getEmployeeId(), windowDays, lineId));
+    }
+
+    @GetMapping("/line-manager/phm-coverage-trend")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getLineManagerPhmCoverageTrend(
+            Principal principal,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "365") int windowDays,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long lineId) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+        String email = principal.getName();
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
+        return ResponseEntity.ok(lineManagerDashboardService.getPhmCoverageTrend(employee.getEmployeeId(), windowDays, lineId));
+    }
+
+    @GetMapping("/line-manager/efficiency-trend")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getLineManagerEfficiencyTrend(
+            Principal principal,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "365") int windowDays,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long lineId) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+        String email = principal.getName();
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
+        return ResponseEntity.ok(lineManagerDashboardService.getEmployeeEfficiencyTrend(employee.getEmployeeId(), windowDays, lineId));
+    }
+
+    @GetMapping("/line-manager/evidence-trend")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getLineManagerEvidenceTrend(
+            Principal principal,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "365") int windowDays,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Long lineId) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+        String email = principal.getName();
+        Employee employee = employeeRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
+        return ResponseEntity.ok(lineManagerDashboardService.getEvidenceComplianceTrend(employee.getEmployeeId(), windowDays, lineId));
     }
 
     @GetMapping("/maintenance-manager")
@@ -173,6 +228,28 @@ public class DashboardController {
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "365") int windowDays) {
         try {
             return ResponseEntity.ok(maintenanceManagerDashboardService.getPlantApprovalTurnaroundTrend(windowDays));
+        } catch (RuntimeException e) {
+            throw e;
+        }
+    }
+
+    @GetMapping("/maintenance-manager/phm-coverage-trend")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getPlantPhmCoverageTrend(
+            Principal principal,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "365") int windowDays) {
+        try {
+            return ResponseEntity.ok(maintenanceManagerDashboardService.getPlantPhmCoverageTrend(windowDays));
+        } catch (RuntimeException e) {
+            throw e;
+        }
+    }
+
+    @GetMapping("/maintenance-manager/efficiency-trend")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getPlantEmployeeEfficiencyTrend(
+            Principal principal,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "365") int windowDays) {
+        try {
+            return ResponseEntity.ok(maintenanceManagerDashboardService.getPlantEmployeeEfficiencyTrend(windowDays));
         } catch (RuntimeException e) {
             throw e;
         }

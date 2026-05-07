@@ -85,7 +85,10 @@ type DashboardRouteTarget =
   | "LineManagerActiveTasks"
   | "EmployeeApprovalChart"
   | "LineManagerAnalyticsDashboard"
-  | "ConfigParams";
+  | "ConfigParams"
+  | "MmComplianceAnalytics"
+  | "MmPhmCoverageAnalytics"
+  | "MmEmployeeEfficiencyAnalytics";
 
 type DashboardViewModel = {
   greetingShift?: string;
@@ -278,7 +281,7 @@ function buildLineManagerDashboardViewModel(
         footnote: "line quality",
         variant: "today",
         size: "large",
-        navigateTo: "LineManagerTodayApprovals",
+        navigateTo: "MmComplianceAnalytics",
       },
       {
         title: "PHM coverage-",
@@ -286,6 +289,7 @@ function buildLineManagerDashboardViewModel(
         footnote: "prediction coverage",
         variant: "status",
         size: "small",
+        navigateTo: "MmPhmCoverageAnalytics",
       },
       {
         title: "Line health-",
@@ -293,7 +297,7 @@ function buildLineManagerDashboardViewModel(
         footnote: "equipment health",
         variant: "health",
         size: "small",
-        navigateTo: "LineManagerEquipments",
+        navigateTo: "LineManagerAnalyticsDashboard",
         healthValue: lineHealth,
       },
       {
@@ -302,6 +306,7 @@ function buildLineManagerDashboardViewModel(
         footnote: "rolling window",
         variant: "other",
         size: "small",
+        navigateTo: "MmEmployeeEfficiencyAnalytics",
       },
       {
         title: "Flags\nraised-",
@@ -554,10 +559,34 @@ export function DashboardScreen() {
         navigation.navigate("LineManagerActiveTasks");
         break;
       case "LineManagerAnalyticsDashboard":
-        navigation.navigate("LineManagerAnalyticsDashboard", {});
+        navigation.navigate("LineManagerAnalyticsDashboard", { lineId: selectedLineId || undefined });
         break;
       case "ConfigParams":
         navigation.navigate("ConfigParams");
+        break;
+      case "MmComplianceAnalytics":
+        navigation.navigate("MmComplianceAnalytics", {
+          windowDays,
+          rollingWindows: (dashboard as LineManagerDashboardResponse)?.rollingWindows,
+          isLineManager: true,
+          lineId: selectedLineId,
+        });
+        break;
+      case "MmPhmCoverageAnalytics":
+        navigation.navigate("MmPhmCoverageAnalytics", {
+          windowDays,
+          rollingWindows: (dashboard as LineManagerDashboardResponse)?.rollingWindows,
+          isLineManager: true,
+          lineId: selectedLineId,
+        });
+        break;
+      case "MmEmployeeEfficiencyAnalytics":
+        navigation.navigate("MmEmployeeEfficiencyAnalytics", {
+          windowDays,
+          rollingWindows: (dashboard as LineManagerDashboardResponse)?.rollingWindows,
+          isLineManager: true,
+          lineId: selectedLineId,
+        });
         break;
       default:
         break;
@@ -808,7 +837,10 @@ export function DashboardScreen() {
                             <Text style={card.size === "large" ? styles.cardTitle : styles.cardTitleSmall}>
                               {card.title}
                             </Text>
-                            <Text style={card.size === "large" ? styles.bigNumber : styles.mediumNumber}>
+                            <Text style={[
+                              card.size === "large" ? styles.bigNumber : styles.mediumNumber,
+                              width < 380 && { fontSize: card.size === "large" ? 40 : 36 }
+                            ]}>
                               {card.value}
                             </Text>
                             {card.footnote ? (
@@ -1123,50 +1155,50 @@ const styles = StyleSheet.create({
   },
   todayCard: {
     backgroundColor: "#CFD1E0",
-    height: 180,
-    paddingTop: 22,
+    height: 170,
+    paddingTop: 20,
     paddingHorizontal: 24,
     paddingBottom: 24,
   },
   backlogCard: {
     backgroundColor: "#FDE3C5",
-    height: 180,
-    paddingTop: 24,
+    height: 170,
+    paddingTop: 20,
     paddingHorizontal: 20,
     paddingBottom: 24,
   },
   statusCard: {
     backgroundColor: "#D2E0D1",
-    height: 180,
-    paddingTop: 22,
+    height: 170,
+    paddingTop: 20,
     paddingHorizontal: 20,
     paddingBottom: 24,
   },
   healthGoodCard: {
     backgroundColor: "#D8EAD7",
-    height: 180,
-    paddingTop: 22,
+    height: 170,
+    paddingTop: 20,
     paddingHorizontal: 24,
     paddingBottom: 24,
   },
   healthWarningCard: {
     backgroundColor: "#F5E4C9",
-    height: 180,
-    paddingTop: 22,
+    height: 170,
+    paddingTop: 20,
     paddingHorizontal: 24,
     paddingBottom: 24,
   },
   healthBadCard: {
     backgroundColor: "#FDE8E7",
-    height: 180,
-    paddingTop: 22,
+    height: 170,
+    paddingTop: 20,
     paddingHorizontal: 24,
     paddingBottom: 24,
   },
   otherTasksCard: {
     backgroundColor: "#FBF794",
-    height: 180,
-    paddingTop: 22,
+    height: 170,
+    paddingTop: 20,
     paddingHorizontal: 26,
     paddingBottom: 24,
   },
@@ -1186,16 +1218,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   bigNumber: {
-    fontFamily: "Jost_600Medium",
-    fontSize: 52,
-    lineHeight: 54,
+    fontFamily: "Jost_500Medium",
+    fontSize: 48,
+    lineHeight: 52,
     paddingTop: 6,
     color: "#000000",
   },
   mediumNumber: {
-    fontFamily: "Jost_600Medium",
-    fontSize: 52,
-    lineHeight: 54,
+    fontFamily: "Jost_500Medium",
+    fontSize: 48,
+    lineHeight: 52,
     color: "#000000",
     marginTop: 0,
     paddingTop: 8,
@@ -1589,7 +1621,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   lineBreakdownMetricVal: {
-    fontFamily: "Jost_700Bold",
+    fontFamily: "Jost_500Medium",
     fontSize: 18,
     color: "#111111",
     marginBottom: 2,

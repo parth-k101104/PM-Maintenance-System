@@ -253,6 +253,36 @@ public class MaintenanceManagerDashboardService {
         return jdbcTemplate.queryForList(sql, Map.of("windowDays", windowDays));
     }
 
+    public List<Map<String, Object>> getPlantPhmCoverageTrend(int windowDays) {
+        String sql = """
+                    SELECT
+                        evaluation_date         AS "evaluationDate",
+                        pm_compliance_rate      AS "phmCoverageRate"
+                    FROM phm_health_scores
+                    WHERE entity_type = 'PLANT'
+                      AND window_days  = :windowDays
+                      AND pm_compliance_rate IS NOT NULL
+                    ORDER BY evaluation_date ASC
+                    LIMIT 30
+                """;
+        return jdbcTemplate.queryForList(sql, Map.of("windowDays", windowDays));
+    }
+
+    public List<Map<String, Object>> getPlantEmployeeEfficiencyTrend(int windowDays) {
+        String sql = """
+                    SELECT
+                        evaluation_date         AS "evaluationDate",
+                        employee_efficiency     AS "efficiencyRate"
+                    FROM phm_health_scores
+                    WHERE entity_type = 'PLANT'
+                      AND window_days  = :windowDays
+                      AND employee_efficiency IS NOT NULL
+                    ORDER BY evaluation_date ASC
+                    LIMIT 30
+                """;
+        return jdbcTemplate.queryForList(sql, Map.of("windowDays", windowDays));
+    }
+
     // ─── Helpers ───────────────────────────────────────────────────────────────
 
     private Double toDouble(Object val) {

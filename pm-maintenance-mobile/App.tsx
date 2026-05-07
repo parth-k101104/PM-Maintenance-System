@@ -37,6 +37,8 @@ import { MaintenanceManagerDashboardScreen } from "./src/screens/MaintenanceMana
 import { MmTaskStatusListScreen } from "./src/screens/MmTaskStatusListScreen";
 import { MmComplianceAnalyticsScreen } from "./src/screens/MmComplianceAnalyticsScreen";
 import { MmEvidenceComplianceAnalyticsScreen } from "./src/screens/MmEvidenceComplianceAnalyticsScreen";
+import { MmPhmCoverageAnalyticsScreen } from "./src/screens/MmPhmCoverageAnalyticsScreen";
+import { MmEmployeeEfficiencyAnalyticsScreen } from "./src/screens/MmEmployeeEfficiencyAnalyticsScreen";
 import { MmMetricTrendScreen } from "./src/screens/MmMetricTrendScreen";
 import { ConfigParamsScreen } from "./src/screens/ConfigParamsScreen";
 
@@ -68,6 +70,8 @@ function RootNavigator() {
           <Stack.Screen name="MmTaskStatusList" component={MmTaskStatusListScreen} />
           <Stack.Screen name="MmComplianceAnalytics" component={MmComplianceAnalyticsScreen} />
           <Stack.Screen name="MmEvidenceComplianceAnalytics" component={MmEvidenceComplianceAnalyticsScreen} />
+          <Stack.Screen name="MmPhmCoverageAnalytics" component={MmPhmCoverageAnalyticsScreen} />
+          <Stack.Screen name="MmEmployeeEfficiencyAnalytics" component={MmEmployeeEfficiencyAnalyticsScreen} />
           <Stack.Screen name="MmMetricTrend" component={MmMetricTrendScreen} />
           <Stack.Screen name="LineManagerAnalyticsDashboard" component={LineManagerAnalyticsDashboardScreen} />
           <Stack.Screen name="LineManagerPartAnalytics" component={LineManagerPartAnalyticsScreen} />
@@ -103,6 +107,11 @@ function RootNavigator() {
         <Stack.Screen name="LineManagerFlagDetail" component={LineManagerFlagDetailScreen} />
         <Stack.Screen name="SupervisorFlags" component={SupervisorFlagsScreen} />
         <Stack.Screen name="SupervisorFlagReview" component={SupervisorFlagReviewScreen} />
+        <Stack.Screen name="MmComplianceAnalytics" component={MmComplianceAnalyticsScreen} />
+        <Stack.Screen name="MmEvidenceComplianceAnalytics" component={MmEvidenceComplianceAnalyticsScreen} />
+        <Stack.Screen name="MmPhmCoverageAnalytics" component={MmPhmCoverageAnalyticsScreen} />
+        <Stack.Screen name="MmEmployeeEfficiencyAnalytics" component={MmEmployeeEfficiencyAnalyticsScreen} />
+        <Stack.Screen name="MmMetricTrend" component={MmMetricTrendScreen} />
         <Stack.Screen name="ConfigParams" component={ConfigParamsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
