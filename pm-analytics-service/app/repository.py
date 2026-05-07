@@ -53,7 +53,7 @@ ORDER BY replacement_dttm
 
 
 EXECUTIONS_SQL = """
-SELECT schedule_execution_id, completed_dttm, actual_value
+SELECT schedule_execution_id, completed_dttm, actual_value, deviation_flag
 FROM pm_schedule_execution
 WHERE task_schedule_id = %(task_schedule_id)s
   AND completed_dttm IS NOT NULL
@@ -71,17 +71,21 @@ SELECT
     SUM(e.time_taken) AS total_time_taken,
     COUNT(*) AS total_completed,
     COUNT(CASE WHEN e.status = 'REJECTED' THEN 1 END) AS total_rejected,
-    COUNT(CASE WHEN e.evidence_rejected_flag = FALSE THEN 1 END) AS total_evidence_accepted,
-    SUM(EXTRACT(EPOCH FROM (a.approved_dttm - e.completed_dttm))/3600) AS sum_turnaround_hours,
-    COUNT(a.approved_dttm) AS count_approved
+    COUNT(CASE WHEN e.evidence_rejected_flag IS FALSE OR e.evidence_rejected_flag IS NULL THEN 1 END) AS total_evidence_accepted,
+    SUM(EXTRACT(EPOCH FROM (a.final_approved_dttm - e.completed_dttm))/3600) AS sum_turnaround_hours,
+    COUNT(CASE WHEN e.status IN ('APPROVED', 'COMPLETED', 'FLAGGED_AND_COMPLETED') THEN 1 END) AS count_approved
 FROM pm_schedule_execution e
 JOIN pm_task_schedules pts ON pts.task_schedule_id = e.task_schedule_id
 JOIN pm_std_tasks pst ON pst.std_task_id = pts.std_task_id
 JOIN equipment_parts ep ON ep.part_id = pst.part_id
 LEFT JOIN equipment_element ee ON ee.element_id = ep.equipment_element_id
 LEFT JOIN equipments eq ON eq.equipment_id = ee.equipment_id
-LEFT JOIN pm_schedule_approval a ON a.schedule_execution_id = e.schedule_execution_id 
-    AND a.approval_status = 'APPROVED'
+LEFT JOIN LATERAL (
+    SELECT MAX(approved_dttm) AS final_approved_dttm
+    FROM pm_schedule_approval
+    WHERE schedule_execution_id = e.schedule_execution_id
+      AND approval_status = 'APPROVED'
+) a ON TRUE
 WHERE e.completed_dttm IS NOT NULL
   AND e.completed_dttm >= %(start_date)s
   AND e.completed_dttm <= %(end_date)s
@@ -371,6 +375,7 @@ def persist_health_scores(conn, evaluation_date: date, scores: list[dict[str, An
                     health_score,
                     critical_flags_count,
                     pm_compliance_rate,
+                    pm_operational_compliance,
                     employee_efficiency,
                     task_rejection_rate,
                     approval_turnaround_time,
@@ -385,6 +390,7 @@ def persist_health_scores(conn, evaluation_date: date, scores: list[dict[str, An
                     %(health_score)s,
                     %(critical_flags_count)s,
                     %(pm_compliance_rate)s,
+                    %(pm_operational_compliance)s,
                     %(employee_efficiency)s,
                     %(task_rejection_rate)s,
                     %(approval_turnaround_time)s,

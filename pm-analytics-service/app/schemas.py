@@ -68,6 +68,7 @@ class EvaluationAuditResponse(BaseModel):
     data_points_count: int
     current_cycle_points_count: int
     completed_cycles_count: int
+    last_execution_date: date | None = None
 
 
 class RunNightlyResponse(BaseModel):

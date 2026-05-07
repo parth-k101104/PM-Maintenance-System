@@ -14,6 +14,7 @@ class InsightGenerator:
         predicted_failure_date: date | None,
         velocity_ratio: float | None,
         config: AnalyticsConfig,
+        has_deviation: bool = False,
     ) -> list[dict[str, Any]]:
         insights: list[dict[str, Any]] = []
 
@@ -52,6 +53,21 @@ class InsightGenerator:
                         "velocity_increase": f"{round((velocity_ratio - 1) * 100, 2)}%",
                         "velocity_ratio": round(velocity_ratio, 4),
                         "action": "Immediate inspection required.",
+                    },
+                }
+            )
+
+        if has_deviation:
+            insights.append(
+                {
+                    "line_id": task["line_id"],
+                    "part_id": task["part_id"],
+                    "insight_type": "DEVIATION_FLAG",
+                    "insight_code": "DEVIATION_FLAG",
+                    "severity": "CRITICAL",
+                    "metadata": {
+                        "part": task["part_name"],
+                        "action": "Task marked with deviation. Needs supervisor review.",
                     },
                 }
             )

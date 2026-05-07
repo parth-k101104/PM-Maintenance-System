@@ -15,6 +15,14 @@ import java.util.Map;
 public class MaintenanceManagerDashboardResponse {
 
     private TaskStatusCounts taskStatusCounts;
+    /**
+     * PHM prediction coverage: % of tasks the analytics engine evaluated (from
+     * phm_health_scores).
+     */
+    private Double overallPhmCoverageRate;
+    /**
+     * Operational PM compliance: approved / (approved + rejected + overdue) × 100.
+     */
     private Double overallPmComplianceRate;
 
     // Orange metrics — plant-wide averages from phm_health_scores
@@ -33,6 +41,14 @@ public class MaintenanceManagerDashboardResponse {
     public static class RollingWindowMetrics {
         private int windowDays;
         private TaskStatusCounts taskStatusCounts;
+        /**
+         * PHM prediction coverage: % of tasks the analytics engine evaluated (from
+         * phm_health_scores).
+         */
+        private Double overallPhmCoverageRate;
+        /**
+         * Operational PM compliance: approved / (approved + rejected + overdue) × 100.
+         */
         private Double overallPmComplianceRate;
         private Double plantRejectionRate;
         private Double plantApprovalTurnaroundTimeHours;
@@ -60,7 +76,15 @@ public class MaintenanceManagerDashboardResponse {
     public static class LineWiseComplianceData {
         private Long lineId;
         private String lineName;
-        private Double complianceRate;
+        /** PHM health score for this line (0-100 from phm_health_scores). */
+        private Double lineHealthScore;
+        /** PHM prediction coverage for this line (from phm_health_scores). */
+        private Double phmCoverageRate;
+        /**
+         * Operational PM compliance for this line: approved / (approved + rejected +
+         * overdue) × 100.
+         */
+        private Double pmComplianceRate;
         // Orange metrics — most recent phm_health_scores entry per line
         private Double rejectionRate;
         private Double approvalTurnaroundTimeHours;

@@ -241,8 +241,9 @@ function buildLineManagerDashboardViewModel(
   fallbackName: string,
   windowDays: 30 | 365,
 ): DashboardViewModel {
-  const metrics = dashboard?.rollingWindows?.[windowDays];
+  const metrics = dashboard?.rollingWindows?.[String(windowDays)];
   const lineHealth = metrics?.lineHealth;
+  const phmCoverageRate = metrics?.phmCoverageRate;
   const pmComplianceRate = metrics?.pmComplianceRate;
   const employeeEfficiency = metrics?.employeeEfficiency;
   
@@ -259,9 +260,16 @@ function buildLineManagerDashboardViewModel(
         healthValue: lineHealth,
       },
       {
+        title: "PHM coverage-",
+        value: phmCoverageRate != null ? `${Math.round(phmCoverageRate)}%` : "N/A",
+        footnote: "prediction coverage",
+        variant: "status",
+        size: "small",
+      },
+      {
         title: "PM compliance-",
         value: pmComplianceRate != null ? `${Math.round(pmComplianceRate)}%` : "N/A",
-        footnote: "rolling window",
+        footnote: "on-time completion",
         variant: "status",
         size: "small",
       },

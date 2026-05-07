@@ -32,6 +32,9 @@ public class LineManagerDashboardResponse {
     public static class RollingWindowMetrics {
         private int windowDays;
         private Double lineHealth;
+        /** PHM prediction coverage: % of tasks the analytics engine evaluated (from phm_health_scores). */
+        private Double phmCoverageRate;
+        /** Operational PM compliance: approved / (approved + rejected + overdue) × 100. */
         private Double pmComplianceRate;
         private Double taskRejectionRate;
         private Double approvalTurnaroundTimeHours;
