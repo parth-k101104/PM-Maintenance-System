@@ -3,6 +3,7 @@ import type { QRScanResponse, ScannedEquipmentDetails, SupervisorQRScanResponse,
 export type RootStackParamList = {
   Dashboard: undefined;
   MaintenanceManagerDashboard: undefined;
+  MaintenanceReports: undefined;
   MmTaskStatusList: { statusGroup: string; label: string; color: string; windowDays: number; rollingWindows: any };
   MmComplianceAnalytics: {
     currentRate?: number | null;

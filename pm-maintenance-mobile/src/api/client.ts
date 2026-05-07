@@ -16,6 +16,9 @@ import type {
   OperatorDashboardResponse,
   QRScanRequest,
   QRScanResponse,
+  ReportOptionsResponse,
+  ReportRequest,
+  ReportResponse,
   SupervisorDashboardResponse,
   SupervisorQRScanRequest,
   SupervisorQRScanResponse,
@@ -95,6 +98,52 @@ export async function fetchMaintenanceManagerDashboard(token: string, windowDays
   return request<MaintenanceManagerDashboardResponse>(`/api/v1/dashboard/maintenance-manager?windowDays=${windowDays}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchMaintenanceReportOptions(token: string) {
+  return request<ReportOptionsResponse>("/api/v1/reports/maintenance-manager/options", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function generateMaintenanceReport(token: string, payload: ReportRequest) {
+  return request<ReportResponse>("/api/v1/reports/maintenance-manager/generate", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ ...payload, format: "JSON" }),
+  });
+}
+
+export async function generateMaintenanceReportPdf(token: string, payload: ReportRequest) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/reports/maintenance-manager/generate/pdf`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ ...payload, format: "PDF" }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    try {
+      const parsed = JSON.parse(text);
+      throw new Error(parsed?.message || parsed?.error || text);
+    } catch {
+      throw new Error(text || "Failed to generate PDF report");
+    }
+  }
+
+  return response.blob();
+}
+
+export async function generateMaintenanceReportPdfBase64(token: string, payload: ReportRequest) {
+  return request<{ filename: string; contentType: string; base64: string }>("/api/v1/reports/maintenance-manager/generate/pdf-base64", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ ...payload, format: "PDF" }),
   });
 }
 

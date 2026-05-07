@@ -197,6 +197,81 @@ export type MaintenanceManagerDashboardResponse = MaintenanceManagerDashboardWin
   actionInsights?: ActionInsight[];
 };
 
+export type ReportType =
+  | "OVERALL_MAINTENANCE_PERFORMANCE"
+  | "LINE_WISE_PERFORMANCE"
+  | "TASK_STATUS"
+  | "EMPLOYEE_EFFICIENCY"
+  | "PM_COMPLIANCE_TREND"
+  | "ISSUE_FLAGS_REPLACEMENT";
+
+export type ReportScope = "PLANT" | "LINE";
+export type ReportPeriod = "LAST_30_DAYS" | "LAST_365_DAYS" | "QUARTERLY" | "HALF_YEARLY" | "CUSTOM";
+export type ReportFormat = "PDF" | "JSON";
+
+export type ReportRequest = {
+  reportType: ReportType;
+  scope: ReportScope;
+  lineId?: number | null;
+  period: ReportPeriod;
+  quarter?: number | null;
+  half?: number | null;
+  customStartDate?: string | null;
+  customEndDate?: string | null;
+  format?: ReportFormat;
+};
+
+export type ReportOption = {
+  value: string;
+  label: string;
+  description?: string;
+};
+
+export type ReportLineOption = {
+  lineId: number;
+  lineName: string;
+  lineCode?: string | null;
+};
+
+export type ReportOptionsResponse = {
+  reportTypes: ReportOption[];
+  scopes: ReportOption[];
+  periods: ReportOption[];
+  formats: ReportOption[];
+  lines: ReportLineOption[];
+};
+
+export type ReportSummaryCard = {
+  label: string;
+  value: number | string | null;
+  unit?: string | null;
+  description?: string | null;
+  tone?: string | null;
+};
+
+export type ReportSection = {
+  title: string;
+  description?: string | null;
+  visualization?: "bar" | "line" | "table" | string;
+  data: Record<string, unknown>[];
+};
+
+export type ReportResponse = {
+  reportType: ReportType;
+  title: string;
+  subtitle: string;
+  generatedAt: string;
+  startDate: string;
+  endDate: string;
+  periodLabel: string;
+  scope: ReportScope;
+  lineId?: number | null;
+  scopeLabel: string;
+  summaryCards: ReportSummaryCard[];
+  sections: ReportSection[];
+  detailedRows?: Record<string, unknown>[];
+};
+
 export type DashboardKind = "operator" | "supervisor" | "lineManager" | "maintenanceManager";
 
 export type AuthSession = LoginResponse & {

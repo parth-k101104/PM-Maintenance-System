@@ -1,0 +1,10 @@
+package com.maint.pm_backend.dto;
+
+public enum ReportType {
+    OVERALL_MAINTENANCE_PERFORMANCE,
+    LINE_WISE_PERFORMANCE,
+    TASK_STATUS,
+    EMPLOYEE_EFFICIENCY,
+    PM_COMPLIANCE_TREND,
+    ISSUE_FLAGS_REPLACEMENT
+}

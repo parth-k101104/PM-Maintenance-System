@@ -20,7 +20,8 @@
         {
           "cameraPermission": "Allow PM Maintenance Mobile to scan equipment QR codes."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "apiBaseUrl": "http://localhost:8080"
