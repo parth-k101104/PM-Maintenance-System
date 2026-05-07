@@ -826,6 +826,14 @@ export function MaintenanceManagerDashboardScreen() {
             <Pressable
               onPress={() => {
                 setMenuOpen(false);
+                navigation.push("MaintenanceReports");
+              }}
+            >
+              <Text style={s.drawerItemText}>Reports</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setMenuOpen(false);
                 navigation.push("ConfigParams");
               }}
             >

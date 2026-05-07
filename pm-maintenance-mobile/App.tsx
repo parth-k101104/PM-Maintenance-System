@@ -41,6 +41,7 @@ import { MmPhmCoverageAnalyticsScreen } from "./src/screens/MmPhmCoverageAnalyti
 import { MmEmployeeEfficiencyAnalyticsScreen } from "./src/screens/MmEmployeeEfficiencyAnalyticsScreen";
 import { MmMetricTrendScreen } from "./src/screens/MmMetricTrendScreen";
 import { ConfigParamsScreen } from "./src/screens/ConfigParamsScreen";
+import { MaintenanceReportsScreen } from "./src/screens/MaintenanceReportsScreen";
 
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -67,6 +68,7 @@ function RootNavigator() {
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="MaintenanceManagerDashboard" component={MaintenanceManagerDashboardScreen} />
+          <Stack.Screen name="MaintenanceReports" component={MaintenanceReportsScreen} />
           <Stack.Screen name="MmTaskStatusList" component={MmTaskStatusListScreen} />
           <Stack.Screen name="MmComplianceAnalytics" component={MmComplianceAnalyticsScreen} />
           <Stack.Screen name="MmEvidenceComplianceAnalytics" component={MmEvidenceComplianceAnalyticsScreen} />
