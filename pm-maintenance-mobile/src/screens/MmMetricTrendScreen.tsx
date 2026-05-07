@@ -38,7 +38,7 @@ export function MmMetricTrendScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const currentData = rollingWindows?.[windowDays];
+  const currentData = rollingWindows?.[String(windowDays)];
   const currentValue = metric === "approvalTurnaround"
     ? currentData?.plantApprovalTurnaroundTimeHours
     : currentData?.plantRejectionRate;

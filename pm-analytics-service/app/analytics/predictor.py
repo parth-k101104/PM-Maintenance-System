@@ -23,20 +23,21 @@ class DegradationPredictor:
     @staticmethod
     def evaluate_task(conn: Any, task: dict[str, Any], evaluation_date: date, config: AnalyticsConfig) -> tuple[PredictionResponse | None, EvaluationAuditResponse]:
         executions = fetch_executions(conn, task["task_schedule_id"])
+        last_exec = executions[-1]["completed_dttm"].date() if executions else None
         if len(executions) < 2:
-            return None, DegradationPredictor.make_audit(task, "INSUFFICIENT_DATA", "LESS_THAN_TWO_READINGS", len(executions), len(executions), 0)
+            return None, DegradationPredictor.make_audit(task, "INSUFFICIENT_DATA", "LESS_THAN_TWO_READINGS", len(executions), len(executions), 0, last_exec)
 
         if task["tolerance_min"] is None and task["tolerance_max"] is None:
-            return None, DegradationPredictor.make_audit(task, "CONFIG_MISSING", "NO_TOLERANCE_THRESHOLD", len(executions), 0, 0)
+            return None, DegradationPredictor.make_audit(task, "CONFIG_MISSING", "NO_TOLERANCE_THRESHOLD", len(executions), 0, 0, last_exec)
 
         replacements = fetch_replacements(conn, task["part_id"])
         cycles = DegradationPredictor.build_cycles(executions, replacements)
         if not cycles:
-            return None, DegradationPredictor.make_audit(task, "INSUFFICIENT_DATA", "NO_ACTIVE_CYCLE", len(executions), 0, 0)
+            return None, DegradationPredictor.make_audit(task, "INSUFFICIENT_DATA", "NO_ACTIVE_CYCLE", len(executions), 0, 0, last_exec)
 
         current_cycle = cycles[-1]
         if len(current_cycle.points) < 2:
-            return None, DegradationPredictor.make_audit(task, "INSUFFICIENT_DATA", "CURRENT_CYCLE_LESS_THAN_TWO_READINGS", len(executions), len(current_cycle.points), len(cycles[:-1]))
+            return None, DegradationPredictor.make_audit(task, "INSUFFICIENT_DATA", "CURRENT_CYCLE_LESS_THAN_TWO_READINGS", len(executions), len(current_cycle.points), len(cycles[:-1]), last_exec)
 
         completed_cycles = [cycle for cycle in cycles[:-1] if len(cycle.points) >= 2]
         max_threshold = DegradationPredictor.as_float(task["tolerance_max"])
@@ -57,7 +58,7 @@ class DegradationPredictor:
         else:
             velocity_ratio = 1.0
 
-        lifecycle_ratio = DegradationPredictor.calculate_lifecycle_ratio(
+        value_ratio, cycle_progress = DegradationPredictor.calculate_lifecycle_ratio(
             current_cycle=current_cycle,
             current_value=current_value,
             standard_value=standard_value,
@@ -65,9 +66,7 @@ class DegradationPredictor:
             max_threshold=max_threshold,
             boundary=boundary,
             completed_cycles=completed_cycles,
-            velocity_ratio=velocity_ratio,
         )
-        risk_score = DegradationPredictor.clamp(lifecycle_ratio * 100, 0, 100)
 
         status = DegradationPredictor.choose_status(current_slope, current_value, warning_value, prediction_threshold, boundary, completed_cycles, config)
         predicted_failure_date: date | None = None
@@ -95,7 +94,19 @@ class DegradationPredictor:
             if status == "LINEAR_REGRESSION":
                 confidence_score = min(confidence_score, config.lr_confidence_cap)
 
+        import math
+        c_prog = DegradationPredictor.clamp(cycle_progress, 0.0, 1.5)
+        if days_remaining is not None:
+            time_pressure = math.exp(-days_remaining / 90.0)
+            base_risk = 0.35 * value_ratio + 0.50 * time_pressure + 0.15 * c_prog
+        else:
+            base_risk = 0.65 * value_ratio + 0.35 * c_prog
+
+        v_factor = DegradationPredictor.clamp(velocity_ratio if velocity_ratio is not None else 1.0, 0.7, 1.5)
+        risk_score = DegradationPredictor.clamp(base_risk * v_factor, 0.0, 1.0) * 100.0
+
         simulated_curve = DegradationPredictor.project_curve(current_points[-1], current_slope, prediction_threshold, days_to_threshold)
+        has_deviation = executions[-1].get("deviation_flag", False) if executions else False
         insights = InsightGenerator.build_insights(
             task=task,
             current_value=current_value,
@@ -104,6 +115,7 @@ class DegradationPredictor:
             predicted_failure_date=predicted_failure_date,
             velocity_ratio=velocity_ratio,
             config=config,
+            has_deviation=has_deviation,
         )
 
         prediction = PredictionResponse(
@@ -120,7 +132,7 @@ class DegradationPredictor:
             days_remaining=days_remaining,
             degradation_velocity=round(current_slope, 6),
             risk_score=round(risk_score, 2),
-            lifecycle_ratio=round(DegradationPredictor.clamp(lifecycle_ratio, 0, 1.5), 4),
+            lifecycle_ratio=round(c_prog, 4),
             velocity_ratio=round(velocity_ratio, 4) if velocity_ratio is not None else None,
             thresholds=Thresholds(
                 standard_value=standard_value,
@@ -143,6 +155,7 @@ class DegradationPredictor:
             data_points_count=len(executions),
             current_cycle_points_count=len(current_cycle.points),
             completed_cycles_count=len(completed_cycles),
+            last_execution_date=last_exec,
         )
 
     @staticmethod
@@ -153,6 +166,7 @@ class DegradationPredictor:
         data_points_count: int,
         current_cycle_points_count: int,
         completed_cycles_count: int,
+        last_execution_date: date | None = None,
     ) -> EvaluationAuditResponse:
         return EvaluationAuditResponse(
             part_id=task["part_id"],
@@ -163,6 +177,7 @@ class DegradationPredictor:
             data_points_count=data_points_count,
             current_cycle_points_count=current_cycle_points_count,
             completed_cycles_count=completed_cycles_count,
+            last_execution_date=last_execution_date,
         )
 
     @staticmethod
@@ -188,6 +203,7 @@ class DegradationPredictor:
             "data_points_count": audit.data_points_count,
             "current_cycle_points_count": audit.current_cycle_points_count,
             "completed_cycles_count": audit.completed_cycles_count,
+            "last_execution_date": audit.last_execution_date,
             "current_value": prediction.current_value if prediction is not None else None,
             "risk_score": prediction.risk_score if prediction is not None else None,
             "metadata": {
@@ -337,10 +353,13 @@ class DegradationPredictor:
         max_threshold: float | None,
         boundary: str,
         completed_cycles: list[Cycle],
-        velocity_ratio: float | None,
-    ) -> float:
-        if boundary == "UPPER" and max_threshold and max_threshold > 0:
-            value_ratio = current_value / max_threshold
+    ) -> tuple[float, float]:
+        if boundary == "UPPER" and max_threshold is not None:
+            healthy_anchor = standard_value if standard_value is not None else min_threshold
+            if healthy_anchor is not None and healthy_anchor != max_threshold:
+                value_ratio = (current_value - healthy_anchor) / (max_threshold - healthy_anchor)
+            else:
+                value_ratio = 1.0 if current_value >= max_threshold else 0.0
         elif boundary == "LOWER" and min_threshold is not None:
             healthy_anchor = standard_value if standard_value is not None else max_threshold
             if healthy_anchor is not None and healthy_anchor != min_threshold:
@@ -351,13 +370,13 @@ class DegradationPredictor:
             value_ratio = 0.0
 
         if not completed_cycles:
-            return value_ratio
+            return value_ratio, 0.0
 
         durations = [(cycle.points[-1]["completed_dttm"].date() - cycle.start.date()).days for cycle in completed_cycles]
         avg_duration = max(mean([duration for duration in durations if duration > 0] or [1]), 1)
         elapsed = (current_cycle.points[-1]["completed_dttm"].date() - current_cycle.start.date()).days
-        adjusted_duration = avg_duration / max(velocity_ratio or 1.0, 0.1)
-        return max(value_ratio, elapsed / adjusted_duration)
+        cycle_progress = elapsed / avg_duration
+        return value_ratio, cycle_progress
 
     @staticmethod
     def calculate_confidence(completed_cycles: list[Cycle], config: AnalyticsConfig) -> float:

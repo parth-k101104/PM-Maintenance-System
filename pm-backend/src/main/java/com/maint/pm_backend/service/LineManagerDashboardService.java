@@ -73,21 +73,23 @@ public class LineManagerDashboardService {
             Long employeeId) {
         String sql = """
                 SELECT
-                    AVG(t.health_score) AS avg_health,
-                    AVG(t.pm_compliance_rate) AS avg_compliance,
-                    AVG(t.task_rejection_rate) AS avg_rejection,
+                    AVG(t.health_score)                AS avg_health,
+                    AVG(t.pm_compliance_rate)          AS avg_phm_coverage,
+                    AVG(t.pm_operational_compliance)   AS avg_pm_compliance,
+                    AVG(t.task_rejection_rate)         AS avg_rejection,
                     AVG(CAST(NULLIF(REGEXP_REPLACE(t.approval_turnaround_time, '[^0-9.]', '', 'g'), '') AS NUMERIC)) AS avg_turnaround,
-                    AVG(t.evidence_compliance_rate) AS avg_evidence,
-                    AVG(t.employee_efficiency) AS avg_employee_efficiency
+                    AVG(t.evidence_compliance_rate)    AS avg_evidence,
+                    AVG(t.employee_efficiency)         AS avg_employee_efficiency
                 FROM (
                     SELECT
                         hs.health_score,
                         hs.pm_compliance_rate,
+                        hs.pm_operational_compliance,
                         hs.task_rejection_rate,
                         hs.approval_turnaround_time,
                         hs.evidence_compliance_rate,
                         hs.employee_efficiency,
-                        ROW_NUMBER() OVER (PARTITION BY hs.entity_id ORDER BY hs.evaluation_date DESC, hs.health_id DESC) as rn
+                        ROW_NUMBER() OVER (PARTITION BY hs.entity_id ORDER BY hs.evaluation_date DESC, hs.health_id DESC) AS rn
                     FROM phm_health_scores hs
                     WHERE hs.entity_type = 'LINE'
                       AND hs.window_days = :windowDays
@@ -105,7 +107,8 @@ public class LineManagerDashboardService {
         return LineManagerDashboardResponse.RollingWindowMetrics.builder()
                 .windowDays(windowDays)
                 .lineHealth(toDouble(row.get("avg_health")))
-                .pmComplianceRate(normalizePercentScale(toDouble(row.get("avg_compliance"))))
+                .phmCoverageRate(toDouble(row.get("avg_phm_coverage")))
+                .pmComplianceRate(toDouble(row.get("avg_pm_compliance")))
                 .taskRejectionRate(toDouble(row.get("avg_rejection")))
                 .approvalTurnaroundTimeHours(toDouble(row.get("avg_turnaround")))
                 .evidenceComplianceRate(toDouble(row.get("avg_evidence")))
@@ -123,13 +126,6 @@ public class LineManagerDashboardService {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    private Double normalizePercentScale(Double value) {
-        if (value == null) {
-            return null;
-        }
-        return value <= 10.0 ? value * 10.0 : value;
     }
 
     public List<TaskDetailsProjection> getTodaysApprovalsList(Long employeeId) {

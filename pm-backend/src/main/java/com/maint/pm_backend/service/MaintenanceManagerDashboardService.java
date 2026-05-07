@@ -33,6 +33,7 @@ public class MaintenanceManagerDashboardService {
 
         return MaintenanceManagerDashboardResponse.builder()
                 .taskStatusCounts(selected.getTaskStatusCounts())
+                .overallPhmCoverageRate(selected.getOverallPhmCoverageRate())
                 .overallPmComplianceRate(selected.getOverallPmComplianceRate())
                 .plantRejectionRate(selected.getPlantRejectionRate())
                 .plantApprovalTurnaroundTimeHours(selected.getPlantApprovalTurnaroundTimeHours())
@@ -53,7 +54,8 @@ public class MaintenanceManagerDashboardService {
         int underReviewCount = pmScheduleExecutionRepository.countTasksByStatusesBetweenDates(
                 List.of("UNDER_SUPERVISOR_REVIEW", "UNDER_LINE_MANAGER_REVIEW", "UNDER_MAINT_MANAGER_REVIEW"),
                 startDate, endDate);
-        int rejectedCount = pmScheduleExecutionRepository.countTasksByStatusesBetweenDates(List.of("REJECTED"), startDate,
+        int rejectedCount = pmScheduleExecutionRepository.countTasksByStatusesBetweenDates(List.of("REJECTED"),
+                startDate,
                 endDate);
         int approvedCount = pmScheduleExecutionRepository
                 .countTasksByStatusesBetweenDates(List.of("APPROVED", "COMPLETED", "FLAGGED_AND_COMPLETED"),
@@ -71,9 +73,10 @@ public class MaintenanceManagerDashboardService {
 
         String plantLatestSql = """
                 SELECT
-                    hs.pm_compliance_rate                              AS pm_compliance,
+                    hs.pm_compliance_rate                              AS phm_coverage,
+                    hs.pm_operational_compliance                       AS pm_compliance,
                     hs.task_rejection_rate                             AS rejection,
-                    CAST(NULLIF(REGEXP_REPLACE(hs.approval_turnaround_time, '[^0-9.]', '', 'g'), '') AS NUMERIC)       AS turnaround,
+                    CAST(NULLIF(REGEXP_REPLACE(hs.approval_turnaround_time, '[^0-9.]', '', 'g'), '') AS NUMERIC) AS turnaround,
                     hs.evidence_compliance_rate                        AS evidence,
                     hs.employee_efficiency                             AS employee_efficiency
                 FROM phm_health_scores hs
@@ -86,7 +89,8 @@ public class MaintenanceManagerDashboardService {
         List<Map<String, Object>> plantRows = jdbcTemplate.queryForList(plantLatestSql,
                 Map.of("windowDays", windowDays));
         Map<String, Object> plantLatest = plantRows.isEmpty() ? Collections.emptyMap() : plantRows.get(0);
-        Double plantCompliance = toDouble(plantLatest.get("pm_compliance"));
+        Double plantPhmCoverage = toDouble(plantLatest.get("phm_coverage"));
+        Double plantPmCompliance = toDouble(plantLatest.get("pm_compliance"));
         Double plantRejectionRate = toDouble(plantLatest.get("rejection"));
         Double plantApprovalTurnaround = toDouble(plantLatest.get("turnaround"));
         Double plantEvidenceComplianceRate = toDouble(plantLatest.get("evidence"));
@@ -96,7 +100,9 @@ public class MaintenanceManagerDashboardService {
                 SELECT
                     l.line_id,
                     l.line_name,
+                    latest.health_score,
                     latest.pm_compliance_rate,
+                    latest.pm_operational_compliance,
                     latest.task_rejection_rate,
                     CAST(NULLIF(REGEXP_REPLACE(latest.approval_turnaround_time, '[^0-9.]', '', 'g'), '') AS NUMERIC) AS approval_turnaround_time,
                     latest.evidence_compliance_rate,
@@ -104,7 +110,9 @@ public class MaintenanceManagerDashboardService {
                 FROM lines l
                 LEFT JOIN LATERAL (
                     SELECT
+                        hs.health_score,
                         hs.pm_compliance_rate,
+                        hs.pm_operational_compliance,
                         hs.task_rejection_rate,
                         hs.approval_turnaround_time,
                         hs.evidence_compliance_rate,
@@ -127,7 +135,9 @@ public class MaintenanceManagerDashboardService {
                     return MaintenanceManagerDashboardResponse.LineWiseComplianceData.builder()
                             .lineId(toLong(row.get("line_id")))
                             .lineName((String) row.get("line_name"))
-                            .complianceRate(round1dp(toDouble(row.get("pm_compliance_rate"))))
+                            .lineHealthScore(round1dp(toDouble(row.get("health_score"))))
+                            .phmCoverageRate(round1dp(toDouble(row.get("pm_compliance_rate"))))
+                            .pmComplianceRate(round1dp(toDouble(row.get("pm_operational_compliance"))))
                             .rejectionRate(round1dp(toDouble(row.get("task_rejection_rate"))))
                             .approvalTurnaroundTimeHours(round1dp(toDouble(row.get("approval_turnaround_time"))))
                             .evidenceComplianceRate(round1dp(toDouble(row.get("evidence_compliance_rate"))))
@@ -139,7 +149,8 @@ public class MaintenanceManagerDashboardService {
         return MaintenanceManagerDashboardResponse.RollingWindowMetrics.builder()
                 .windowDays(windowDays)
                 .taskStatusCounts(statusCounts)
-                .overallPmComplianceRate(round1dp(plantCompliance))
+                .overallPhmCoverageRate(round1dp(plantPhmCoverage))
+                .overallPmComplianceRate(round1dp(plantPmCompliance))
                 .plantRejectionRate(round1dp(plantRejectionRate))
                 .plantApprovalTurnaroundTimeHours(round1dp(plantApprovalTurnaround))
                 .plantEvidenceComplianceRate(round1dp(plantEvidenceComplianceRate))
@@ -170,23 +181,22 @@ public class MaintenanceManagerDashboardService {
     }
 
     private LocalDate getWindowStartDate(int windowDays, LocalDate endDate) {
-        return windowDays == 30 ? endDate.withDayOfMonth(1) : endDate.withDayOfYear(1);
+        return endDate.minusDays(windowDays);
     }
 
     private LocalDate getWindowEndDate(int windowDays, LocalDate today) {
-        return windowDays == 30
-                ? today.withDayOfMonth(today.lengthOfMonth())
-                : today.withDayOfYear(today.lengthOfYear());
+        return today;
     }
 
     public List<Map<String, Object>> getPlantComplianceTrend(int windowDays) {
         String sql = """
                     SELECT
-                        evaluation_date  AS "evaluationDate",
-                        pm_compliance_rate AS "complianceRate"
+                        evaluation_date         AS "evaluationDate",
+                        pm_operational_compliance AS "complianceRate"
                     FROM phm_health_scores
                     WHERE entity_type = 'PLANT'
                       AND window_days  = :windowDays
+                      AND pm_operational_compliance IS NOT NULL
                     ORDER BY evaluation_date ASC
                     LIMIT 30
                 """;

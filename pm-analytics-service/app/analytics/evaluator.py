@@ -41,11 +41,18 @@ class HealthEvaluator:
 
         for key, rows in buckets.items():
             entity_type, entity_id = key
-            contribution_scores = [self._health_contribution(row) for row in rows]
+
+            window_rows = []
+            for row in rows:
+                last_exec = row.get("last_execution_date")
+                if last_exec is not None and (self.evaluation_date - last_exec).days <= self.window_days:
+                    window_rows.append(row)
+
+            contribution_scores = [self._health_contribution(row) for row in window_rows]
             health_score = round(mean(contribution_scores), 2) if contribution_scores else 100.0
-            critical_flags_count = sum(1 for row in rows if (row.get("risk_score") or 0) >= critical_threshold)
-            complete_count = sum(1 for row in rows if row["evaluation_status"] in {"PREDICTED", "STABLE"})
-            coverage_rate = round((complete_count / len(rows)) * 100, 2) if rows else 100.0
+            critical_flags_count = sum(1 for row in window_rows if (row.get("risk_score") or 0) >= critical_threshold)
+            complete_count = sum(1 for row in window_rows if row["evaluation_status"] in {"PREDICTED", "STABLE"})
+            coverage_rate = round((complete_count / len(window_rows)) * 100, 2) if window_rows else 100.0
             previous = previous_scores.get(key)
 
             if previous is None or abs(health_score - previous) < trend_threshold:
@@ -60,6 +67,7 @@ class HealthEvaluator:
             task_rejection_rate = metrics.get("task_rejection_rate", 0.0)
             approval_turnaround_time = metrics.get("approval_turnaround_time", "0h")
             evidence_compliance_rate = metrics.get("evidence_compliance_rate", 100.0)
+            pm_operational_compliance = metrics.get("pm_operational_compliance")
 
             health_scores.append(
                 {
@@ -67,7 +75,10 @@ class HealthEvaluator:
                     "entity_id": entity_id,
                     "health_score": health_score,
                     "critical_flags_count": critical_flags_count,
+                    # PHM prediction coverage: % of tasks the engine could evaluate
                     "pm_compliance_rate": coverage_rate,
+                    # Operational PM compliance: approved / (approved + rejected) × 100
+                    "pm_operational_compliance": pm_operational_compliance,
                     "employee_efficiency": employee_efficiency,
                     "task_rejection_rate": task_rejection_rate,
                     "approval_turnaround_time": approval_turnaround_time,
@@ -107,12 +118,17 @@ class HealthEvaluator:
             task_rejection_rate = round((total_rej / total_comp * 100), 2) if total_comp > 0 else 0.0
             avg_turnaround_hours = round(sum_turnaround_hours / count_approved, 2) if count_approved > 0 else 0.0
             evidence_compliance_rate = round((total_ev_acc / total_comp * 100), 2) if total_comp > 0 else 100.0
+            # Operational PM compliance: of tasks that reached a terminal decision
+            # (approved or rejected), what % were approved.
+            terminal = count_approved + total_rej
+            pm_operational_compliance = round((count_approved / terminal) * 100, 2) if terminal > 0 else None
 
             agg[(etype, eid)] = {
                 "employee_efficiency": employee_efficiency,
                 "task_rejection_rate": task_rejection_rate,
                 "approval_turnaround_time": self._format_turnaround(avg_turnaround_hours),
-                "evidence_compliance_rate": evidence_compliance_rate
+                "evidence_compliance_rate": evidence_compliance_rate,
+                "pm_operational_compliance": pm_operational_compliance,
             }
         return agg
 

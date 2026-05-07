@@ -104,6 +104,9 @@ export type SupervisorDashboardResponse = {
 export type LineManagerDashboardWindowMetrics = {
   windowDays: number;
   lineHealth?: number;
+  /** PHM prediction coverage: % of tasks the analytics engine could evaluate. */
+  phmCoverageRate?: number;
+  /** Operational PM compliance: approved / (approved + rejected) × 100. */
   pmComplianceRate?: number;
   taskRejectionRate?: number;
   approvalTurnaroundTimeHours?: number;
@@ -149,6 +152,9 @@ export type MaintenanceManagerDashboardWindowMetrics = {
     rejected: number;
     approved: number;
   };
+  /** PHM prediction coverage: % of tasks the analytics engine could evaluate. */
+  overallPhmCoverageRate: number | null;
+  /** Operational PM compliance: approved / (approved + rejected) × 100. */
   overallPmComplianceRate: number | null;
   // Orange metrics — plant-wide averages
   plantRejectionRate: number | null;
@@ -158,7 +164,12 @@ export type MaintenanceManagerDashboardWindowMetrics = {
   lineWiseCompliance: {
     lineId: number;
     lineName: string;
-    complianceRate: number | null;
+    /** PHM health score for this line (0-100). */
+    lineHealthScore: number | null;
+    /** PHM prediction coverage for this line. */
+    phmCoverageRate: number | null;
+    /** Operational PM compliance for this line. */
+    pmComplianceRate: number | null;
     // Orange metrics — per line
     rejectionRate: number | null;
     approvalTurnaroundTimeHours: number | null;
@@ -238,7 +249,7 @@ export type CompletedTask = {
   reviewerName?: string;
   /** Human-readable review stage label, e.g. "Supervisor Review" */
   reviewType?: string;
-  
+
   // Reschedule info for rejected tasks
   rescheduleFlag?: boolean;
   parentScheduleExecutionId?: number;

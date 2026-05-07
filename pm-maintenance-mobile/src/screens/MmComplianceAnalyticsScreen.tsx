@@ -21,8 +21,11 @@ export function MmComplianceAnalyticsScreen() {
   const [windowDays, setWindowDays] = useState(route.params.windowDays);
   const { authState } = useAuth();
 
-  const currentData = rollingWindows?.[windowDays];
-  const currentRate = currentData?.overallPmComplianceRate;
+  const currentData = rollingWindows?.[String(windowDays)];
+  // Operational PM compliance: approved / (approved + rejected) × 100 — PRIMARY metric
+  const pmComplianceRate = currentData?.overallPmComplianceRate;
+  // PHM prediction coverage: % of tasks the analytics engine could evaluate — secondary
+  const phmCoverageRate = currentData?.overallPhmCoverageRate;
   const lineWiseData = currentData?.lineWiseCompliance || [];
 
   const [trendData, setTrendData] = useState<{ value: number; label: string }[]>([]);
@@ -51,15 +54,16 @@ export function MmComplianceAnalyticsScreen() {
   }, [authState.session?.token, windowDays]);
 
   const barData = lineWiseData.map((l: any) => {
-    const compliancePct = l.complianceRate;
+    const rate = l.pmComplianceRate;
     return {
-      value: compliancePct ?? 0,
+      value: rate ?? 0,
       label: l.lineName.length > 8 ? l.lineName.substring(0, 8) + "..." : l.lineName,
       frontColor:
-        compliancePct == null ? "#626781" : compliancePct >= 85 ? "#2E8B57" : compliancePct >= 65 ? "#AD531A" : "#7D0000",
+        rate == null ? "#626781" : rate >= 85 ? "#2E8B57" : rate >= 65 ? "#AD531A" : "#7D0000",
     };
   });
-  const cColor = currentRate == null ? "#626781" : currentRate >= 85 ? "#2E8B57" : currentRate >= 65 ? "#AD531A" : "#7D0000";
+  const pmcColor = pmComplianceRate == null ? "#626781" : pmComplianceRate >= 85 ? "#2E8B57" : pmComplianceRate >= 65 ? "#AD531A" : "#7D0000";
+  const phmColor = phmCoverageRate == null ? "#626781" : phmCoverageRate >= 85 ? "#2E8B57" : phmCoverageRate >= 65 ? "#AD531A" : "#7D0000";
 
   return (
     <SafeAreaView style={s.safe}>
@@ -68,22 +72,41 @@ export function MmComplianceAnalyticsScreen() {
         <Pressable hitSlop={12} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back-outline" size={26} color="#111" />
         </Pressable>
-        <Text style={s.headerTitle}>Compliance Analytics ({windowDays}d)</Text>
+        <Text style={s.headerTitle}>PM Compliance ({windowDays}d)</Text>
         <View style={{ width: 26 }} />
       </View>
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-        <View style={[s.heroCard, { borderLeftColor: cColor }]}>
+        {/* PM Compliance summary — operational on-time completion rate — PRIMARY */}
+        <View style={[s.heroCard, { borderLeftColor: pmcColor }]}>
           <View style={s.heroLeft}>
-            <Ionicons name="checkmark-done-circle-outline" size={26} color={cColor} style={{ marginBottom: 4 }} />
-            <Text style={[s.heroValue, { color: cColor }]}>
-              {currentRate != null ? `${currentRate.toFixed(1)}%` : "N/A"}
+            <Ionicons name="checkmark-circle-outline" size={26} color={pmcColor} style={{ marginBottom: 4 }} />
+            <Text style={[s.heroValue, { color: pmcColor }]}>
+              {pmComplianceRate != null ? `${pmComplianceRate.toFixed(1)}%` : "N/A"}
             </Text>
             <Text style={s.heroLabel}>Plant-wide PM Compliance</Text>
+            <Text style={[s.heroLabel, { fontSize: 11, marginTop: 2, color: "#626781" }]}>
+              approved / (approved + rejected)
+            </Text>
           </View>
           <View style={s.heroBadge}>
-            <Text style={[s.heroBadgeText, { color: cColor }]}>
-              {currentRate == null ? "N/A" : currentRate >= 85 ? "Good" : currentRate >= 65 ? "Warn" : "Critical"}
+            <Text style={[s.heroBadgeText, { color: pmcColor }]}>
+              {pmComplianceRate == null ? "N/A" : pmComplianceRate >= 85 ? "Good" : pmComplianceRate >= 65 ? "Warn" : "Critical"}
+            </Text>
+          </View>
+        </View>
+
+        <View style={[s.heroCard, { borderLeftColor: phmColor, marginTop: 10 }]}>
+          <View style={s.heroLeft}>
+            <Ionicons name="checkmark-done-circle-outline" size={26} color={phmColor} style={{ marginBottom: 4 }} />
+            <Text style={[s.heroValue, { color: phmColor }]}>
+              {phmCoverageRate != null ? `${phmCoverageRate.toFixed(1)}%` : "N/A"}
+            </Text>
+            <Text style={s.heroLabel}>Plant-wide PHM Coverage</Text>
+          </View>
+          <View style={s.heroBadge}>
+            <Text style={[s.heroBadgeText, { color: phmColor }]}>
+              {phmCoverageRate == null ? "N/A" : phmCoverageRate >= 85 ? "Good" : phmCoverageRate >= 65 ? "Warn" : "Critical"}
             </Text>
           </View>
         </View>
@@ -134,7 +157,7 @@ export function MmComplianceAnalyticsScreen() {
               <LineChart
                 data={trendData}
                 height={210}
-                color={cColor}
+                color={pmcColor}
                 thickness={3}
                 spacing={trendData.length > 10 ? 36 : 52}
                 initialSpacing={16}
@@ -149,21 +172,21 @@ export function MmComplianceAnalyticsScreen() {
                 yAxisSuffix="%"
                 maxValue={100}
                 noOfSections={5}
-                dataPointsColor={cColor}
+                dataPointsColor={pmcColor}
                 dataPointsRadius={5}
                 referenceLine1Config={{ color: "#2E8B57", dashWidth: 4, dashGap: 4, thickness: 1 }}
                 referenceLine1Position={85}
                 referenceLine2Config={{ color: "#AD531A", dashWidth: 4, dashGap: 4, thickness: 1 }}
                 referenceLine2Position={65}
                 areaChart
-                startFillColor={cColor}
+                startFillColor={pmcColor}
                 startOpacity={0.18}
-                endFillColor={cColor}
+                endFillColor={pmcColor}
                 endOpacity={0.01}
                 showValuesAsDataPointsText
                 textShiftY={-10}
                 textShiftX={-4}
-                textColor={cColor}
+                textColor={pmcColor}
                 textFontSize={9}
                 curved
               />
@@ -180,7 +203,7 @@ export function MmComplianceAnalyticsScreen() {
         <View style={s.section}>
           <View style={s.sectionHeader}>
             <Ionicons name="bar-chart-outline" size={18} color={colors.primary} />
-            <Text style={s.sectionTitle}>Line-wise Compliance</Text>
+            <Text style={s.sectionTitle}>Line-wise PM Compliance</Text>
           </View>
           {barData.length > 0 ? (
             <View style={s.chartCard}>

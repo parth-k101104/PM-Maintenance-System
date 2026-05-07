@@ -80,7 +80,7 @@ export function MmEvidenceComplianceAnalyticsScreen() {
   const [windowDays, setWindowDays] = useState(route.params.windowDays);
   const { authState } = useAuth();
 
-  const currentData = rollingWindows?.[windowDays];
+  const currentData = rollingWindows?.[String(windowDays)];
   const currentRate = currentData?.plantEvidenceComplianceRate;
   interface LineEvidenceStat {
     lineName: string;

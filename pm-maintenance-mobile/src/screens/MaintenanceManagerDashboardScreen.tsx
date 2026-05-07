@@ -225,8 +225,10 @@ export function MaintenanceManagerDashboardScreen() {
     { color: "#7D0000", label: "Rejected", value: counts?.rejected ?? 0, statusGroup: "REJECTED" },
   ];
 
-  const compliance = currentData?.overallPmComplianceRate;
+  const compliance = currentData?.overallPhmCoverageRate;
+  const pmCompliance = currentData?.overallPmComplianceRate;
   const cColor = complianceColor(compliance);
+  const pmcColor = complianceColor(pmCompliance);
   const evidenceRate = currentData?.plantEvidenceComplianceRate;
   const employeeEfficiency = currentData?.plantEmployeeEfficiency;
   const rejectionRate = currentData?.plantRejectionRate;
@@ -323,26 +325,27 @@ export function MaintenanceManagerDashboardScreen() {
             ) : (
               <View style={s.dashboardBody}>
                 <View style={s.cardsRow}>
+                  {/* PM Compliance — PRIMARY large card */}
                   <Pressable
                     style={[s.dashboardCard, s.complianceDashboardCard, s.flexLarge]}
                     onPress={() =>
                       navigation.push("MmComplianceAnalytics", {
-                        currentRate: compliance,
+                        currentRate: pmCompliance,
                         lineWiseData: currentData?.lineWiseCompliance || [],
                         windowDays,
                         rollingWindows: data?.rollingWindows,
                       })
                     }
                   >
-                    <Text style={s.cardTitle}>Overall PM compliance-</Text>
-                    <Text style={[s.bigNumber, { color: cColor }]}>
-                      {compliance != null ? `${compliance.toFixed(1)}%` : "N/A"}
+                    <Text style={s.cardTitle}>PM compliance-</Text>
+                    <Text style={[s.bigNumber, { color: pmcColor }]}>
+                      {pmCompliance != null ? `${pmCompliance.toFixed(1)}%` : "N/A"}
                     </Text>
-                    <Text style={s.cardFootnote}>On-Time Execution Rate</Text>
+                    <Text style={s.cardFootnote}>Approved / terminal tasks</Text>
                     <View style={s.cardProgressRow}>
-                      <AnimBar pct={compliance ?? 0} color={cColor} />
-                      <Text style={[s.barPct, { color: cColor }]}>
-                        {compliance != null ? `${compliance.toFixed(1)}%` : "N/A"}
+                      <AnimBar pct={pmCompliance ?? 0} color={pmcColor} />
+                      <Text style={[s.barPct, { color: pmcColor }]}>
+                        {pmCompliance != null ? `${pmCompliance.toFixed(1)}%` : "N/A"}
                       </Text>
                     </View>
                     <View style={s.compactLegend}>
@@ -356,27 +359,38 @@ export function MaintenanceManagerDashboardScreen() {
                     <Ionicons name="arrow-forward-outline" size={32} color="#111111" style={s.cardArrow} />
                   </Pressable>
 
-                  <Pressable
-                    style={[s.dashboardCard, s.evidenceDashboardCard, s.flexSmall]}
-                    onPress={() =>
-                      navigation.push("MmEvidenceComplianceAnalytics", {
-                        currentRate: evidenceRate,
-                        lineWiseData: (currentData?.lineWiseCompliance ?? []).map((l) => ({
-                          lineName: l.lineName,
-                          evidenceComplianceRate: l.evidenceComplianceRate,
-                        })),
-                        windowDays,
-                        rollingWindows: data?.rollingWindows,
-                      })
-                    }
-                  >
-                    <Text style={s.cardTitleSmall}>Evidence compliance-</Text>
-                    <Text style={[s.mediumNumber, { color: evidenceColor(evidenceRate) }]}>
-                      {evidenceRate != null ? `${evidenceRate.toFixed(1)}%` : "N/A"}
-                    </Text>
-                    <Text style={s.cardFootnoteSmall}>plant-wide</Text>
-                    <Ionicons name="arrow-forward-outline" size={30} color="#111111" style={s.smallCardArrow} />
-                  </Pressable>
+                  <View style={s.flexSmall}>
+                    <Pressable
+                      style={[s.dashboardCard, s.evidenceDashboardCard, { flex: 1 }]}
+                      onPress={() =>
+                        navigation.push("MmEvidenceComplianceAnalytics", {
+                          currentRate: evidenceRate,
+                          lineWiseData: (currentData?.lineWiseCompliance ?? []).map((l) => ({
+                            lineName: l.lineName,
+                            evidenceComplianceRate: l.evidenceComplianceRate,
+                          })),
+                          windowDays,
+                          rollingWindows: data?.rollingWindows,
+                        })
+                      }
+                    >
+                      <Text style={s.cardTitleSmall}>Evidence compliance-</Text>
+                      <Text style={[s.mediumNumber, { color: evidenceColor(evidenceRate) }]}>
+                        {evidenceRate != null ? `${evidenceRate.toFixed(1)}%` : "N/A"}
+                      </Text>
+                      <Text style={s.cardFootnoteSmall}>plant-wide</Text>
+                      <Ionicons name="arrow-forward-outline" size={30} color="#111111" style={s.smallCardArrow} />
+                    </Pressable>
+
+                    {/* PHM Coverage — secondary info card */}
+                    <View style={[s.dashboardCard, { flex: 1, marginTop: 8, backgroundColor: "#CFD1E0" }]}>
+                      <Text style={s.cardTitleSmall}>PHM coverage-</Text>
+                      <Text style={[s.mediumNumber, { color: cColor }]}>
+                        {compliance != null ? `${compliance.toFixed(1)}%` : "N/A"}
+                      </Text>
+                      <Text style={s.cardFootnoteSmall}>Prediction coverage</Text>
+                    </View>
+                  </View>
                 </View>
 
                 <View style={[s.dashboardPanel, s.statusPanel]}>
@@ -490,19 +504,33 @@ export function MaintenanceManagerDashboardScreen() {
                   ) : (
                     <View style={s.lineList}>
                       {(currentData?.lineWiseCompliance ?? [])
-                        .sort((a, b) => (b.complianceRate ?? -1) - (a.complianceRate ?? -1))
+                        .sort((a, b) => (b.pmComplianceRate ?? -1) - (a.pmComplianceRate ?? -1))
                         .map((line, idx) => {
-                          const cc = complianceColor(line.complianceRate);
+                          const pc = complianceColor(line.pmComplianceRate);
+                          const hc = complianceColor(line.lineHealthScore);
                           return (
                             <View key={line.lineId} style={[s.lineRow, idx > 0 && s.lineRowBorder]}>
                               <View style={s.lineTop}>
                                 <Text style={s.lineName}>{line.lineName}</Text>
-                                <Text style={[s.lineRate, { color: cc }]}>
-                                  {line.complianceRate != null ? `${line.complianceRate.toFixed(1)}%` : "N/A"}
-                                </Text>
+                                <View style={{ alignItems: "flex-end" }}>
+                                  <Text style={[s.lineRate, { color: pc }]}>
+                                    {line.pmComplianceRate != null ? `${line.pmComplianceRate.toFixed(1)}%` : "N/A"}
+                                  </Text>
+                                  <Text style={[s.lineMetricLabel, { color: colors.textMuted, textTransform: "none", letterSpacing: 0 }]}>
+                                    PM Compliance
+                                  </Text>
+                                </View>
                               </View>
                               <View style={s.barRow}>
-                                <AnimBar pct={line.complianceRate ?? 0} color={cc} />
+                                <AnimBar pct={line.pmComplianceRate ?? 0} color={pc} />
+                              </View>
+                              {/* Health score pill */}
+                              <View style={s.healthScoreRow}>
+                                <Ionicons name="heart-outline" size={13} color={hc} />
+                                <Text style={[s.healthScoreLabel]}>Line Health Score: </Text>
+                                <Text style={[s.healthScoreVal, { color: hc }]}>
+                                  {line.lineHealthScore != null ? `${line.lineHealthScore.toFixed(1)}%` : "N/A"}
+                                </Text>
                               </View>
                               <View style={s.lineMetrics}>
                                 <View style={s.lineMetricItem}>
@@ -536,7 +564,7 @@ export function MaintenanceManagerDashboardScreen() {
                                   <Ionicons name="speedometer-outline" size={13}
                                     color={line.employeeEfficiency != null ? evidenceColor(line.employeeEfficiency) : colors.textSoft} />
                                   <Text style={[s.lineMetricVal,
-                                    { color: line.employeeEfficiency != null ? evidenceColor(line.employeeEfficiency) : colors.textSoft }]}>
+                                  { color: line.employeeEfficiency != null ? evidenceColor(line.employeeEfficiency) : colors.textSoft }]}>
                                     {line.employeeEfficiency != null ? `${line.employeeEfficiency.toFixed(1)}%` : "N/A"}
                                   </Text>
                                   <Text style={s.lineMetricLabel}>Efficiency</Text>
@@ -574,14 +602,14 @@ export function MaintenanceManagerDashboardScreen() {
               onPress={() => {
                 setMenuOpen(false);
                 navigation.push("MmComplianceAnalytics", {
-                  currentRate: compliance,
+                  currentRate: pmCompliance,
                   lineWiseData: currentData?.lineWiseCompliance || [],
                   windowDays,
                   rollingWindows: data?.rollingWindows,
                 });
               }}
             >
-              <Text style={s.drawerItemText}>Compliance analytics</Text>
+              <Text style={s.drawerItemText}>PM compliance</Text>
             </Pressable>
             <Pressable
               onPress={() => {
@@ -916,7 +944,10 @@ const s = StyleSheet.create({
   lineRowBorder: { borderTopWidth: 1, borderTopColor: "#EBEBF5" },
   lineTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   lineName: { fontSize: 14, fontWeight: "600", color: colors.text, flex: 1 },
-  lineRate: { fontSize: 14, fontWeight: "700", flexShrink: 0 },
+  lineRate: { fontSize: 15, fontWeight: "700", flexShrink: 0 },
+  healthScoreRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  healthScoreLabel: { fontSize: 11, color: colors.textMuted },
+  healthScoreVal: { fontSize: 12, fontWeight: "700" },
   lineMetrics: { flexDirection: "row", gap: 0, marginTop: 6 },
   lineMetricItem: { flex: 1, alignItems: "center", gap: 2 },
   lineMetricVal: { fontSize: 13, fontWeight: "700" },
