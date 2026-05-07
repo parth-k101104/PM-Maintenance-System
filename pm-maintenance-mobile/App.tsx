@@ -7,6 +7,8 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
+import { SyncProvider } from "./src/context/SyncContext";
+import { OfflineSyncStatus } from "./src/components/OfflineSyncStatus";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { QRScannerScreen } from "./src/screens/QRScannerScreen";
@@ -24,6 +26,7 @@ import { LineManagerPartAnalyticsScreen } from "./src/screens/LineManagerPartAna
 import { SupervisorTaskReviewScreen } from "./src/screens/SupervisorTaskReviewScreen";
 import { BacklogTasksScreen } from "./src/screens/BacklogTasksScreen";
 import { UpcomingTasksScreen } from "./src/screens/UpcomingTasksScreen";
+import { UpcomingApprovalsScreen } from "./src/screens/UpcomingApprovalsScreen";
 import { FlagsRaisedScreen } from "./src/screens/FlagsRaisedScreen";
 import { FlagDetailScreen } from "./src/screens/FlagDetailScreen";
 import { LineManagerActiveTasksScreen } from "./src/screens/LineManagerActiveTasksScreen";
@@ -59,7 +62,12 @@ function RootNavigator() {
   }
 
   if (!authState.session) {
-    return <LoginScreen />;
+    return (
+      <>
+        <LoginScreen />
+        <OfflineSyncStatus />
+      </>
+    );
   }
 
   // Route maintenance managers directly to their dedicated screen
@@ -79,6 +87,7 @@ function RootNavigator() {
           <Stack.Screen name="LineManagerPartAnalytics" component={LineManagerPartAnalyticsScreen} />
           <Stack.Screen name="ConfigParams" component={ConfigParamsScreen} />
         </Stack.Navigator>
+        <OfflineSyncStatus />
       </NavigationContainer>
     );
   }
@@ -98,6 +107,7 @@ function RootNavigator() {
         <Stack.Screen name="BacklogTasks" component={BacklogTasksScreen} />
         <Stack.Screen name="TaskApproval" component={TaskApprovalScreen} />
         <Stack.Screen name="UpcomingTasks" component={UpcomingTasksScreen} />
+        <Stack.Screen name="UpcomingApprovals" component={UpcomingApprovalsScreen} />
         <Stack.Screen name="TaskDocuments" component={TaskDocumentsScreen} />
         <Stack.Screen name="QRScanner" component={QRScannerScreen} />
         <Stack.Screen name="TaskExecution" component={TaskExecutionScreen} />
@@ -116,6 +126,7 @@ function RootNavigator() {
         <Stack.Screen name="MmMetricTrend" component={MmMetricTrendScreen} />
         <Stack.Screen name="ConfigParams" component={ConfigParamsScreen} />
       </Stack.Navigator>
+      <OfflineSyncStatus />
     </NavigationContainer>
   );
 }
@@ -137,9 +148,11 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <RootNavigator />
-      </AuthProvider>
+      <SyncProvider>
+        <AuthProvider>
+          <RootNavigator />
+        </AuthProvider>
+      </SyncProvider>
     </SafeAreaProvider>
   );
 }

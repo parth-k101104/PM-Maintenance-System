@@ -153,12 +153,63 @@ public interface PmScheduleApprovalRepository extends JpaRepository<PmScheduleAp
         "  AND a.approval_level = 1 " +
         "  AND a.approval_status IN ('PENDING', 'APPROVAL_REQUESTED') " +
         "  AND CAST(a.approval_due_date AS DATE) >= :monthStart " +
-        "  AND CAST(a.approval_due_date AS DATE) <= :monthEnd",
+        "  AND CAST(a.approval_due_date AS DATE) <= :monthEnd " +
+        "  AND NOT (a.approval_status = 'APPROVAL_REQUESTED' AND CAST(a.approval_due_date AS DATE) = :today)",
         nativeQuery = true)
     int countUpcomingApprovalsThisMonth(
             @Param("supervisorId") Long supervisorId,
             @Param("monthStart") LocalDate monthStart,
-            @Param("monthEnd") LocalDate monthEnd);
+            @Param("monthEnd") LocalDate monthEnd,
+            @Param("today") LocalDate today);
+
+    /**
+     * Returns the detailed list of upcoming approvals for this supervisor
+     * within the current month.
+     */
+    @Query(value = "SELECT " +
+            "  a.execution_approval_id AS scheduleApprovalId, " +
+            "  se.schedule_execution_id AS scheduleExecutionId, " +
+            "  st.std_task_id AS stdTaskId, " +
+            "  st.task_ref_no AS taskRefNo, " +
+            "  st.method AS taskName, " +
+            "  st.estimated_req_time AS timeRequired, " +
+            "  eq.name AS machineName, " +
+            "  ee.element_name AS machineElementName, " +
+            "  ep.name AS machinePartName, " +
+            "  l.zone AS zone, " +
+            "  l.block AS block, " +
+            "  l.line_name AS lineName, " +
+            "  l.line_code AS lineCode, " +
+            "  l.line_id AS lineId, " +
+            "  se.due_date AS dueDate, " +
+            "  st.task_criticality AS taskCriticality, " +
+            "  se.time_taken AS timeTaken, " +
+            "  emp.full_name AS employeeName, " +
+            "  se.deviation_flag AS deviationFlag, " +
+            "  a.approval_status AS approvalStatus, " +
+            "  CASE WHEN f.flag_status IS NOT NULL AND f.flag_status != 'CLOSED' THEN true ELSE false END AS hasActiveFlag, " +
+            "  f.flag_status AS activeFlagStatus " +
+            "FROM pm_schedule_approval a " +
+            "JOIN pm_schedule_execution se ON a.schedule_execution_id = se.schedule_execution_id " +
+            "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
+            "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+            "LEFT JOIN employees emp ON se.employee_id = emp.employee_id " +
+            "LEFT JOIN equipment_element ee ON st.element_id = ee.element_id " +
+            "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
+            "LEFT JOIN equipment_parts ep ON st.part_id = ep.part_id " +
+            "LEFT JOIN lines l ON eq.line_id = l.line_id " +
+            "LEFT JOIN issue_flags f ON se.schedule_execution_id = f.schedule_execution_id " +
+            "WHERE a.approver_id = :supervisorId " +
+            "  AND a.approval_level = 1 " +
+            "  AND a.approval_status IN ('PENDING', 'APPROVAL_REQUESTED') " +
+            "  AND CAST(a.approval_due_date AS DATE) >= :monthStart " +
+            "  AND CAST(a.approval_due_date AS DATE) <= :monthEnd " +
+            "  AND NOT (a.approval_status = 'APPROVAL_REQUESTED' AND CAST(a.approval_due_date AS DATE) = :today)", nativeQuery = true)
+    List<com.maint.pm_backend.dto.TaskDetailsProjection> findUpcomingApprovalsList(
+            @Param("supervisorId") Long supervisorId,
+            @Param("monthStart") LocalDate monthStart,
+            @Param("monthEnd") LocalDate monthEnd,
+            @Param("today") LocalDate today);
 
     /**
      * Distinct count of operators/employees whose tasks this supervisor reviews.

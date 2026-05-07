@@ -24,4 +24,5 @@ public interface TaskDetailsProjection {
     String getActiveFlagStatus();
     Boolean getRescheduleFlag();
     Long getParentScheduleExecutionId();
+    String getApprovalStatus();
 }

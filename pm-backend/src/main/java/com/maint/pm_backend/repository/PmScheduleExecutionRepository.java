@@ -329,6 +329,29 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
                         @Param("approverId") Long approverId,
                         @Param("approvalLevel") Integer approvalLevel);
 
+        @Query(value = "SELECT st.uom AS uom, " +
+                        "st.tolerance_min AS toleranceMin, " +
+                        "st.tolerance_max AS toleranceMax, " +
+                        "st.standard_value AS standardValue, " +
+                        "se.actual_value AS actualValue, " +
+                        "se.deviation_flag AS deviationFlag, " +
+                        "se.time_taken AS timeTaken, " +
+                        "se.notes AS notes, " +
+                        "st.estimated_req_time AS estimatedReqTime, " +
+                        "st.std_task_id AS stdTaskId " +
+                        "FROM pm_schedule_execution se " +
+                        "JOIN pm_schedule_approval sa ON se.schedule_execution_id = sa.schedule_execution_id " +
+                        "JOIN pm_task_schedules ts ON se.task_schedule_id = ts.task_schedule_id " +
+                        "JOIN pm_std_tasks st ON ts.std_task_id = st.std_task_id " +
+                        "WHERE sa.approver_id = :approverId " +
+                        "  AND sa.approval_level = :approvalLevel " +
+                        "  AND sa.approval_status = 'APPROVAL_REQUESTED' " +
+                        "  AND se.schedule_execution_id = :scheduleExecutionId", nativeQuery = true)
+        java.util.Optional<com.maint.pm_backend.dto.SupervisorTaskValidationProjection> fetchApprovalTaskMetadataOnly(
+                        @Param("scheduleExecutionId") Long scheduleExecutionId,
+                        @Param("approverId") Long approverId,
+                        @Param("approvalLevel") Integer approvalLevel);
+
         @Query(value = "SELECT " +
                         "  se.schedule_execution_id AS scheduleExecutionId, " +
                         "  st.method AS taskName, " +
