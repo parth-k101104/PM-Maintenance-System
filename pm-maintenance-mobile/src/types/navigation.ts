@@ -4,20 +4,42 @@ export type RootStackParamList = {
   Dashboard: undefined;
   MaintenanceManagerDashboard: undefined;
   MmTaskStatusList: { statusGroup: string; label: string; color: string; windowDays: number; rollingWindows: any };
-  MmComplianceAnalytics: { currentRate?: number | null; lineWiseData: any[]; windowDays: number; rollingWindows: any };
+  MmComplianceAnalytics: {
+    currentRate?: number | null;
+    lineWiseData?: any[];
+    windowDays: number;
+    rollingWindows: any;
+    isLineManager?: boolean;
+    lineId?: number | null;
+  };
   MmEvidenceComplianceAnalytics: {
     currentRate?: number | null;
     lineWiseData: { lineName: string; evidenceComplianceRate: number | null }[];
     windowDays: number;
     rollingWindows: any;
+    isLineManager?: boolean;
+    lineId?: number | null;
+  };
+  MmPhmCoverageAnalytics: {
+    windowDays: number;
+    rollingWindows: any;
+    isLineManager?: boolean;
+    lineId?: number | null;
+  };
+  MmEmployeeEfficiencyAnalytics: {
+    windowDays: number;
+    rollingWindows: any;
+    isLineManager?: boolean;
+    lineId?: number | null;
   };
   MmMetricTrend: {
-    metric: "rejection" | "approvalTurnaround";
+    metric: "rejection" | "approvalTurnaround" | "phmCoverage" | "efficiency";
     title: string;
     currentValue?: number | null;
     unit: string;
     windowDays: number;
     rollingWindows: any;
+    isLineManager?: boolean;
   };
   ConfigParams: undefined;
   TaskList: undefined;

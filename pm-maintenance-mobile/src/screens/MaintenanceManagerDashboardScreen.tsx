@@ -17,7 +17,8 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { PieChart } from "react-native-gifted-charts";
 
-import { acknowledgeLineManagerInsight, fetchMaintenanceManagerDashboard } from "../api/client";
+import { acknowledgeLineManagerInsight, fetchMaintenanceManagerDashboard, runAnalyticsSyncJob } from "../api/client";
+import { AppMessageModal } from "../components/AppMessageModal";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 import type { ActionInsight, MaintenanceManagerDashboardResponse } from "../types/api";
@@ -200,6 +201,13 @@ export function MaintenanceManagerDashboardScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedInsight, setSelectedInsight] = useState<ActionInsight | null>(null);
   const [acknowledgingInsightId, setAcknowledgingInsightId] = useState<number | null>(null);
+  const [syncingAnalytics, setSyncingAnalytics] = useState(false);
+  const [syncModal, setSyncModal] = useState<{
+    visible: boolean;
+    type: "success" | "failure";
+    title: string;
+    message: string;
+  }>({ visible: false, type: "success", title: "", message: "" });
   const translateX = useRef(new Animated.Value(-300)).current;
 
   const [windowDays, setWindowDays] = useState<number>(30);
@@ -296,6 +304,30 @@ export function MaintenanceManagerDashboardScreen() {
     }
   };
 
+  async function handleAnalyticsSync() {
+    if (!session?.token || syncingAnalytics) return;
+    setSyncingAnalytics(true);
+    try {
+      await runAnalyticsSyncJob(session.token);
+      await load(true);
+      setSyncModal({
+        visible: true,
+        type: "success",
+        title: "Analytics sync done",
+        message: "Predictive maintenance analytics were refreshed. Job for short-term (30 days) analytics is completed.",
+      });
+    } catch (error) {
+      setSyncModal({
+        visible: true,
+        type: "failure",
+        title: "Sync failed",
+        message: error instanceof Error ? error.message : "Analytics sync could not be completed.",
+      });
+    } finally {
+      setSyncingAnalytics(false);
+    }
+  }
+
   useEffect(() => {
     Animated.timing(translateX, {
       toValue: menuOpen ? 0 : -(drawerWidth + 20),
@@ -345,8 +377,22 @@ export function MaintenanceManagerDashboardScreen() {
               <Pressable onPress={() => setMenuOpen(true)} hitSlop={8} style={s.headerIcon}>
                 <Ionicons name="menu-outline" size={isTablet ? 40 : 34} color="#525252" />
               </Pressable>
-              <View style={s.profileIcon}>
-                <Ionicons name="person-circle-outline" size={isTablet ? 56 : 48} color="#525252" />
+
+              <View style={s.headerActions}>
+                <Pressable
+                  style={[s.syncButton, syncingAnalytics && s.syncButtonDisabled]}
+                  onPress={handleAnalyticsSync}
+                  disabled={syncingAnalytics}
+                >
+                  {syncingAnalytics ? (
+                    <ActivityIndicator size="small" color="#111111" />
+                  ) : (
+                    <Ionicons name="sync-outline" size={20} color="#111111" />
+                  )}
+                </Pressable>
+                <View style={s.profileIcon}>
+                  <Ionicons name="person-circle-outline" size={isTablet ? 56 : 48} color="#525252" />
+                </View>
               </View>
             </View>
 
@@ -369,14 +415,17 @@ export function MaintenanceManagerDashboardScreen() {
               </Pressable>
             </View>
 
-            {insights.length > 0 && (
-              <View style={[s.dashboardPanel, { backgroundColor: "#FFF7ED", borderColor: "#FFEDD5" }]}>
-                <View style={s.sectionRow}>
-                  <Text style={s.sectionTitle}>Actionable Insights</Text>
+            <View style={[s.dashboardPanel, { backgroundColor: "#FFF7ED", borderColor: "#FFEDD5", marginBottom: 24 }]}>
+              <View style={s.sectionRow}>
+                <Text style={s.sectionTitle}>Actionable Insights</Text>
+                {insights.length > 0 && (
                   <View style={[s.badge, { backgroundColor: "#FFEDD5" }]}>
                     <Text style={[s.badgeText, { color: "#9A3412" }]}>{insights.length} Alerts</Text>
                   </View>
-                </View>
+                )}
+              </View>
+              
+              {insights.length > 0 ? (
                 <ScrollView 
                   horizontal 
                   showsHorizontalScrollIndicator={false} 
@@ -400,8 +449,17 @@ export function MaintenanceManagerDashboardScreen() {
                     </Pressable>
                   ))}
                 </ScrollView>
-              </View>
-            )}
+              ) : (
+                <Pressable 
+                  style={s.emptyInsightsCard}
+                  onPress={handleAnalyticsSync}
+                  disabled={syncingAnalytics}
+                >
+                  <Text style={s.emptyInsightsText}>No new insights available</Text>
+                  <Ionicons name="sync-outline" size={16} color="#626781" />
+                </Pressable>
+              )}
+            </View>
 
             {loading ? (
               <View style={s.center}>
@@ -484,7 +542,15 @@ export function MaintenanceManagerDashboardScreen() {
                     <Text style={s.cardFootnoteSmall}>plant-wide</Text>
                   </Pressable>
 
-                  <View style={[s.dashboardCard, s.phmDashboardCard, s.flexHalf]}>
+                  <Pressable
+                    style={[s.dashboardCard, s.phmDashboardCard, s.flexHalf]}
+                    onPress={() =>
+                      navigation.push("MmPhmCoverageAnalytics", {
+                        windowDays,
+                        rollingWindows: data?.rollingWindows,
+                      })
+                    }
+                  >
                     <View style={s.cardIconBadge}>
                        <Ionicons name="analytics-outline" size={20} color={cColor} />
                     </View>
@@ -493,7 +559,7 @@ export function MaintenanceManagerDashboardScreen() {
                       {compliance != null ? `${compliance.toFixed(1)}%` : "N/A"}
                     </Text>
                     <Text style={s.cardFootnoteSmall}>Prediction coverage</Text>
-                  </View>
+                  </Pressable>
                 </View>
 
                 <View style={[s.dashboardPanel, s.statusPanel]}>
@@ -571,7 +637,15 @@ export function MaintenanceManagerDashboardScreen() {
                     </Text>
                   </Pressable>
 
-                  <View style={[s.dashboardCard, s.efficiencyDashboardCard, s.flexHalf]}>
+                  <Pressable
+                    style={[s.dashboardCard, s.efficiencyDashboardCard, s.flexHalf]}
+                    onPress={() =>
+                      navigation.push("MmEmployeeEfficiencyAnalytics", {
+                        windowDays,
+                        rollingWindows: data?.rollingWindows,
+                      })
+                    }
+                  >
                     <View style={s.cardIconBadge}>
                        <Ionicons name="speedometer-outline" size={20} color={evidenceColor(efficiency)} />
                     </View>
@@ -579,7 +653,7 @@ export function MaintenanceManagerDashboardScreen() {
                     <Text style={[s.mediumNumber, { color: evidenceColor(efficiency) }]}>
                       {efficiency != null ? `${efficiency.toFixed(1)}%` : "N/A"}
                     </Text>
-                  </View>
+                  </Pressable>
                 </View>
 
                 <View style={s.heroRow}>
@@ -768,6 +842,15 @@ export function MaintenanceManagerDashboardScreen() {
             </Pressable>
           </View>
         </Animated.View>
+
+        <AppMessageModal
+          visible={syncModal.visible}
+          type={syncModal.type}
+          title={syncModal.title}
+          message={syncModal.message}
+          primaryActionLabel="OK"
+          onPrimaryAction={() => setSyncModal(curr => ({ ...curr, visible: false }))}
+        />
         {/* ─── Insight Detail Modal ────────────────────────────────────────────── */}
         <Modal
           visible={!!selectedInsight}
@@ -875,6 +958,22 @@ const s = StyleSheet.create({
     height: 56,
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  syncButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "#F5E4C9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  syncButtonDisabled: {
+    opacity: 0.7,
   },
   greetingText: {
     fontFamily: "Jost_500Medium",
@@ -1299,6 +1398,22 @@ const s = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
     marginTop: 2,
+  },
+  emptyInsightsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: "#FFEDD5",
+  },
+  emptyInsightsText: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 14,
+    color: "#9A3412",
   },
 });
 const mmS = StyleSheet.create({

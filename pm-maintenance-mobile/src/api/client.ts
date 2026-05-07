@@ -133,6 +133,52 @@ export async function fetchApprovalTurnaroundTrend(token: string, windowDays: nu
   });
 }
 
+export async function fetchPhmCoverageTrend(token: string, windowDays: number = 365) {
+  return request<{ evaluationDate: string; phmCoverageRate: number }[]>(`/api/v1/dashboard/maintenance-manager/phm-coverage-trend?windowDays=${windowDays}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchEmployeeEfficiencyTrend(token: string, windowDays: number = 365) {
+  return request<{ evaluationDate: string; efficiencyRate: number }[]>(`/api/v1/dashboard/maintenance-manager/efficiency-trend?windowDays=${windowDays}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchLmComplianceTrend(token: string, windowDays: number = 365, lineId?: number | null) {
+  const url = `/api/v1/dashboard/line-manager/compliance-trend?windowDays=${windowDays}${lineId ? `&lineId=${lineId}` : ""}`;
+  return request<{ evaluationDate: string; complianceRate: number }[]>(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchLmPhmCoverageTrend(token: string, windowDays: number = 365, lineId?: number | null) {
+  const url = `/api/v1/dashboard/line-manager/phm-coverage-trend?windowDays=${windowDays}${lineId ? `&lineId=${lineId}` : ""}`;
+  return request<{ evaluationDate: string; phmCoverageRate: number }[]>(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchLmEmployeeEfficiencyTrend(token: string, windowDays: number = 365, lineId?: number | null) {
+  const url = `/api/v1/dashboard/line-manager/efficiency-trend?windowDays=${windowDays}${lineId ? `&lineId=${lineId}` : ""}`;
+  return request<{ evaluationDate: string; efficiencyRate: number }[]>(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchLmEvidenceTrend(token: string, windowDays: number = 365, lineId?: number | null) {
+  const url = `/api/v1/dashboard/line-manager/evidence-trend?windowDays=${windowDays}${lineId ? `&lineId=${lineId}` : ""}`;
+  return request<{ evaluationDate: string; evidenceComplianceRate: number }[]>(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export async function fetchConfigParams(token: string) {
   return request<ConfigParam[]>("/api/v1/config-params", {
     method: "GET",

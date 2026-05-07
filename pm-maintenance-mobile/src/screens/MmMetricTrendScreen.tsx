@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
@@ -103,7 +103,7 @@ export function MmMetricTrendScreen() {
               size={26}
               color={tone}
             />
-            <Text style={[s.heroValue, { color: tone }]}>
+            <Text style={[s.heroValue, { color: tone }, useWindowDimensions().width < 380 && { fontSize: 36 }]}>
               {currentValue != null ? `${currentValue.toFixed(1)}${unit}` : "N/A"}
             </Text>
             <Text style={s.heroLabel}>Plant-wide {title}</Text>
@@ -203,7 +203,7 @@ const s = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: colors.surface,
   },
-  headerTitle: { fontFamily: "Jost_600SemiBold", fontSize: 19, lineHeight: 24, color: "#111" },
+  headerTitle: { fontFamily: "Jost_500Medium", fontSize: 19, lineHeight: 24, color: "#111" },
   content: { padding: 18, paddingBottom: 48, gap: 20 },
   heroCard: {
     backgroundColor: colors.surfaceAlt,
@@ -217,7 +217,7 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
   },
   heroLeft: { gap: 4 },
-  heroValue: { fontFamily: "Jost_600SemiBold", fontSize: 44, lineHeight: 50 },
+  heroValue: { fontFamily: "Jost_500Medium", fontSize: 44, lineHeight: 50 },
   heroLabel: { fontFamily: "Jost_400Regular", fontSize: 12, color: colors.textMuted },
   heroBadge: {
     backgroundColor: "#FFFFFF",
@@ -225,10 +225,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  heroBadgeText: { fontFamily: "Jost_600SemiBold", fontSize: 13 },
+  heroBadgeText: { fontFamily: "Jost_500Medium", fontSize: 13 },
   section: { gap: 10 },
   sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
-  sectionTitle: { fontFamily: "Jost_600SemiBold", fontSize: 16, lineHeight: 22, color: "#111" },
+  sectionTitle: { fontFamily: "Jost_500Medium", fontSize: 16, lineHeight: 22, color: "#111" },
   chartCard: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: 24,
@@ -246,7 +246,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EBEBF5",
   },
-  emptyText: { fontFamily: "Jost_600SemiBold", fontSize: 14, color: colors.textMuted, marginTop: 4 },
+  emptyText: { fontFamily: "Jost_500Medium", fontSize: 14, color: colors.textMuted, marginTop: 4 },
   emptySubText: { fontFamily: "Jost_400Regular", fontSize: 12, color: colors.textMuted, textAlign: "center" },
   center: { padding: 32, alignItems: "center", gap: 8 },
   loadingText: { fontFamily: "Jost_400Regular", fontSize: 13, color: colors.textMuted },
