@@ -1,12 +1,15 @@
 package com.maint.pm_backend.service;
 
 import com.maint.pm_backend.dto.MaintenanceManagerDashboardResponse;
+import com.maint.pm_backend.dto.LineAnalyticsDashboardResponse;
 import com.maint.pm_backend.repository.PmScheduleExecutionRepository;
 import com.maint.pm_backend.util.DateUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -20,6 +23,7 @@ public class MaintenanceManagerDashboardService {
 
     private final PmScheduleExecutionRepository pmScheduleExecutionRepository;
     private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
 
     public MaintenanceManagerDashboardResponse getDashboard(Long employeeId, int windowDays) {
         MaintenanceManagerDashboardResponse.RollingWindowMetrics metrics365 = buildRollingWindowMetrics(365);
@@ -40,6 +44,7 @@ public class MaintenanceManagerDashboardService {
                 .plantEvidenceComplianceRate(selected.getPlantEvidenceComplianceRate())
                 .plantEmployeeEfficiency(selected.getPlantEmployeeEfficiency())
                 .lineWiseCompliance(selected.getLineWiseCompliance())
+                .actionInsights(fetchPlantActionInsights())
                 .rollingWindows(rollingWindows)
                 .build();
     }
@@ -278,5 +283,133 @@ public class MaintenanceManagerDashboardService {
         if (val == null)
             return null;
         return Math.round(val * 10.0) / 10.0;
+    }
+
+    private List<LineAnalyticsDashboardResponse.ActionInsight> fetchPlantActionInsights() {
+        String sql = """
+                SELECT i.insight_id, i.line_id, eq.equipment_id, eq.name AS equipment_name, ep.part_id, ep.name AS part_name,
+                       i.insight_type, i.insight_code, i.severity, i.status, i.created_at, i.metadata::text AS metadata_json,
+                       p.current_value, p.predicted_failure_date, p.confidence_score, p.days_remaining, p.risk_score
+                FROM phm_action_insights i
+                LEFT JOIN equipment_parts ep ON i.part_id = ep.part_id
+                LEFT JOIN equipment_element ee ON ep.equipment_element_id = ee.element_id
+                LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id
+                LEFT JOIN LATERAL (
+                    SELECT current_value, predicted_failure_date, confidence_score, days_remaining, risk_score
+                    FROM phm_degradation_predictions pred
+                    WHERE pred.part_id = i.part_id AND pred.is_active = TRUE
+                    ORDER BY pred.created_at DESC LIMIT 1
+                ) p ON TRUE
+                WHERE i.status = 'UNREAD'
+                ORDER BY CASE i.severity WHEN 'CRITICAL' THEN 0 WHEN 'WARNING' THEN 1 ELSE 2 END, i.created_at DESC
+                LIMIT 50
+                """;
+        return jdbcTemplate.query(sql, Collections.emptyMap(), (rs, rowNum) -> {
+            String metadataJson = rs.getString("metadata_json");
+            Map<String, Object> metadata = parseMetadata(metadataJson);
+            BigDecimal velocityIncrease = decimalFrom(metadata.get("velocity_increase_percent"));
+            
+            BigDecimal riskScore = rs.getBigDecimal("risk_score");
+            BigDecimal confidenceScore = rs.getBigDecimal("confidence_score");
+            Integer daysRemaining = rs.getObject("days_remaining", Integer.class);
+            LocalDate predictedFailureDate = rs.getDate("predicted_failure_date") != null 
+                    ? rs.getDate("predicted_failure_date").toLocalDate() : null;
+
+            String message = buildInsightMessage(
+                    rs.getString("insight_code"),
+                    rs.getString("severity"),
+                    rs.getString("part_name"),
+                    rs.getString("equipment_name"),
+                    riskScore,
+                    confidenceScore,
+                    daysRemaining,
+                    predictedFailureDate,
+                    velocityIncrease);
+
+            return new LineAnalyticsDashboardResponse.ActionInsight(
+                    rs.getLong("insight_id"),
+                    rs.getObject("line_id", Long.class),
+                    rs.getLong("equipment_id"),
+                    rs.getString("equipment_name"),
+                    rs.getObject("part_id", Long.class),
+                    rs.getString("part_name"),
+                    rs.getString("insight_type"),
+                    rs.getString("insight_code"),
+                    rs.getString("severity"),
+                    rs.getString("status"),
+                    toLocalDateTime(rs.getTimestamp("created_at")),
+                    message,
+                    rs.getBigDecimal("current_value"),
+                    predictedFailureDate,
+                    confidenceScore,
+                    daysRemaining,
+                    riskScore,
+                    velocityIncrease
+            );
+        });
+    }
+
+    private String buildInsightMessage(
+            String code,
+            String severity,
+            String partName,
+            String equipmentName,
+            BigDecimal riskScore,
+            BigDecimal confidenceScore,
+            Integer daysRemaining,
+            LocalDate predictedFailureDate,
+            BigDecimal velocityIncreasePercent) {
+        String part = partName != null ? partName : "A monitored part";
+        String equipment = equipmentName != null ? " on " + equipmentName : "";
+        String risk = riskScore != null ? " Risk score " + riskScore.setScale(0, java.math.RoundingMode.HALF_UP) + "%."
+                : "";
+        String confidence = confidenceScore != null
+                ? " Confidence " + confidenceScore.setScale(0, java.math.RoundingMode.HALF_UP) + "%."
+                : "";
+
+        if ("DEGRADATION_ANOMALY".equalsIgnoreCase(code) || "ANOMALY_DETECTED".equalsIgnoreCase(code)) {
+            String velocity = velocityIncreasePercent != null
+                    ? " Degradation velocity is up "
+                            + velocityIncreasePercent.setScale(0, java.math.RoundingMode.HALF_UP)
+                            + "% versus expected behavior."
+                    : " Degradation velocity is above the expected curve.";
+            return part + equipment + " is degrading faster than expected." + velocity + risk + confidence;
+        }
+
+        if (predictedFailureDate != null || daysRemaining != null) {
+            String failure = predictedFailureDate != null ? " Predicted failure date: " + predictedFailureDate + "."
+                    : "";
+            String remaining = daysRemaining != null ? " Estimated remaining life: " + daysRemaining + " days." : "";
+            return part + equipment + " needs maintenance planning." + remaining + failure + risk + confidence;
+        }
+
+        return part + equipment + " has an analytics insight marked " + severity + "." + risk + confidence;
+    }
+
+    private Map<String, Object> parseMetadata(String metadataJson) {
+        if (metadataJson == null || metadataJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(metadataJson, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+        } catch (Exception ignored) {
+            return Map.of();
+        }
+    }
+
+    private BigDecimal decimalFrom(Object value) {
+        if (value == null)
+            return null;
+        if (value instanceof Number number)
+            return BigDecimal.valueOf(number.doubleValue());
+        try {
+            return new BigDecimal(String.valueOf(value).replace("%", "").trim());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private java.time.LocalDateTime toLocalDateTime(java.sql.Timestamp timestamp) {
+        return timestamp != null ? timestamp.toLocalDateTime() : null;
     }
 }

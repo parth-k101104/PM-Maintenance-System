@@ -28,44 +28,39 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class LineAnalyticsService {
 
+    private static final long MAINTENANCE_MANAGER_ROLE_ID = 1L;
+    private static final long PLANT_ADMIN_ROLE_ID = 11L;
     private static final long LINE_MANAGER_ROLE_ID = 2L;
 
     private final EmployeeRepository employeeRepository;
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
-    public LineAnalyticsDashboardResponse getDashboard(Long lineManagerId) {
-        validateLineManager(lineManagerId);
-        MapSqlParameterSource params = new MapSqlParameterSource("lineManagerId", lineManagerId);
+    public LineAnalyticsDashboardResponse getDashboard(Long employeeId) {
+        Employee user = employeeRepository.findById(employeeId).orElseThrow();
+        boolean isMm = user.getRoleId() != null && (user.getRoleId() == MAINTENANCE_MANAGER_ROLE_ID || user.getRoleId() == PLANT_ADMIN_ROLE_ID);
+
+        MapSqlParameterSource params = new MapSqlParameterSource("lineManagerId", employeeId);
+
+        String healthScoreFilter = isMm ? "" : """
+                  AND (
+                    (hs.entity_type = 'LINE' AND hs.entity_id IN (SELECT line_id FROM lines WHERE line_manager_id = :lineManagerId))
+                 OR (hs.entity_type = 'EQUIPMENT' AND hs.entity_id IN (
+                        SELECT equipment_id FROM equipments
+                        WHERE line_id IN (SELECT line_id FROM lines WHERE line_manager_id = :lineManagerId)
+                    ))
+                )
+                """;
 
         Map<Integer, List<LineAnalyticsDashboardResponse.HealthScore>> rollingHealthScores = jdbcTemplate.query(
-                """
-                        SELECT hs.window_days,
-                               hs.health_id,
-                               hs.evaluation_date,
-                               hs.entity_type,
-                               hs.entity_id,
-                               CASE
-                                   WHEN hs.entity_type = 'LINE' THEN l.line_name
-                                   WHEN hs.entity_type = 'EQUIPMENT' THEN eq.name
-                                   ELSE hs.entity_type || ' #' || hs.entity_id
-                               END AS entity_name,
-                               hs.health_score,
-                               hs.critical_flags_count,
-                               hs.pm_compliance_rate,
-                               hs.trend
-                        FROM phm_health_scores hs
-                        LEFT JOIN lines l ON hs.entity_type = 'LINE' AND hs.entity_id = l.line_id
-                        LEFT JOIN equipments eq ON hs.entity_type = 'EQUIPMENT' AND hs.entity_id = eq.equipment_id
-                        WHERE hs.window_days IN (30, 365) AND (
-                            (hs.entity_type = 'LINE' AND hs.entity_id IN (SELECT line_id FROM lines WHERE line_manager_id = :lineManagerId))
-                         OR (hs.entity_type = 'EQUIPMENT' AND hs.entity_id IN (
-                                SELECT equipment_id FROM equipments
-                                WHERE line_id IN (SELECT line_id FROM lines WHERE line_manager_id = :lineManagerId)
-                            ))
-                        )
-                        ORDER BY hs.window_days, hs.evaluation_date DESC, hs.entity_type, hs.health_score ASC
-                        """,
+                "SELECT hs.window_days, hs.health_id, hs.evaluation_date, hs.entity_type, hs.entity_id, " +
+                "CASE WHEN hs.entity_type = 'LINE' THEN l.line_name WHEN hs.entity_type = 'EQUIPMENT' THEN eq.name ELSE hs.entity_type || ' #' || hs.entity_id END AS entity_name, " +
+                "hs.health_score, hs.critical_flags_count, hs.pm_compliance_rate, hs.trend " +
+                "FROM phm_health_scores hs " +
+                "LEFT JOIN lines l ON hs.entity_type = 'LINE' AND hs.entity_id = l.line_id " +
+                "LEFT JOIN equipments eq ON hs.entity_type = 'EQUIPMENT' AND hs.entity_id = eq.equipment_id " +
+                "WHERE hs.window_days IN (30, 365) " + healthScoreFilter +
+                " ORDER BY hs.window_days, hs.evaluation_date DESC, hs.entity_type, hs.health_score ASC",
                 params, rs -> {
                     Map<Integer, List<LineAnalyticsDashboardResponse.HealthScore>> map = new java.util.HashMap<>();
                     map.put(30, new ArrayList<>());
@@ -81,86 +76,75 @@ public class LineAnalyticsService {
                     return map;
                 });
 
-        List<LineAnalyticsDashboardResponse.PartPrediction> predictions = jdbcTemplate.query("""
-                SELECT p.prediction_id,
-                       l.line_id,
-                       l.line_name,
-                       eq.equipment_id,
-                       eq.name AS equipment_name,
-                       ep.part_id,
-                       ep.name AS part_name,
-                       p.task_schedule_id,
-                       p.evaluation_date,
-                       p.current_value,
-                       p.predicted_failure_date,
-                       p.confidence_score,
-                       p.days_remaining,
-                       p.degradation_velocity,
-                       p.risk_score,
-                       p.lifecycle_ratio
-                FROM phm_degradation_predictions p
-                JOIN equipment_parts ep ON p.part_id = ep.part_id
-                JOIN equipment_element ee ON ep.equipment_element_id = ee.element_id
-                JOIN equipments eq ON ee.equipment_id = eq.equipment_id
-                JOIN lines l ON eq.line_id = l.line_id
-                WHERE l.line_manager_id = :lineManagerId
-                  AND p.is_active = TRUE
-                ORDER BY p.risk_score DESC NULLS LAST, p.days_remaining ASC NULLS LAST
-                """, params, this::mapPrediction);
+        String predictionFilter = isMm ? "" : "WHERE l.line_manager_id = :lineManagerId";
+        List<LineAnalyticsDashboardResponse.PartPrediction> predictions = jdbcTemplate.query(
+                "SELECT p.prediction_id, l.line_id, l.line_name, eq.equipment_id, eq.name AS equipment_name, ep.part_id, ep.name AS part_name, " +
+                "p.task_schedule_id, p.evaluation_date, p.current_value, p.predicted_failure_date, p.confidence_score, p.days_remaining, p.degradation_velocity, p.risk_score, p.lifecycle_ratio " +
+                "FROM phm_degradation_predictions p " +
+                "JOIN equipment_parts ep ON p.part_id = ep.part_id " +
+                "JOIN equipment_element ee ON ep.equipment_element_id = ee.element_id " +
+                "JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
+                "JOIN lines l ON eq.line_id = l.line_id " +
+                predictionFilter +
+                (isMm ? " WHERE " : " AND ") + "p.is_active = TRUE " +
+                "ORDER BY p.risk_score DESC NULLS LAST, p.days_remaining ASC NULLS LAST", 
+                params, this::mapPrediction);
 
-        List<LineAnalyticsDashboardResponse.ActionInsight> actionInsights = jdbcTemplate.query("""
-                SELECT i.insight_id,
-                       i.line_id,
-                       eq.equipment_id,
-                       eq.name AS equipment_name,
-                       ep.part_id,
-                       ep.name AS part_name,
-                       i.insight_type,
-                       i.insight_code,
-                       i.severity,
-                       i.status,
-                       i.created_at,
-                       i.metadata::text AS metadata_json,
-                       p.current_value,
-                       p.predicted_failure_date,
-                       p.confidence_score,
-                       p.days_remaining,
-                       p.risk_score
-                FROM phm_action_insights i
-                LEFT JOIN equipment_parts ep ON i.part_id = ep.part_id
-                LEFT JOIN equipment_element ee ON ep.equipment_element_id = ee.element_id
-                LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id
-                LEFT JOIN LATERAL (
-                    SELECT current_value, predicted_failure_date, confidence_score, days_remaining, risk_score
-                    FROM phm_degradation_predictions pred
-                    WHERE pred.part_id = i.part_id
-                      AND pred.is_active = TRUE
-                    ORDER BY pred.created_at DESC
-                    LIMIT 1
-                ) p ON TRUE
-                WHERE i.status = 'UNREAD'
-                  AND i.line_id IN (SELECT line_id FROM lines WHERE line_manager_id = :lineManagerId)
-                ORDER BY
-                    CASE i.severity WHEN 'CRITICAL' THEN 0 WHEN 'WARNING' THEN 1 ELSE 2 END,
-                    i.created_at DESC
-                """, params, this::mapActionInsight);
+        String insightFilter = isMm ? "" : " AND i.line_id IN (SELECT line_id FROM lines WHERE line_manager_id = :lineManagerId)";
+        List<LineAnalyticsDashboardResponse.ActionInsight> actionInsights = jdbcTemplate.query(
+                "SELECT i.insight_id, i.line_id, eq.equipment_id, eq.name AS equipment_name, ep.part_id, ep.name AS part_name, " +
+                "i.insight_type, i.insight_code, i.severity, i.status, i.created_at, i.metadata::text AS metadata_json, " +
+                "p.current_value, p.predicted_failure_date, p.confidence_score, p.days_remaining, p.risk_score " +
+                "FROM phm_action_insights i " +
+                "LEFT JOIN equipment_parts ep ON i.part_id = ep.part_id " +
+                "LEFT JOIN equipment_element ee ON ep.equipment_element_id = ee.element_id " +
+                "LEFT JOIN equipments eq ON ee.equipment_id = eq.equipment_id " +
+                "LEFT JOIN LATERAL ( " +
+                "    SELECT current_value, predicted_failure_date, confidence_score, days_remaining, risk_score " +
+                "    FROM phm_degradation_predictions pred " +
+                "    WHERE pred.part_id = i.part_id AND pred.is_active = TRUE " +
+                "    ORDER BY pred.created_at DESC LIMIT 1 " +
+                ") p ON TRUE " +
+                "WHERE i.status = 'UNREAD' " + insightFilter +
+                " ORDER BY CASE i.severity WHEN 'CRITICAL' THEN 0 WHEN 'WARNING' THEN 1 ELSE 2 END, i.created_at DESC",
+                params, this::mapActionInsight);
+
+        // Ensure all authorized lines are in the dropdown
+        String linesSql = isMm ? "SELECT line_id, line_name FROM lines" : "SELECT line_id, line_name FROM lines WHERE line_manager_id = :lineManagerId";
+        List<Map<String, Object>> linesList = jdbcTemplate.queryForList(linesSql, params.getValues());
+        for (Map<String, Object> lRow : linesList) {
+            Long lid = toLong(lRow.get("line_id"));
+            String lname = (String) lRow.get("line_name");
+            for (int wd : List.of(30, 365)) {
+                List<LineAnalyticsDashboardResponse.HealthScore> list = rollingHealthScores.get(wd);
+                if (list != null) {
+                    boolean exists = list.stream().anyMatch(s -> "LINE".equals(s.getEntityType()) && lid.equals(s.getEntityId()));
+                    if (!exists) {
+                        list.add(new LineAnalyticsDashboardResponse.HealthScore(null, null, "LINE", lid, lname, null, null, null, null));
+                    }
+                }
+            }
+        }
 
         return new LineAnalyticsDashboardResponse(rollingHealthScores, predictions, actionInsights);
     }
 
-    public PartAnalyticsResponse getPartAnalytics(Long lineManagerId, Long partId) {
-        validateLineManager(lineManagerId);
+    public PartAnalyticsResponse getPartAnalytics(Long employeeId, Long partId) {
+        Employee user = employeeRepository.findById(employeeId).orElseThrow();
+        boolean isMm = user.getRoleId() != null && (user.getRoleId() == MAINTENANCE_MANAGER_ROLE_ID || user.getRoleId() == PLANT_ADMIN_ROLE_ID);
 
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM equipment_parts ep" +
-                        " JOIN equipment_element ee ON ep.equipment_element_id = ee.element_id" +
-                        " JOIN equipments eq ON ee.equipment_id = eq.equipment_id" +
-                        " JOIN lines l ON eq.line_id = l.line_id" +
-                        " WHERE l.line_manager_id = :lineManagerId AND ep.part_id = :partId",
-                new MapSqlParameterSource().addValue("lineManagerId", lineManagerId).addValue("partId", partId),
-                Integer.class);
-        if (count == null || count == 0) {
-            throw new RuntimeException("Access denied: part does not belong to this line manager");
+        if (!isMm) {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM equipment_parts ep" +
+                            " JOIN equipment_element ee ON ep.equipment_element_id = ee.element_id" +
+                            " JOIN equipments eq ON ee.equipment_id = eq.equipment_id" +
+                            " JOIN lines l ON eq.line_id = l.line_id" +
+                            " WHERE l.line_manager_id = :lineManagerId AND ep.part_id = :partId",
+                    new MapSqlParameterSource().addValue("lineManagerId", employeeId).addValue("partId", partId),
+                    Integer.class);
+            if (count == null || count == 0) {
+                throw new RuntimeException("Access denied: part does not belong to this line manager");
+            }
         }
 
         MapSqlParameterSource params = new MapSqlParameterSource("partId", partId);
@@ -307,18 +291,18 @@ public class LineAnalyticsService {
     }
 
     @Transactional
-    public void acknowledgeInsight(Long lineManagerId, Long insightId) {
-        validateLineManager(lineManagerId);
-        int updated = jdbcTemplate.update("""
-                UPDATE phm_action_insights
-                SET status = 'ACKNOWLEDGED'
-                WHERE insight_id = :insightId
-                  AND line_id IN (SELECT line_id FROM lines WHERE line_manager_id = :lineManagerId)
-                """, new MapSqlParameterSource()
-                .addValue("insightId", insightId)
-                .addValue("lineManagerId", lineManagerId));
+    public void acknowledgeInsight(Long employeeId, Long insightId) {
+        Employee user = employeeRepository.findById(employeeId).orElseThrow();
+        boolean isMm = user.getRoleId() != null && user.getRoleId() == MAINTENANCE_MANAGER_ROLE_ID;
+
+        String insightFilter = isMm ? "" : " AND line_id IN (SELECT line_id FROM lines WHERE line_manager_id = :lineManagerId)";
+        int updated = jdbcTemplate.update(
+                "UPDATE phm_action_insights SET status = 'ACKNOWLEDGED' WHERE insight_id = :insightId" + insightFilter,
+                new MapSqlParameterSource()
+                    .addValue("insightId", insightId)
+                    .addValue("lineManagerId", employeeId));
         if (updated == 0) {
-            throw new RuntimeException("Insight not found for this line manager");
+            throw new RuntimeException("Insight not found or access denied");
         }
     }
 
@@ -465,8 +449,21 @@ public class LineAnalyticsService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
-        if (employee.getRoleId() == null || employee.getRoleId() != LINE_MANAGER_ROLE_ID) {
-            throw new RuntimeException("Access denied: only line managers can access this endpoint");
+        if (employee.getRoleId() == null || 
+            (employee.getRoleId() != MAINTENANCE_MANAGER_ROLE_ID && 
+             employee.getRoleId() != PLANT_ADMIN_ROLE_ID && 
+             employee.getRoleId() != LINE_MANAGER_ROLE_ID)) {
+            throw new RuntimeException("Access denied: only managers can access this endpoint");
+        }
+    }
+
+    private Long toLong(Object val) {
+        if (val == null) return null;
+        if (val instanceof Number n) return n.longValue();
+        try {
+            return Long.parseLong(val.toString());
+        } catch (Exception e) {
+            return null;
         }
     }
 }

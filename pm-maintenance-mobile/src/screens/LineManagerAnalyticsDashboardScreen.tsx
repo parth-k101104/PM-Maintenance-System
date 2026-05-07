@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,7 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LineChart } from "react-native-gifted-charts";
 
@@ -195,6 +196,14 @@ function InsightCard({
   );
 }
 
+function getSeverityColor(severity?: string) {
+  switch (severity) {
+    case "CRITICAL": return "#EF4444";
+    case "WARNING": return "#F59E0B";
+    default: return "#3B82F6";
+  }
+}
+
 function PredictionCard({ prediction, onPress }: { prediction: PartPrediction; onPress?: () => void }) {
   const lifecycle = prediction.lifecycleRatio !== undefined ? prediction.lifecycleRatio * 100 : undefined;
 
@@ -240,6 +249,9 @@ function PredictionCard({ prediction, onPress }: { prediction: PartPrediction; o
 export function LineManagerAnalyticsDashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { authState } = useAuth();
+  const route = useRoute<RouteProp<RootStackParamList, "LineManagerAnalyticsDashboard">>();
+  const initialLineId = route.params?.lineId;
+
   const [data, setData] = useState<AnalyticsDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -247,6 +259,9 @@ export function LineManagerAnalyticsDashboardScreen() {
   const [syncing, setSyncing] = useState(false);
   const [selectedHealthKey, setSelectedHealthKey] = useState<string | null>(null);
   const [windowDays, setWindowDays] = useState<number>(30);
+  const [selectedLineId, setSelectedLineId] = useState<number | null>(null);
+  const [selectedInsight, setSelectedInsight] = useState<ActionInsight | null>(null);
+  const [lineSelectorVisible, setLineSelectorVisible] = useState(false);
 
   const loadDashboard = useCallback(
     async (asRefresh = false) => {
@@ -277,31 +292,85 @@ export function LineManagerAnalyticsDashboardScreen() {
 
   const healthGroups = useMemo(() => buildHealthGroups(currentHealthScores), [currentHealthScores]);
 
-  const latestLineHealth = useMemo(() => {
-    const latestLineGroups = healthGroups.filter((group) => group.latest.entityType === "LINE");
-    const scores = latestLineGroups
-      .map((group) => group.latest.healthScore)
-      .filter((score): score is number => score !== undefined && score !== null);
-    const healthScore = scores.length
-      ? scores.reduce((sum, score) => sum + score, 0) / scores.length
-      : undefined;
-
-    return {
-      healthScore,
-      trend: latestLineGroups[0]?.latest.trend,
-    };
+  const allLines = useMemo(() => {
+    return healthGroups
+      .filter(g => g.latest.entityType === "LINE")
+      .map(g => ({ id: g.latest.entityId, name: g.latest.entityName || `Line #${g.latest.entityId}` }));
   }, [healthGroups]);
 
+  // Default to first line or passed param
+  useEffect(() => {
+    if (selectedLineId === null && allLines.length > 0) {
+      const targetId = initialLineId ?? allLines[0].id;
+      setSelectedLineId(targetId);
+    }
+  }, [allLines, selectedLineId, initialLineId]);
+
+  // Handle external line selection changes (drill-down)
+  useEffect(() => {
+    if (initialLineId != null) {
+      setSelectedLineId(initialLineId);
+    }
+  }, [initialLineId]);
+
+  const equipmentToLineMap = useMemo(() => {
+    const map = new Map<number, number>();
+    (data?.predictions ?? []).forEach((p) => {
+      if (p.equipmentId != null && p.lineId != null) {
+        map.set(p.equipmentId, p.lineId);
+      }
+    });
+    return map;
+  }, [data?.predictions]);
+
+  const latestLineHealth = useMemo(() => {
+    const lineGroup = healthGroups.find(
+      (group) => group.latest.entityType === "LINE" && group.latest.entityId === selectedLineId
+    );
+    
+    return {
+      healthScore: lineGroup?.latest.healthScore,
+      trend: lineGroup?.latest.trend,
+      name: lineGroup?.latest.entityName
+    };
+  }, [healthGroups, selectedLineId]);
+
+  const filteredHealthGroups = useMemo(() => {
+    return healthGroups.filter(group => {
+      if (group.latest.entityType === "LINE") {
+        return group.latest.entityId === selectedLineId;
+      }
+      if (group.latest.entityType === "EQUIPMENT") {
+        return equipmentToLineMap.get(group.latest.entityId) === selectedLineId;
+      }
+      return false;
+    });
+  }, [healthGroups, selectedLineId, equipmentToLineMap]);
+
+  const trendSelectorGroups = useMemo(() => {
+    return filteredHealthGroups.filter(g => g.latest.entityType === "EQUIPMENT");
+  }, [filteredHealthGroups]);
+
   const selectedHealthGroup = useMemo(() => {
-    if (!healthGroups.length) return undefined;
-    return healthGroups.find((group) => group.key === selectedHealthKey) ?? healthGroups[0];
-  }, [healthGroups, selectedHealthKey]);
+    if (!filteredHealthGroups.length) return undefined;
+    const found = filteredHealthGroups.find((group) => group.key === selectedHealthKey);
+    return found ?? filteredHealthGroups[0]; // Default to the line itself or first equipment
+  }, [filteredHealthGroups, selectedHealthKey]);
+
+  // Reset selected health key when line changes to show the line's trend first
+  useEffect(() => {
+    const lineKey = `LINE:${selectedLineId}`;
+    setSelectedHealthKey(lineKey);
+  }, [selectedLineId]);
 
   const equipmentHierarchy = useMemo<EquipmentHealthNode[]>(() => {
-    const equipmentGroups = healthGroups.filter((group) => group.latest.entityType === "EQUIPMENT");
+    const equipmentGroups = filteredHealthGroups.filter(g => g.latest.entityType === "EQUIPMENT");
+
     const predictionsByEquipment = new Map<number, PartPrediction[]>();
     (data?.predictions ?? []).forEach((prediction) => {
       if (prediction.equipmentId === undefined || prediction.equipmentId === null) return;
+      if (prediction.lineId !== selectedLineId) return;
+      
       predictionsByEquipment.set(prediction.equipmentId, [
         ...(predictionsByEquipment.get(prediction.equipmentId) ?? []),
         prediction,
@@ -323,7 +392,15 @@ export function LineManagerAnalyticsDashboardScreen() {
         parts,
       };
     });
-  }, [data?.predictions, healthGroups]);
+  }, [data?.predictions, healthGroups, selectedLineId, equipmentToLineMap]);
+
+  const filteredPredictions = useMemo(() => {
+    return (data?.predictions ?? []).filter(p => p.lineId === selectedLineId);
+  }, [data?.predictions, selectedLineId]);
+
+  const filteredInsights = useMemo(() => {
+    return (data?.actionInsights ?? []).filter(i => i.lineId === selectedLineId);
+  }, [data?.actionInsights, selectedLineId]);
 
   function openPartAnalytics(part: PartPrediction) {
     navigation.navigate("LineManagerPartAnalytics", {
@@ -399,15 +476,26 @@ export function LineManagerAnalyticsDashboardScreen() {
       </View>
 
       <FlatList
-        data={data?.predictions ?? []}
+        data={filteredPredictions}
         keyExtractor={(item) => String(item.predictionId)}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadDashboard(true)} />}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={styles.topContent}>
+            <View style={styles.lineSelectorSection}>
+              <Text style={styles.lineSelectorLabel}>Select Line</Text>
+              <Pressable style={styles.lineSelectorBtn} onPress={() => setLineSelectorVisible(true)}>
+                <Ionicons name="location-outline" size={18} color={colors.primary} />
+                <Text style={styles.lineSelectorBtnText}>
+                  {allLines.find(l => l.id === selectedLineId)?.name || "Select Line"}
+                </Text>
+                <Ionicons name="chevron-down-outline" size={18} color="#626781" />
+              </Pressable>
+            </View>
+
             <View style={styles.healthBand}>
               <View>
-                <Text style={styles.healthLabel}>Line health score</Text>
+                <Text style={styles.healthLabel}>{latestLineHealth?.name || "Line"} health score</Text>
                 <Text style={styles.healthValue}>{formatPercent(latestLineHealth?.healthScore)}</Text>
               </View>
               <View style={styles.healthMetaBox}>
@@ -441,7 +529,7 @@ export function LineManagerAnalyticsDashboardScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.healthSelectorRow}
               >
-                {healthGroups.map((group) => {
+                {trendSelectorGroups.map((group) => {
                   const selected = group.key === selectedHealthGroup?.key;
                   return (
                     <Pressable
@@ -449,14 +537,17 @@ export function LineManagerAnalyticsDashboardScreen() {
                       style={[styles.healthChip, selected && styles.healthChipSelected]}
                       onPress={() => setSelectedHealthKey(group.key)}
                     >
-                      <Text style={[styles.healthChipLabel, selected && styles.healthChipLabelSelected]}>
-                        {group.latest.entityType}
-                      </Text>
+                      <Ionicons 
+                        name="hardware-chip-outline" 
+                        size={12} 
+                        color={selected ? "#4F46E5" : "#626781"} 
+                        style={{ marginBottom: 2 }}
+                      />
                       <Text
                         style={[styles.healthChipName, selected && styles.healthChipNameSelected]}
                         numberOfLines={1}
                       >
-                        {group.latest.entityName || `#${group.latest.entityId}`}
+                        {group.latest.entityName || `Equipment #${group.latest.entityId}`}
                       </Text>
                     </Pressable>
                   );
@@ -509,48 +600,136 @@ export function LineManagerAnalyticsDashboardScreen() {
               )}
             </View>
 
-            <Text style={styles.sectionTitle}>Actionable insights</Text>
-            <View style={styles.insightsCard}>
-              {(data?.actionInsights ?? []).length ? (
-                <>
-                  <ScrollView
-                    style={styles.insightsScroll}
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.insightsScrollContent}
-                  >
-                    {data?.actionInsights.map((insight) => (
-                      <InsightCard
-                        key={insight.insightId}
-                        insight={insight}
-                        closing={closingInsightId === insight.insightId}
-                        onAcknowledge={acknowledgeInsight}
-                      />
-                    ))}
-                  </ScrollView>
-                  {(data?.actionInsights.length ?? 0) > 2 && (
-                    <View style={styles.scrollHint}>
-                      <Ionicons name="chevron-down-outline" size={14} color="#626781" />
-                      <Text style={styles.scrollHintText}>Scroll for more</Text>
-                    </View>
-                  )}
-                </>
-              ) : (
-                <View style={styles.emptyInsights}>
-                  <Ionicons name="sparkles-outline" size={22} color="#626781" />
-                  <Text style={styles.emptyInsightsText}>No actionable insights. Sync to get fresh insights.</Text>
+            {filteredInsights.length > 0 && (
+              <View style={[styles.dashboardPanel, { backgroundColor: "#FFF7ED", borderColor: "#FFEDD5", marginBottom: 24, padding: 16, borderRadius: 20, borderWidth: 1 }]}>
+                <View style={styles.sectionRow}>
+                  <Text style={styles.sectionTitleNoMargin}>Actionable Insights</Text>
+                  <View style={[styles.badge, { backgroundColor: "#FFEDD5" }]}>
+                    <Text style={[styles.badgeText, { color: "#9A3412" }]}>{filteredInsights.length} Alerts</Text>
+                  </View>
                 </View>
-              )}
-            </View>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false} 
+                  style={{ marginHorizontal: -16, marginTop: 8 }} 
+                  contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 4 }}
+                >
+                  {filteredInsights.map(insight => (
+                    <Pressable 
+                      key={insight.insightId} 
+                      style={styles.insightCardMini}
+                      onPress={() => setSelectedInsight(insight)}
+                    >
+                      <View style={[styles.insightSeverityDot, { backgroundColor: getSeverityColor(insight.severity) }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.insightTitleMini} numberOfLines={2}>{insight.message || insight.insightCode.replace(/_/g, ' ')}</Text>
+                        <Text style={styles.insightTargetMini} numberOfLines={1}>
+                          {insight.equipmentName} • {insight.partName}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
             <Text style={styles.sectionTitle}>Equipment and part predictions</Text>
           </View>
         }
         ListEmptyComponent={
-          <Text style={styles.emptyText}>No predictions are available for your line yet.</Text>
+          <Text style={styles.emptyText}>No predictions are available for this line yet.</Text>
         }
         renderItem={({ item }) => <PredictionCard prediction={item} onPress={() => openPartAnalytics(item)} />}
       />
+
+      {/* ─── Insight Detail Modal ────────────────────────────────────────────── */}
+      <Modal
+        visible={!!selectedInsight}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedInsight(null)}
+      >
+        <View style={styles.modalOverlayFull}>
+          <View style={styles.modalContentFull}>
+            <View style={styles.modalHeaderFull}>
+              <Text style={styles.modalTitleFull}>Insight Detail</Text>
+              <Pressable onPress={() => setSelectedInsight(null)} hitSlop={12}>
+                <Ionicons name="close" size={24} color={colors.textMuted} />
+              </Pressable>
+            </View>
+
+            {selectedInsight && (
+              <View style={[styles.insightCardModal, selectedInsight.severity === "CRITICAL" ? styles.insightCriticalModal : styles.insightWarningModal]}>
+                <View style={styles.insightCardHeaderModal}>
+                  <View style={styles.insightTitleWrapModal}>
+                    <Text style={styles.insightSeverityModal}>{selectedInsight.severity || "INFO"}</Text>
+                    <Text style={styles.insightPartModal}>{selectedInsight.partName || "Monitored part"}</Text>
+                  </View>
+                  <Pressable
+                    style={styles.closeInsightButtonModal}
+                    onPress={async () => {
+                      const id = selectedInsight.insightId;
+                      await acknowledgeInsight(id);
+                      setSelectedInsight(null);
+                    }}
+                    disabled={closingInsightId === selectedInsight.insightId}
+                  >
+                    {closingInsightId === selectedInsight.insightId ? (
+                      <ActivityIndicator size="small" color="#111111" />
+                    ) : (
+                      <Ionicons name="checkmark-outline" size={22} color="#111111" />
+                    )}
+                  </Pressable>
+                </View>
+                <Text style={styles.insightMessageModal}>{selectedInsight.message}</Text>
+                <View style={styles.metricRowModal}>
+                  <View style={styles.metricPillModal}>
+                    <Text style={styles.metricLabelModal}>Risk</Text>
+                    <Text style={[styles.metricValueModal, getRiskTone(selectedInsight.riskScore)]}>
+                      {formatPercent(selectedInsight.riskScore)}
+                    </Text>
+                  </View>
+                  <View style={styles.metricPillModal}>
+                    <Text style={styles.metricLabelModal}>Confidence</Text>
+                    <Text style={styles.metricValueModal}>{formatPercent(selectedInsight.confidenceScore)}</Text>
+                  </View>
+                  <View style={styles.metricPillModal}>
+                    <Text style={styles.metricLabelModal}>Life left</Text>
+                    <Text style={styles.metricValueModal}>{selectedInsight.daysRemaining ?? "N/A"}d</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={lineSelectorVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLineSelectorVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setLineSelectorVisible(false)}>
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Select Line</Text>
+            <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
+              {allLines.map((line) => (
+                <Pressable 
+                  key={line.id}
+                  style={[styles.pickerOption, selectedLineId === line.id && styles.pickerOptionSelected]}
+                  onPress={() => { setSelectedLineId(line.id); setLineSelectorVisible(false); }}
+                >
+                  <Text style={[styles.pickerOptionText, selectedLineId === line.id && styles.pickerOptionTextSelected]}>
+                    {line.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -599,6 +778,32 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     gap: 12,
     marginBottom: 20,
+  },
+  lineSelectorSection: {
+    marginBottom: 20,
+  },
+  lineSelectorLabel: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 14,
+    color: "#626781",
+    marginBottom: 8,
+  },
+  lineSelectorBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F6FA",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    gap: 12,
+  },
+  lineSelectorBtnText: {
+    flex: 1,
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 15,
+    color: "#111111",
   },
   toggleBtn: {
     flex: 1,
@@ -769,4 +974,218 @@ const styles = StyleSheet.create({
   predictionMetric: { flex: 1, borderRadius: 14, backgroundColor: "#FFFFFF", padding: 10 },
   predictionFootnote: { fontFamily: "Jost_400Regular", fontSize: 12, color: "#626781", marginTop: 12 },
   emptyText: { fontFamily: "Jost_400Regular", textAlign: "center", marginTop: 14, fontSize: 14, color: "#626781" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pickerModalContent: {
+    width: "85%",
+    maxWidth: 320,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  pickerModalTitle: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 20,
+    color: "#111111",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  pickerScroll: {
+    maxHeight: 400,
+  },
+  pickerOption: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 4,
+    backgroundColor: "#F9FAFB",
+  },
+  pickerOptionSelected: {
+    backgroundColor: colors.primaryMuted,
+  },
+  pickerOptionText: {
+    fontFamily: "Jost_400Regular",
+    fontSize: 17,
+    color: "#111111",
+  },
+  pickerOptionTextSelected: {
+    fontFamily: "Jost_600SemiBold",
+    color: colors.primary,
+  },
+  sectionTitleNoMargin: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  sectionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  insightCardMini: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 14,
+    width: 260,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#FFEDD5",
+    shadowColor: "#9A3412",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  insightSeverityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 6,
+  },
+  insightTitleMini: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111111",
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  insightTargetMini: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  modalOverlayFull: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContentFull: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeaderFull: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitleFull: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  insightCardModal: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  insightCriticalModal: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+  insightWarningModal: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FEF3C7",
+  },
+  insightCardHeaderModal: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  insightTitleWrapModal: {
+    flex: 1,
+  },
+  insightSeverityModal: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  insightPartModal: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  closeInsightButtonModal: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  insightMessageModal: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#374151",
+    marginBottom: 16,
+  },
+  metricRowModal: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  metricPillModal: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.6)",
+    padding: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  metricLabelModal: {
+    fontSize: 10,
+    color: colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  metricValueModal: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  dashboardPanel: {
+    width: "100%",
+    backgroundColor: "#FFF7ED",
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "#FFEDD5",
+    padding: 16,
+    gap: 12,
+  },
 });

@@ -69,6 +69,8 @@ function RootNavigator() {
           <Stack.Screen name="MmComplianceAnalytics" component={MmComplianceAnalyticsScreen} />
           <Stack.Screen name="MmEvidenceComplianceAnalytics" component={MmEvidenceComplianceAnalyticsScreen} />
           <Stack.Screen name="MmMetricTrend" component={MmMetricTrendScreen} />
+          <Stack.Screen name="LineManagerAnalyticsDashboard" component={LineManagerAnalyticsDashboardScreen} />
+          <Stack.Screen name="LineManagerPartAnalytics" component={LineManagerPartAnalyticsScreen} />
           <Stack.Screen name="ConfigParams" component={ConfigParamsScreen} />
         </Stack.Navigator>
       </NavigationContainer>

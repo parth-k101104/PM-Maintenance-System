@@ -26,7 +26,7 @@ export type RootStackParamList = {
   LineManagerBacklogApprovals: undefined;
   LineManagerFlags: undefined;
   LineManagerEquipments: undefined;
-  LineManagerAnalyticsDashboard: undefined;
+  LineManagerAnalyticsDashboard: { lineId?: number };
   LineManagerEquipmentParts: { equipment: LineEquipment };
   LineManagerPartAnalytics: { part: { partId: number; partName: string; equipmentName: string; equipmentId: number } };
   BacklogTasks: undefined;
