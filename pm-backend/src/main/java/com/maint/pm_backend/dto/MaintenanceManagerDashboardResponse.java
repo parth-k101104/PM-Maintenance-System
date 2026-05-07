@@ -32,6 +32,7 @@ public class MaintenanceManagerDashboardResponse {
     private Double plantEmployeeEfficiency;
 
     private List<LineWiseComplianceData> lineWiseCompliance;
+    private List<LineAnalyticsDashboardResponse.ActionInsight> actionInsights;
     private Map<Integer, RollingWindowMetrics> rollingWindows;
 
     @Data

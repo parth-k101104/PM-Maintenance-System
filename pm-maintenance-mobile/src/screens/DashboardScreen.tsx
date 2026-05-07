@@ -97,6 +97,13 @@ type DashboardViewModel = {
   items?: string[];
   ctaLabel: string;
   ctaTarget?: DashboardRouteTarget;
+  lineBreakdown?: {
+    lineId: number;
+    lineName: string;
+    healthScore?: number;
+    phmCoverageRate?: number;
+    pmComplianceRate?: number;
+  }[];
 };
 
 function isOperatorDashboard(dashboard: unknown): dashboard is OperatorDashboardResponse {
@@ -240,24 +247,38 @@ function buildLineManagerDashboardViewModel(
   dashboard: LineManagerDashboardResponse | undefined,
   fallbackName: string,
   windowDays: 30 | 365,
+  selectedLineId: number | null,
 ): DashboardViewModel {
   const metrics = dashboard?.rollingWindows?.[String(windowDays)];
-  const lineHealth = metrics?.lineHealth;
-  const phmCoverageRate = metrics?.phmCoverageRate;
-  const pmComplianceRate = metrics?.pmComplianceRate;
-  const employeeEfficiency = metrics?.employeeEfficiency;
   
+  let lineHealth = metrics?.lineHealth;
+  let phmCoverageRate = metrics?.phmCoverageRate;
+  let pmComplianceRate = metrics?.pmComplianceRate;
+  let employeeEfficiency = metrics?.employeeEfficiency;
+  
+  // Use specific line metrics if selected. If no line is selected yet, 
+  // we'll default to the first one in the component state, but if 
+  // this is called with null, it will show the aggregate (which we want to avoid via state).
+  if (selectedLineId != null && metrics?.lineMetrics) {
+    const line = metrics.lineMetrics.find(l => l.lineId === selectedLineId);
+    if (line) {
+      lineHealth = line.healthScore;
+      phmCoverageRate = line.phmCoverageRate;
+      pmComplianceRate = line.pmComplianceRate;
+      employeeEfficiency = line.employeeEfficiency;
+    }
+  }
+
   return {
     userName: fallbackName,
     cards: [
       {
-        title: "Line health-",
-        value: lineHealth != null ? `${Math.round(lineHealth)}%` : "N/A",
-        footnote: "equipment health",
-        variant: "health",
+        title: "PM compliance-",
+        value: pmComplianceRate != null ? `${Math.round(pmComplianceRate)}%` : "N/A",
+        footnote: "line quality",
+        variant: "today",
         size: "large",
-        navigateTo: "LineManagerEquipments",
-        healthValue: lineHealth,
+        navigateTo: "LineManagerTodayApprovals",
       },
       {
         title: "PHM coverage-",
@@ -267,11 +288,13 @@ function buildLineManagerDashboardViewModel(
         size: "small",
       },
       {
-        title: "PM compliance-",
-        value: pmComplianceRate != null ? `${Math.round(pmComplianceRate)}%` : "N/A",
-        footnote: "on-time completion",
-        variant: "status",
+        title: "Line health-",
+        value: lineHealth != null ? `${Math.round(lineHealth)}%` : "N/A",
+        footnote: "equipment health",
+        variant: "health",
         size: "small",
+        navigateTo: "LineManagerEquipments",
+        healthValue: lineHealth,
       },
       {
         title: "Employee efficiency-",
@@ -310,6 +333,7 @@ function buildLineManagerDashboardViewModel(
         navigateTo: "LineManagerBacklogApprovals",
       },
     ],
+    lineBreakdown: metrics?.lineMetrics,
     ctaLabel: "Review Tasks",
     ctaTarget: "LineManagerTodayApprovals",
   };
@@ -367,7 +391,12 @@ export function DashboardScreen() {
   const [lineInsights, setLineInsights] = useState<ActionInsight[]>([]);
   const [closingInsightId, setClosingInsightId] = useState<number | null>(null);
   const [windowDays, setWindowDays] = useState<30 | 365>(30);
-  const translateX = useRef(new Animated.Value(-300)).current;
+  const [selectedLineId, setSelectedLineId] = useState<number | null>(null);
+  const [lineSelectorVisible, setLineSelectorVisible] = useState(false);
+  const [insightsModalVisible, setInsightsModalVisible] = useState(false);
+  const [selectedInsight, setSelectedInsight] = useState<ActionInsight | null>(null);
+  const [showInsightModal, setShowInsightModal] = useState(false);
+  const translateX = useRef(new Animated.Value(-400)).current;
   const session = authState.session;
   const dashboard = session?.dashboard;
 
@@ -393,15 +422,17 @@ export function DashboardScreen() {
     }
 
     if (session?.dashboardKind === "lineManager" || isLineManagerDashboard(dashboard)) {
+      const lmDashboard = isLineManagerDashboard(dashboard) ? dashboard : undefined;
       return buildLineManagerDashboardViewModel(
-        isLineManagerDashboard(dashboard) ? dashboard : undefined,
+        lmDashboard,
         fallbackName,
         windowDays,
+        selectedLineId
       );
     }
 
     return buildOperatorDashboardViewModel(isOperatorDashboard(dashboard) ? dashboard : undefined, fallbackName);
-  }, [dashboard, fallbackName, session?.dashboardKind, windowDays]);
+  }, [dashboard, fallbackName, session?.dashboardKind, windowDays, selectedLineId]);
   const greeting = formatGreeting(dashboardView.greetingShift);
   const userName = dashboardView.userName;
   const isTablet = width >= 768;
@@ -449,7 +480,7 @@ export function DashboardScreen() {
 
   useEffect(() => {
     Animated.timing(translateX, {
-      toValue: menuOpen ? 0 : -(drawerWidth + 20),
+      toValue: menuOpen ? 0 : -(drawerWidth + 50),
       duration: 250,
       useNativeDriver: true,
     }).start();
@@ -458,6 +489,18 @@ export function DashboardScreen() {
   useEffect(() => {
     loadLineInsights();
   }, [loadLineInsights]);
+
+  // Set first line as default if none selected
+  useEffect(() => {
+    if (selectedLineId === null && dashboardView.lineBreakdown?.length) {
+      setSelectedLineId(dashboardView.lineBreakdown[0].lineId);
+    }
+  }, [dashboardView.lineBreakdown, selectedLineId]);
+
+  // Refresh data in background when window changes
+  useEffect(() => {
+    refreshDashboard();
+  }, [windowDays]);
 
   useFocusEffect(
     useCallback(() => {
@@ -511,7 +554,7 @@ export function DashboardScreen() {
         navigation.navigate("LineManagerActiveTasks");
         break;
       case "LineManagerAnalyticsDashboard":
-        navigation.navigate("LineManagerAnalyticsDashboard");
+        navigation.navigate("LineManagerAnalyticsDashboard", {});
         break;
       case "ConfigParams":
         navigation.navigate("ConfigParams");
@@ -557,6 +600,33 @@ export function DashboardScreen() {
     }
   }
 
+  async function handleAcknowledgeInsight() {
+    if (!session?.token || !selectedInsight || closingInsightId) return;
+    setClosingInsightId(selectedInsight.insightId);
+    try {
+      await acknowledgeLineManagerInsight(session.token, selectedInsight.insightId);
+      setLineInsights((current) => current.filter((i) => i.insightId !== selectedInsight.insightId));
+      setShowInsightModal(false);
+      setSelectedInsight(null);
+    } catch (error) {
+      console.error("Acknowledge failed:", error);
+    } finally {
+      setClosingInsightId(null);
+    }
+  }
+
+  function getRiskTone(score?: number) {
+    if (score == null) return "Stable";
+    if (score >= 80) return "Critical";
+    if (score >= 60) return "Warning";
+    return "Stable";
+  }
+
+  function formatPercent(val?: number) {
+    if (val == null) return "N/A";
+    return `${Math.round(val)}%`;
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.screen}>
@@ -595,6 +665,48 @@ export function DashboardScreen() {
               {greeting} {userName}
             </Text>
 
+            {isLineManager && lineInsights.length > 0 && (
+              <View style={[styles.dashboardPanel, { marginBottom: 24, backgroundColor: "#FFF7ED" }]}>
+                <View style={styles.sectionRow}>
+                  <Text style={styles.sectionTitleNoMargin}>Actionable Insights</Text>
+                  <View style={[styles.badge, { backgroundColor: "#FFEDD5" }]}>
+                    <Text style={[styles.badgeText, { color: "#9A3412" }]}>{lineInsights.length}</Text>
+                  </View>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 12, paddingRight: 20 }}
+                >
+                  {lineInsights.map((insight) => (
+                    <Pressable
+                      key={insight.insightId}
+                      style={styles.insightCardMini}
+                      onPress={() => {
+                        setSelectedInsight(insight);
+                        setShowInsightModal(true);
+                      }}
+                    >
+                      <View
+                        style={[
+                          styles.insightSeverityDot,
+                          { backgroundColor: insight.severity === "CRITICAL" ? "#EF4444" : "#F59E0B" },
+                        ]}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.insightTitleMini} numberOfLines={2}>
+                          {insight.message}
+                        </Text>
+                        <Text style={styles.insightTargetMini}>
+                          {insight.partName || insight.equipmentName || "Unknown Part"}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
             {isLineManager ? (
               <View style={styles.toggleContainer}>
                 <Pressable
@@ -612,69 +724,58 @@ export function DashboardScreen() {
               </View>
             ) : null}
 
-            {isLineManager ? (
-              <View style={styles.dashboardInsights}>
-                <Text style={styles.dashboardInsightsTitle}>Actionable insights</Text>
-                <View style={styles.dashboardInsightsCard}>
-                  {lineInsights.length ? (
-                    <>
-                      <ScrollView
-                        style={styles.dashboardInsightsScroll}
-                        nestedScrollEnabled
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.dashboardInsightsScrollContent}
-                      >
-                        {lineInsights.map((insight) => (
-                          <View
-                            key={insight.insightId}
-                            style={[
-                              styles.dashboardInsightCard,
-                              insight.severity === "CRITICAL"
-                                ? styles.dashboardInsightCritical
-                                : styles.dashboardInsightWarning,
-                            ]}
-                          >
-                            <View style={styles.dashboardInsightTop}>
-                              <View style={styles.dashboardInsightTextWrap}>
-                                <Text style={styles.dashboardInsightSeverity}>{insight.severity || "INFO"}</Text>
-                                <Text style={styles.dashboardInsightMessage}>{insight.message}</Text>
-                              </View>
-                              <Pressable
-                                style={styles.dashboardInsightClose}
-                                onPress={() => handleCloseInsight(insight.insightId)}
-                                disabled={closingInsightId === insight.insightId}
-                              >
-                                {closingInsightId === insight.insightId ? (
-                                  <ActivityIndicator size="small" color="#111111" />
-                                ) : (
-                                  <Ionicons name="checkmark-outline" size={18} color="#111111" />
-                                )}
-                              </Pressable>
-                            </View>
-                            <Text style={styles.dashboardInsightMeta}>
-                              Risk {Math.round(insight.riskScore ?? 0)}% | Confidence{" "}
-                              {Math.round(insight.confidenceScore ?? 0)}%
+            {dashboardView.lineBreakdown?.length ? (
+              <View style={styles.lineBreakdownSection}>
+                <Text style={styles.lineBreakdownTitle}>Line Performance breakdown</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.lineBreakdownScroll}>
+                  {dashboardView.lineBreakdown.map((line) => {
+                    const health = line.healthScore ?? 0;
+                    const healthColor = health >= 90 ? "#165A15" : health >= 70 ? "#A29200" : "#9B1B1B";
+                    return (
+                      <View key={line.lineId} style={styles.lineBreakdownCard}>
+                        <View style={styles.lineBreakdownHeader}>
+                          <Text style={styles.lineBreakdownName} numberOfLines={1}>{line.lineName}</Text>
+                          <View style={[styles.lineHealthPill, { backgroundColor: healthColor + "15" }]}>
+                            <Text style={[styles.lineHealthPillText, { color: healthColor }]}>
+                              {Math.round(health)}% Health
                             </Text>
                           </View>
-                        ))}
-                      </ScrollView>
-                      {lineInsights.length > 2 && (
-                        <View style={styles.dashboardInsightsHint}>
-                          <Ionicons name="chevron-down-outline" size={13} color="#626781" />
-                          <Text style={styles.dashboardInsightsHintText}>Scroll for more</Text>
                         </View>
-                      )}
-                    </>
-                  ) : (
-                    <View style={styles.dashboardInsightEmpty}>
-                      <Text style={styles.dashboardInsightEmptyText}>
-                        No actionable insights. Sync to get some insights.
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                        
+                        <View style={styles.lineBreakdownMetrics}>
+                          <View style={styles.lineBreakdownMetric}>
+                            <Text style={styles.lineBreakdownMetricVal}>{line.pmComplianceRate != null ? `${Math.round(line.pmComplianceRate)}%` : "N/A"}</Text>
+                            <Text style={styles.lineBreakdownMetricLabel}>PM Compliance</Text>
+                          </View>
+                          <View style={styles.lineBreakdownDivider} />
+                          <View style={styles.lineBreakdownMetric}>
+                            <Text style={styles.lineBreakdownMetricVal}>{line.phmCoverageRate != null ? `${Math.round(line.phmCoverageRate)}%` : "N/A"}</Text>
+                            <Text style={styles.lineBreakdownMetricLabel}>PHM Coverage</Text>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
               </View>
             ) : null}
+
+            {isLineManager && (dashboardView.lineBreakdown?.length ?? 0) > 0 && (
+              <View style={styles.lineSelectorContainer}>
+                <Text style={styles.lineSelectorTitle}>Select Line</Text>
+                <Pressable 
+                  style={styles.lineSelectorBtn} 
+                  onPress={() => setLineSelectorVisible(true)}
+                  hitSlop={20}
+                >
+                  <Ionicons name="location-outline" size={18} color={colors.primary} />
+                  <Text style={styles.lineSelectorBtnText}>
+                    {dashboardView.lineBreakdown?.find(l => l.lineId === selectedLineId)?.lineName || "Select a line"}
+                  </Text>
+                  <Ionicons name="chevron-down-outline" size={18} color="#626781" />
+                </Pressable>
+              </View>
+            )}
 
             <View style={styles.cardsWrapper}>
               {Array.from({ length: Math.ceil(dashboardView.cards.length / 2) }).map((_, rowIndex) => {
@@ -765,7 +866,10 @@ export function DashboardScreen() {
             pointerEvents={menuOpen ? "auto" : "none"}
           />
         )}
-        <Animated.View style={[styles.drawer, { width: drawerWidth, transform: [{ translateX }] }]}>
+        <Animated.View 
+          style={[styles.drawer, { width: drawerWidth, transform: [{ translateX }] }]}
+          pointerEvents={menuOpen ? "auto" : "none"}
+        >
           <Pressable style={styles.drawerHeader} onPress={() => setMenuOpen(false)}>
             <Ionicons style={styles.drawerHeaderArrow} name="arrow-back-outline" size={34} color="#111111" />
             <Text style={styles.drawerHeaderText}>Menu</Text>
@@ -808,10 +912,98 @@ export function DashboardScreen() {
           const shouldOpenAnalytics = syncModal.type === "success";
           setSyncModal((current) => ({ ...current, visible: false }));
           if (shouldOpenAnalytics) {
-            navigation.navigate("LineManagerAnalyticsDashboard");
+            navigation.navigate("LineManagerAnalyticsDashboard", {});
           }
         }}
       />
+
+      <Modal visible={showInsightModal} transparent animationType="fade" onRequestClose={() => setShowInsightModal(false)}>
+        <View style={styles.modalOverlayFull}>
+          <View style={styles.modalContentFull}>
+            <View style={styles.modalHeaderFull}>
+              <Text style={styles.modalTitleFull}>Insight Details</Text>
+              <Pressable onPress={() => setShowInsightModal(false)} hitSlop={15}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </Pressable>
+            </View>
+
+            {selectedInsight && (
+              <View
+                style={[
+                  styles.insightCardModal,
+                  selectedInsight.severity === "CRITICAL" ? styles.insightCriticalModal : styles.insightWarningModal,
+                ]}
+              >
+                <View style={styles.insightCardHeaderModal}>
+                  <View style={styles.insightTitleWrapModal}>
+                    <Text style={styles.insightSeverityModal}>{selectedInsight.severity || "INFO"}</Text>
+                    <Text style={styles.insightPartModal}>
+                      {selectedInsight.partName || selectedInsight.equipmentName || "Monitored Component"}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.insightMessageModal}>{selectedInsight.message}</Text>
+
+                <View style={styles.metricRowModal}>
+                  <View style={styles.metricPillModal}>
+                    <Text style={styles.metricLabelModal}>Risk</Text>
+                    <Text style={[styles.metricValueModal, { color: getRiskTone(selectedInsight.riskScore) === "Critical" ? "#B42318" : "#111111" }]}>
+                      {formatPercent(selectedInsight.riskScore)}
+                    </Text>
+                  </View>
+                  <View style={styles.metricPillModal}>
+                    <Text style={styles.metricLabelModal}>Confidence</Text>
+                    <Text style={styles.metricValueModal}>{formatPercent(selectedInsight.confidenceScore)}</Text>
+                  </View>
+                  <View style={styles.metricPillModal}>
+                    <Text style={styles.metricLabelModal}>Life Left</Text>
+                    <Text style={styles.metricValueModal}>{selectedInsight.daysRemaining ?? "N/A"}d</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            <Pressable
+              style={[styles.primaryButton, { marginTop: 24 }]}
+              onPress={handleAcknowledgeInsight}
+              disabled={closingInsightId != null}
+            >
+              {closingInsightId != null ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Acknowledge Alert</Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={lineSelectorVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLineSelectorVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setLineSelectorVisible(false)}>
+          <View style={styles.pickerModalContent}>
+            <Text style={styles.pickerModalTitle}>Select Line</Text>
+            <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
+              {dashboardView.lineBreakdown?.map((line) => (
+                <Pressable 
+                  key={line.lineId}
+                  style={[styles.pickerOption, selectedLineId === line.lineId && styles.pickerOptionSelected]}
+                  onPress={() => { setSelectedLineId(line.lineId); setLineSelectorVisible(false); }}
+                >
+                  <Text style={[styles.pickerOptionText, selectedLineId === line.lineId && styles.pickerOptionTextSelected]}>
+                    {line.lineName}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1332,5 +1524,400 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     color: "#111111",
     marginLeft: 8,
+  },
+  lineBreakdownSection: {
+    marginBottom: 28,
+    width: "100%",
+  },
+  lineBreakdownTitle: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 20,
+    color: "#111111",
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  lineBreakdownScroll: {
+    paddingRight: 20,
+    gap: 16,
+  },
+  lineBreakdownCard: {
+    width: 260,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#EBEBF5",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  lineBreakdownHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  lineBreakdownName: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 18,
+    color: "#111111",
+    flex: 1,
+    marginRight: 8,
+  },
+  lineHealthPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  lineHealthPillText: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 12,
+  },
+  lineBreakdownMetrics: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 4,
+    backgroundColor: "#F8F9FE",
+    borderRadius: 16,
+    padding: 12,
+  },
+  lineBreakdownMetric: {
+    alignItems: "center",
+    flex: 1,
+  },
+  lineBreakdownMetricVal: {
+    fontFamily: "Jost_700Bold",
+    fontSize: 18,
+    color: "#111111",
+    marginBottom: 2,
+  },
+  lineBreakdownMetricLabel: {
+    fontFamily: "Jost_400Regular",
+    fontSize: 10,
+    color: "#626781",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  lineBreakdownDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: "#D1D5DB",
+    marginHorizontal: 4,
+  },
+  lineSelectorContainer: {
+    width: "100%",
+    marginBottom: 20,
+    paddingHorizontal: 2,
+  },
+  lineSelectorTitle: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 14,
+    color: "#626781",
+    marginBottom: 8,
+  },
+  lineSelectorBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F6FA",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    gap: 10,
+  },
+  lineSelectorBtnText: {
+    flex: 1,
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 15,
+    color: "#111111",
+  },
+  cardSelectorIcon: {
+    position: "absolute",
+    right: 18,
+    top: 18,
+    zIndex: 10,
+    padding: 4,
+  },
+  pickerModalContent: {
+    width: "85%",
+    maxWidth: 320,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 24,
+    maxHeight: "70%",
+    alignSelf: "center",
+    marginTop: "auto",
+    marginBottom: "auto",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  pickerModalTitle: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 20,
+    color: "#111111",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  pickerScroll: {
+    maxHeight: 300,
+  },
+  pickerOption: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 4,
+    backgroundColor: "#F9FAFB",
+  },
+  pickerOptionSelected: {
+    backgroundColor: "#CFD1E0",
+  },
+  pickerOptionText: {
+    fontFamily: "Jost_400Regular",
+    fontSize: 17,
+    color: "#111111",
+  },
+  pickerOptionTextSelected: {
+    fontFamily: "Jost_600SemiBold",
+    color: colors.primary,
+  },
+  topActionsContainer: {
+    width: "100%",
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  orangeInsightsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FF8C00", // Solid Orange
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    shadowColor: "#FF8C00",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  orangeInsightsLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  orangeInsightsText: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 16,
+    color: "#FFFFFF",
+  },
+  insightCountBadge: {
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  insightCountText: {
+    fontFamily: "Jost_700Bold",
+    fontSize: 12,
+    color: "#FFFFFF",
+  },
+  emptyInsightsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F5F6FA",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: "#EBEBF5",
+  },
+  emptyInsightsText: {
+    fontFamily: "Jost_500Medium",
+    fontSize: 14,
+    color: "#626781",
+  },
+  insightsModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    marginTop: "auto",
+    height: "80%",
+    padding: 24,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 22,
+    color: "#111111",
+  },
+  modalScroll: {
+    maxHeight: 400,
+  },
+  sectionTitleNoMargin: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  sectionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  insightCardMini: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 14,
+    width: 260,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#FFEDD5",
+    shadowColor: "#9A3412",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  insightSeverityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 6,
+  },
+  insightTitleMini: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111111",
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  insightTargetMini: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  modalOverlayFull: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContentFull: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeaderFull: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitleFull: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  insightCardModal: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  insightCriticalModal: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+  insightWarningModal: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FEF3C7",
+  },
+  insightCardHeaderModal: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  insightTitleWrapModal: {
+    flex: 1,
+  },
+  insightSeverityModal: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  insightPartModal: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  insightMessageModal: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#374151",
+    marginBottom: 16,
+  },
+  metricRowModal: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  metricPillModal: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.6)",
+    padding: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  metricLabelModal: {
+    fontSize: 10,
+    color: colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  metricValueModal: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  dashboardPanel: {
+    width: "100%",
+    backgroundColor: "#FFF7ED",
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "#FFEDD5",
+    padding: 16,
+    gap: 12,
   },
 });

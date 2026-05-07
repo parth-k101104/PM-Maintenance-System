@@ -101,6 +101,18 @@ export type SupervisorDashboardResponse = {
   tasksInPipeline: number;
 };
 
+export type LineManagerDashboardLineBreakdown = {
+  lineId: number;
+  lineName: string;
+  healthScore?: number;
+  phmCoverageRate?: number;
+  pmComplianceRate?: number;
+  taskRejectionRate?: number;
+  approvalTurnaroundTimeHours?: number;
+  evidenceComplianceRate?: number;
+  employeeEfficiency?: number;
+};
+
 export type LineManagerDashboardWindowMetrics = {
   windowDays: number;
   lineHealth?: number;
@@ -112,6 +124,7 @@ export type LineManagerDashboardWindowMetrics = {
   approvalTurnaroundTimeHours?: number;
   evidenceComplianceRate?: number;
   employeeEfficiency?: number;
+  lineMetrics?: LineManagerDashboardLineBreakdown[];
 };
 
 export type LineManagerDashboardResponse = {
@@ -124,6 +137,7 @@ export type LineManagerDashboardResponse = {
   rejectedTasks?: number;
   todayTasks?: TaskDetails[];
   rollingWindows?: Record<string, LineManagerDashboardWindowMetrics>;
+  actionInsights?: ActionInsight[];
 };
 
 export type LinePart = {
@@ -180,6 +194,7 @@ export type MaintenanceManagerDashboardWindowMetrics = {
 
 export type MaintenanceManagerDashboardResponse = MaintenanceManagerDashboardWindowMetrics & {
   rollingWindows?: Record<string, MaintenanceManagerDashboardWindowMetrics>;
+  actionInsights?: ActionInsight[];
 };
 
 export type DashboardKind = "operator" | "supervisor" | "lineManager" | "maintenanceManager";

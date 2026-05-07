@@ -24,6 +24,7 @@ public class LineManagerDashboardResponse {
     private Integer rejectedTasks;         // REJECTED where rescheduled child is not completed
     
     private Map<Integer, RollingWindowMetrics> rollingWindows;
+    private List<LineAnalyticsDashboardResponse.ActionInsight> actionInsights;
 
     @Data
     @Builder
@@ -35,6 +36,24 @@ public class LineManagerDashboardResponse {
         /** PHM prediction coverage: % of tasks the analytics engine evaluated (from phm_health_scores). */
         private Double phmCoverageRate;
         /** Operational PM compliance: approved / (approved + rejected + overdue) × 100. */
+        private Double pmComplianceRate;
+        private Double taskRejectionRate;
+        private Double approvalTurnaroundTimeHours;
+        private Double evidenceComplianceRate;
+        private Double employeeEfficiency;
+        
+        private List<LineBreakdown> lineMetrics;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class LineBreakdown {
+        private Long lineId;
+        private String lineName;
+        private Double healthScore;
+        private Double phmCoverageRate;
         private Double pmComplianceRate;
         private Double taskRejectionRate;
         private Double approvalTurnaroundTimeHours;
