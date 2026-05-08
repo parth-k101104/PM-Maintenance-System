@@ -19,6 +19,9 @@ import type {
   ReportOptionsResponse,
   ReportRequest,
   ReportResponse,
+  CreatePmScheduleRequest,
+  SchedulePlannerContext,
+  SchedulePlannerTask,
   SupervisorDashboardResponse,
   SupervisorQRScanRequest,
   SupervisorQRScanResponse,
@@ -329,6 +332,43 @@ export async function fetchLineManagerEquipments(token: string) {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
+}
+
+export async function fetchSchedulePlannerContext(token: string, lineId?: number | null, expertise?: string) {
+  const params = new URLSearchParams();
+  if (lineId) params.set("lineId", String(lineId));
+  if (expertise?.trim()) params.set("expertise", expertise.trim());
+  const qs = params.toString();
+  return request<SchedulePlannerContext>(`/api/v1/schedule-planner/context${qs ? `?${qs}` : ""}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchSchedulePlannerTasks(token: string, lineId?: number | null) {
+  const params = new URLSearchParams();
+  if (lineId) params.set("lineId", String(lineId));
+  const qs = params.toString();
+  return request<SchedulePlannerTask[]>(`/api/v1/schedule-planner/tasks${qs ? `?${qs}` : ""}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function createSchedulePlannerTask(token: string, payload: CreatePmScheduleRequest) {
+  return request<SchedulePlannerTask>("/api/v1/schedule-planner/tasks", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  }, `Create PM Schedule ${payload.taskRefNo || payload.method}`);
+}
+
+export async function updateScheduleExecutionAssignment(token: string, scheduleExecutionId: number, assigneeEmployeeId: number) {
+  return request<SchedulePlannerTask>(`/api/v1/schedule-planner/schedule-executions/${scheduleExecutionId}/assignment`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ assigneeEmployeeId }),
+  }, `Reassign Schedule #${scheduleExecutionId}`);
 }
 
 export async function fetchLineManagerAnalyticsDashboard(token: string) {

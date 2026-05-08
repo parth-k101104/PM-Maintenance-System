@@ -78,6 +78,7 @@ type DashboardRouteTarget =
   | "LineManagerBacklogApprovals"
   | "LineManagerFlags"
   | "LineManagerEquipments"
+  | "SchedulePlanner"
   | "BacklogTasks"
   | "TaskApproval"
   | "UpcomingTasks"
@@ -467,6 +468,7 @@ export function DashboardScreen() {
         ? [
             { label: "Dashboard", target: undefined },
             { label: "Analytics dashboard", target: "LineManagerAnalyticsDashboard" as DashboardRouteTarget },
+            { label: "Schedule planner", target: "SchedulePlanner" as DashboardRouteTarget },
             { label: "Line equipments", target: "LineManagerEquipments" as DashboardRouteTarget },
             { label: "Flags raised", target: "LineManagerFlags" as DashboardRouteTarget },
             { label: "Backlogs", target: "LineManagerBacklogApprovals" as DashboardRouteTarget },
@@ -540,6 +542,9 @@ export function DashboardScreen() {
         break;
       case "LineManagerEquipments":
         navigation.navigate("LineManagerEquipments");
+        break;
+      case "SchedulePlanner":
+        navigation.navigate("SchedulePlanner");
         break;
       case "BacklogTasks":
         navigation.navigate("BacklogTasks");

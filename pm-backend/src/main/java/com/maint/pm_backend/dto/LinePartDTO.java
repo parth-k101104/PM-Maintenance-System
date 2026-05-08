@@ -6,4 +6,6 @@ import lombok.Data;
 public class LinePartDTO {
     private Long partId;
     private String partName;
+    private Long sparePartId;
+    private String sparePartName;
 }

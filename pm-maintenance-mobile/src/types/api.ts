@@ -143,6 +143,8 @@ export type LineManagerDashboardResponse = {
 export type LinePart = {
   partId: number;
   partName: string;
+  sparePartId?: number | null;
+  sparePartName?: string | null;
 };
 
 export type LineElement = {
@@ -155,6 +157,106 @@ export type LineEquipment = {
   equipmentId: number;
   equipmentName: string;
   elements: LineElement[];
+};
+
+export type SchedulePlannerLineOption = {
+  lineId: number;
+  lineName: string;
+  lineCode?: string | null;
+  block?: string | null;
+  zone?: string | null;
+};
+
+export type SchedulePlannerEmployeeOption = {
+  employeeId: number;
+  fullName: string;
+  roleId: number;
+  roleName?: string | null;
+  expertise?: string | null;
+  performanceScore?: number | null;
+  availabilityScore?: number | null;
+  primaryMatch: boolean;
+};
+
+export type SchedulePlannerWorkflowOption = {
+  workflowId: number;
+  workflowName: string;
+  description?: string | null;
+};
+
+export type SchedulePlannerSparePartOption = {
+  sparePartId: number;
+  partNumber?: string | null;
+  name: string;
+  category?: string | null;
+  currentStock?: number | null;
+};
+
+export type SchedulePlannerContext = {
+  lines: SchedulePlannerLineOption[];
+  equipments: LineEquipment[];
+  assignableEmployees: SchedulePlannerEmployeeOption[];
+  supervisors: SchedulePlannerEmployeeOption[];
+  approvalWorkflows: SchedulePlannerWorkflowOption[];
+  spareParts: SchedulePlannerSparePartOption[];
+};
+
+export type CreatePmScheduleRequest = {
+  taskRefNo?: string;
+  elementId: number;
+  partId?: number | null;
+  sparePartId?: number | null;
+  taskCriticality?: string;
+  maintenanceStrategy?: string;
+  method: string;
+  tools?: string[];
+  assigneeRoleId?: number | null;
+  assigneeEmployeeId: number;
+  supervisorId: number;
+  estimatedReqTime?: number | null;
+  mode?: string;
+  frequency: "DAILY" | "WEEKLY" | "MONTHLY";
+  startDate: string;
+  endDate?: string | null;
+  occurrences?: number | null;
+  standardValue?: number | null;
+  toleranceMin?: number | null;
+  toleranceMax?: number | null;
+  uom?: string;
+  approvalWorkflowId?: number | null;
+};
+
+export type SchedulePlannerExecutionSummary = {
+  scheduleExecutionId: number;
+  dueDate: string;
+  status: string;
+  assigneeEmployeeId?: number | null;
+  assigneeName?: string | null;
+};
+
+export type SchedulePlannerTask = {
+  stdTaskId: number;
+  taskScheduleId: number;
+  taskRefNo?: string | null;
+  taskName?: string | null;
+  frequency: string;
+  lineId: number;
+  lineName: string;
+  equipmentId: number;
+  equipmentName: string;
+  elementId: number;
+  elementName: string;
+  partId?: number | null;
+  partName?: string | null;
+  assigneeEmployeeId?: number | null;
+  assigneeName?: string | null;
+  supervisorId?: number | null;
+  supervisorName?: string | null;
+  approvalWorkflowId?: number | null;
+  executionCount: number;
+  firstDueDate?: string | null;
+  lastDueDate?: string | null;
+  executions?: SchedulePlannerExecutionSummary[];
 };
 
 export type MaintenanceManagerDashboardWindowMetrics = {
