@@ -16,7 +16,7 @@ import {
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import {
@@ -258,9 +258,12 @@ export function SchedulePlannerScreen() {
     }
   }
 
+  const isFocused = useIsFocused();
   useEffect(() => {
-    load();
-  }, [token]);
+    if (isFocused) {
+      load();
+    }
+  }, [isFocused, token]);
 
   async function handleLineChange(nextLineId: number) {
     const normalizedLineId = Number(nextLineId);
@@ -470,6 +473,29 @@ export function SchedulePlannerScreen() {
     } finally {
       setReassigningExecutionId(null);
     }
+  }
+
+  function confirmReassignExecution(employeeId: number, employeeName: string) {
+    if (!selectedExecution) return;
+    const isReassignment = Boolean(selectedExecution.assigneeEmployeeId);
+    const title = isReassignment ? "Confirm Reassignment" : "Confirm Assignment";
+    const message = `Are you sure you want to ${isReassignment ? "reassign" : "assign"} this schedule to ${employeeName}?`;
+
+    Alert.alert(
+      title,
+      message,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm",
+          style: "default",
+          onPress: () => {
+            reassignExecution(employeeId);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   }
 
   if (loading && !context) {
@@ -693,7 +719,7 @@ export function SchedulePlannerScreen() {
                       key={employee.employeeId}
                       employee={employee}
                       selected={employee.employeeId === selectedExecution.assigneeEmployeeId}
-                      onPress={() => reassignExecution(employee.employeeId)}
+                      onPress={() => confirmReassignExecution(employee.employeeId, employee.fullName)}
                     />
                   ))}
                   {!assignmentEmployees.length ? (

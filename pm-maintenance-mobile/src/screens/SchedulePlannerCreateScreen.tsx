@@ -349,7 +349,7 @@ export function SchedulePlannerCreateScreen() {
           {
             text: "OK",
             onPress: () => {
-              navigation.navigate("SchedulePlanner");
+              navigation.goBack();
             },
           },
         ],
