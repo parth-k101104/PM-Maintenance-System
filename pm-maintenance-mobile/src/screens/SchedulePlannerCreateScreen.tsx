@@ -9,12 +9,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
-  type LayoutChangeEvent,
 } from "react-native";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -57,35 +55,15 @@ function parseIsoDate(value: string) {
   return new Date(year, month - 1, day);
 }
 
-function addMonths(date: Date, months: number) {
-  return new Date(date.getFullYear(), date.getMonth() + months, 1);
-}
-
-function monthTitle(date: Date) {
-  return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-}
-
-function sameDate(left: Date, right: Date) {
-  return left.getFullYear() === right.getFullYear() &&
-    left.getMonth() === right.getMonth() &&
-    left.getDate() === right.getDate();
-}
-
-function buildMonthCells(month: Date) {
-  const first = new Date(month.getFullYear(), month.getMonth(), 1);
-  const start = new Date(first);
-  start.setDate(first.getDate() - first.getDay());
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(start);
-    date.setDate(start.getDate() + index);
-    return date;
-  });
-}
-
 function numberOrNull(value: string) {
   if (!value.trim()) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function defaultOccurrencesFor(frequency: Frequency) {
+  if (frequency === "DAILY") return 30;
+  return 12;
 }
 
 function Chip({
@@ -177,10 +155,8 @@ function EmployeeCard({
   );
 }
 
-export function SchedulePlannerScreen() {
+export function SchedulePlannerCreateScreen() {
   const navigation = useNavigation<Nav>();
-  const { width: windowWidth } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const { authState, refreshDashboard } = useAuth();
   const token = authState.session?.token;
   const isLineManager = authState.session?.dashboardKind === "lineManager";
@@ -194,8 +170,6 @@ export function SchedulePlannerScreen() {
   const [selectedPlannedTask, setSelectedPlannedTask] = useState<SchedulePlannerTask | null>(null);
   const [selectedExecution, setSelectedExecution] = useState<SchedulePlannerExecutionSummary | null>(null);
   const [reassigningExecutionId, setReassigningExecutionId] = useState<number | null>(null);
-  const [calendarMonth, setCalendarMonth] = useState(() => parseIsoDate(todayIso()));
-  const [calendarGridWidth, setCalendarGridWidth] = useState(0);
 
   const [lineId, setLineId] = useState<number | null>(null);
   const [equipmentId, setEquipmentId] = useState<number | null>(null);
@@ -214,7 +188,7 @@ export function SchedulePlannerScreen() {
   const [frequency, setFrequency] = useState<Frequency>("WEEKLY");
   const [startDate, setStartDate] = useState(todayIso());
   const [endDate, setEndDate] = useState("");
-  const [occurrences, setOccurrences] = useState("4");
+  const [occurrences] = useState("");
   const [estimatedMins, setEstimatedMins] = useState("");
   const [standardValue, setStandardValue] = useState("");
   const [toleranceMin, setToleranceMin] = useState("");
@@ -241,7 +215,7 @@ export function SchedulePlannerScreen() {
       }
 
       setContext(finalCtx);
-      setLineId(isLineManager ? firstLineId : effectiveTargetId ?? null);
+      setLineId(firstLineId);
       setWorkflowId((current) => current ?? finalCtx.approvalWorkflows[0]?.workflowId ?? null);
 
       try {
@@ -300,67 +274,6 @@ export function SchedulePlannerScreen() {
     () => context?.supervisors.find((item) => item.employeeId === supervisorId) ?? null,
     [context?.supervisors, supervisorId],
   );
-  const visibleTasks = useMemo(
-    () => {
-      const activeTasks = tasks.filter((task) =>
-        (task.executions ?? []).some((execution) => execution.status === "ASSIGNED" || execution.status === "IN_PROGRESS"),
-      );
-      return lineId ? activeTasks.filter((task) => Number(task.lineId) === Number(lineId)) : activeTasks;
-    },
-    [tasks, lineId],
-  );
-  const tasksByLine = useMemo(() => {
-    const groups = new Map<number, { lineName: string; tasks: SchedulePlannerTask[] }>();
-    visibleTasks.forEach((task) => {
-      const key = Number(task.lineId);
-      const existing = groups.get(key);
-      if (existing) {
-        existing.tasks.push(task);
-      } else {
-        groups.set(key, { lineName: task.lineName || "Line", tasks: [task] });
-      }
-    });
-    return Array.from(groups.entries()).map(([lineKey, value]) => ({ lineKey, ...value }));
-  }, [visibleTasks]);
-  const selectedEditableExecutions = useMemo(
-    () => (selectedPlannedTask?.executions ?? []).filter((execution) => execution.status === "ASSIGNED" || execution.status === "IN_PROGRESS"),
-    [selectedPlannedTask?.executions],
-  );
-  const assignmentEmployees = useMemo(
-    () => (context?.assignableEmployees ?? []).filter((employee) =>
-      selectedExecution?.assigneeEmployeeId ? employee.employeeId !== selectedExecution.assigneeEmployeeId : true,
-    ),
-    [context?.assignableEmployees, selectedExecution?.assigneeEmployeeId],
-  );
-  const calendarCells = useMemo(() => buildMonthCells(calendarMonth), [calendarMonth]);
-  const calendarGap = 6;
-  const calendarFallbackWidth = Math.min(windowWidth - 60, 720);
-  const calendarCellSize = Math.floor(((calendarGridWidth || calendarFallbackWidth) - calendarGap * 6) / 7);
-
-  function handleCalendarGridLayout(event: LayoutChangeEvent) {
-    const nextWidth = Math.floor(event.nativeEvent.layout.width);
-    if (nextWidth > 0 && nextWidth !== calendarGridWidth) {
-      setCalendarGridWidth(nextWidth);
-    }
-  }
-
-  async function openAssignmentTask(task: SchedulePlannerTask) {
-    setSelectedPlannedTask(task);
-    const firstEditable = (task.executions ?? []).find((execution) => execution.status === "ASSIGNED" || execution.status === "IN_PROGRESS");
-    setSelectedExecution(firstEditable ?? null);
-    if (firstEditable?.dueDate) {
-      setCalendarMonth(parseIsoDate(firstEditable.dueDate.slice(0, 10)));
-    } else if (task.firstDueDate) {
-      setCalendarMonth(parseIsoDate(task.firstDueDate));
-    }
-    if (!token) return;
-    try {
-      const lineCtx = await fetchSchedulePlannerContext(token, task.lineId);
-      setContext((current) => ({ ...lineCtx, lines: current?.lines ?? lineCtx.lines }));
-    } catch (error) {
-      console.warn("Failed to load assignment employees for task line:", error);
-    }
-  }
 
   function selectEquipment(equipment: LineEquipment) {
     setEquipmentId(equipment.equipmentId);
@@ -395,12 +308,8 @@ export function SchedulePlannerScreen() {
 
   async function submit() {
     if (!token || saving) return;
-    if (!elementId || !assigneeId || !supervisorId || !method.trim() || !startDate.trim()) {
-      Alert.alert("Missing details", "Select machine element, assignee, supervisor, task name and start date.");
-      return;
-    }
-    if (!endDate.trim() && !occurrences.trim()) {
-      Alert.alert("Schedule range needed", "Enter either an end date or number of occurrences.");
+    if (!elementId || !method.trim() || !startDate.trim()) {
+      Alert.alert("Missing details", "Select machine element, task name and first due date.");
       return;
     }
 
@@ -415,14 +324,14 @@ export function SchedulePlannerScreen() {
         maintenanceStrategy: strategy,
         method: method.trim(),
         tools: tools.split(",").map((item) => item.trim()).filter(Boolean),
-        assigneeEmployeeId: assigneeId,
-        supervisorId,
+        assigneeEmployeeId: null,
+        supervisorId: null,
         estimatedReqTime: numberOrNull(estimatedMins),
         mode,
         frequency,
         startDate: startDate.trim(),
-        endDate: endDate.trim() || null,
-        occurrences: numberOrNull(occurrences),
+        endDate: null,
+        occurrences: numberOrNull(occurrences) ?? defaultOccurrencesFor(frequency),
         standardValue: numberOrNull(standardValue),
         toleranceMin: numberOrNull(toleranceMin),
         toleranceMax: numberOrNull(toleranceMax),
@@ -440,11 +349,7 @@ export function SchedulePlannerScreen() {
           {
             text: "OK",
             onPress: () => {
-              if (authState.session?.dashboardKind === "maintenanceManager") {
-                navigation.navigate("MaintenanceManagerDashboard");
-              } else {
-                navigation.navigate("Dashboard");
-              }
+              navigation.navigate("SchedulePlanner");
             },
           },
         ],
@@ -489,8 +394,8 @@ export function SchedulePlannerScreen() {
           <Ionicons name="arrow-back-outline" size={28} color={colors.text} />
         </Pressable>
         <View style={styles.headerTextWrap}>
-          <Text style={styles.headerTitle}>Schedule assignment</Text>
-          <Text style={styles.headerSubtitle}>Assign generated schedules by line and due date</Text>
+          <Text style={styles.headerTitle}>Create PM task</Text>
+          <Text style={styles.headerSubtitle}>Define the PM task and first due date</Text>
         </View>
         <Pressable style={styles.refreshButton} onPress={() => load()} disabled={loading}>
           {loading ? <ActivityIndicator size="small" color={colors.text} /> : <Ionicons name="refresh-outline" size={19} color={colors.text} />}
@@ -504,55 +409,188 @@ export function SchedulePlannerScreen() {
       >
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Task library</Text>
-            <Text style={styles.selectedText}>{visibleTasks.length} active</Text>
+            <Text style={styles.sectionTitle}>Line</Text>
+            {selectedLine ? <Text style={styles.selectedText}>Selected: {selectedLine.lineName}</Text> : null}
           </View>
-          <Pressable style={styles.submitButton} onPress={() => navigation.navigate("SchedulePlannerCreate")}>
-            <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.submitText}>Create PM task</Text>
+          <Pressable style={styles.selectorButton} onPress={() => !isLineManager && setLinePickerOpen(true)}>
+            <View style={[styles.selectIcon, selectedLine && styles.selectIconSelected]}>
+              <Ionicons name="git-branch-outline" size={18} color={selectedLine ? "#FFFFFF" : colors.primary} />
+            </View>
+            <View style={styles.selectTextWrap}>
+              <Text style={styles.selectTitle}>{selectedLine?.lineName ?? "Select line"}</Text>
+              <Text style={styles.selectSubtitle} numberOfLines={1}>
+                {selectedLine ? [selectedLine.lineCode, selectedLine.block, selectedLine.zone].filter(Boolean).join(" • ") : "Tap to choose a line"}
+              </Text>
+            </View>
+            {!isLineManager && <Ionicons name="chevron-down-outline" size={22} color={colors.primary} />}
           </Pressable>
-          <View style={styles.chipWrap}>
-            {!isLineManager ? (
-              <Chip label="All lines" selected={!lineId} onPress={() => setLineId(null)} icon="albums-outline" />
-            ) : null}
-            {(context?.lines ?? []).map((line) => (
-              <Chip
-                key={line.lineId}
-                label={line.lineName}
-                selected={Number(line.lineId) === Number(lineId)}
-                onPress={() => !isLineManager && setLineId(Number(line.lineId))}
-                icon="git-branch-outline"
-              />
-            ))}
-          </View>
-          {isLineManager ? <Text style={styles.emptyInlineText}>Line manager view is restricted to your assigned line.</Text> : null}
+          {isLineManager ? <Text style={{ fontFamily: "Jost_400Regular", fontSize: 12, color: colors.textMuted, marginTop: 4 }}>You can only schedule tasks for your assigned line.</Text> : null}
         </View>
 
-        {tasksByLine.length ? tasksByLine.map((group) => (
-          <View style={styles.section} key={group.lineKey}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>{group.lineName}</Text>
-              <Text style={styles.selectedText}>{group.tasks.length} tasks</Text>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Asset</Text>
+            {selectedEquipment ? <Text style={styles.selectedText}>Machine: {selectedEquipment.equipmentName}</Text> : null}
+          </View>
+          {canChooseAsset ? (
+            <View style={styles.selectList}>
+              {(context?.equipments ?? []).map((equipment) => (
+                <SelectRow
+                  key={equipment.equipmentId}
+                  title={equipment.equipmentName}
+                  subtitle={`Equipment ID #${equipment.equipmentId}`}
+                  icon="hardware-chip-outline"
+                  selected={equipment.equipmentId === equipmentId}
+                  onPress={() => selectEquipment(equipment)}
+                />
+              ))}
+              {!(context?.equipments ?? []).length ? <Text style={styles.emptyInlineText}>No assets found for the selected line.</Text> : null}
             </View>
-            {group.tasks.map((task) => (
-              <Pressable key={`${task.taskScheduleId}-${task.stdTaskId}`} style={styles.taskCard} onPress={() => openAssignmentTask(task)}>
-                <View style={styles.taskIcon}>
-                  <Ionicons name="calendar-number-outline" size={18} color={colors.primary} />
-                </View>
-                <View style={styles.taskBody}>
-                  <Text style={styles.taskTitle} numberOfLines={1}>{task.taskName || task.taskRefNo || "PM task"}</Text>
-                  <Text style={styles.taskMeta} numberOfLines={2}>
-                    {task.equipmentName} • {task.elementName}{task.partName ? ` • ${task.partName}` : ""}
-                  </Text>
-                  <Text style={styles.taskMeta}>
-                    {task.executionCount} dates • {task.firstDueDate || "-"} to {task.lastDueDate || "-"}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward-outline" size={20} color="#8B90A4" />
+          ) : (
+            <Text style={styles.emptyInlineText}>Select a line first.</Text>
+          )}
+          {selectedEquipment ? (
+            <View style={styles.nestedBlock}>
+              <View style={styles.fieldHeaderRow}>
+                <Text style={styles.fieldLabel}>Element</Text>
+                {selectedElement ? <Text style={styles.fieldSelectedText}>{selectedElement.elementName}</Text> : null}
+              </View>
+              <View style={styles.selectList}>
+                {(selectedEquipment.elements ?? []).map((element) => (
+                  <SelectRow
+                    key={element.elementId}
+                    title={element.elementName}
+                    icon="layers-outline"
+                    selected={element.elementId === elementId}
+                    onPress={() => selectElement(element)}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
+          {selectedElement ? (
+            <View style={styles.nestedBlock}>
+              <View style={styles.fieldHeaderRow}>
+                <Text style={styles.fieldLabel}>Part</Text>
+                {selectedPart ? <Text style={styles.fieldSelectedText}>{selectedPart.partName}</Text> : null}
+              </View>
+              <View style={styles.selectList}>
+                {(selectedElement.parts ?? []).length ? (selectedElement.parts ?? []).map((part) => (
+                  <SelectRow
+                    key={part.partId}
+                    title={part.partName}
+                    subtitle={part.sparePartName ? `Spare: ${part.sparePartName}` : "No spare mapped"}
+                    icon="cube-outline"
+                    selected={part.partId === partId}
+                    onPress={() => selectPart(part)}
+                  />
+                )) : (
+                  <View style={styles.infoBox}>
+                    <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+                    <Text style={styles.infoText}>No parts are mapped to this element. You can still create this as an element-level PM task.</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Task details</Text>
+          <View style={styles.inputRow}>
+            <TextInput style={styles.input} placeholder="Task ref no" value={taskRefNo} onChangeText={setTaskRefNo} />
+            <TextInput style={styles.input} placeholder="Estimated mins" value={estimatedMins} onChangeText={setEstimatedMins} keyboardType="numeric" />
+          </View>
+          <TextInput style={styles.inputWide} placeholder="Task name / method" value={method} onChangeText={setMethod} />
+          <TextInput style={styles.inputWide} placeholder="Tools, comma separated" value={tools} onChangeText={setTools} />
+          <View style={styles.chipWrap}>
+            {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((item) => (
+              <Chip key={item} label={item} selected={criticality === item} onPress={() => setCriticality(item)} />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Schedule</Text>
+          <View style={styles.segment}>
+            {(["DAILY", "WEEKLY", "MONTHLY"] as Frequency[]).map((item) => (
+              <Pressable key={item} style={[styles.segmentItem, frequency === item && styles.segmentItemActive]} onPress={() => setFrequency(item)}>
+                <Text style={[styles.segmentText, frequency === item && styles.segmentTextActive]}>{item}</Text>
               </Pressable>
             ))}
           </View>
-        )) : <Text style={styles.emptyText}>No active task schedules found.</Text>}
+          <View style={styles.inputRow}>
+            <Pressable style={styles.dateButton} onPress={() => setDatePickerTarget("start")}>
+              <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+              <View>
+                <Text style={styles.dateLabel}>First due date</Text>
+                <Text style={styles.dateValue}>{startDate}</Text>
+              </View>
+            </Pressable>
+          </View>
+          {datePickerTarget && (
+            <View style={styles.datePickerWrap}>
+              <DateTimePicker
+                value={parseIsoDate(startDate)}
+                mode="date"
+                display={Platform.OS === "ios" ? "inline" : "calendar"}
+                minimumDate={new Date(2020, 0, 1)}
+                maximumDate={new Date(2050, 0, 1)}
+                onChange={handleDateChange}
+              />
+              {Platform.OS === "ios" && (
+                <Pressable style={styles.doneButton} onPress={() => setDatePickerTarget(null)}>
+                  <Text style={styles.doneButtonText}>Done</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Approval and standards</Text>
+          <View style={styles.chipWrap}>
+            {(context?.approvalWorkflows ?? []).map((workflow) => (
+              <Chip
+                key={workflow.workflowId}
+                label={workflow.workflowName}
+                icon="checkmark-done-outline"
+                selected={workflow.workflowId === workflowId}
+                onPress={() => setWorkflowId(workflow.workflowId)}
+              />
+            ))}
+          </View>
+          <View style={styles.inputRow}>
+            <TextInput style={styles.input} placeholder="Standard value" value={standardValue} onChangeText={setStandardValue} keyboardType="numeric" />
+            <TextInput style={styles.input} placeholder="UOM" value={uom} onChangeText={setUom} />
+          </View>
+          <View style={styles.inputRow}>
+            <TextInput style={styles.input} placeholder="Tolerance min" value={toleranceMin} onChangeText={setToleranceMin} keyboardType="numeric" />
+            <TextInput style={styles.input} placeholder="Tolerance max" value={toleranceMax} onChangeText={setToleranceMax} keyboardType="numeric" />
+          </View>
+          {selectedPart ? (
+            <>
+              <Text style={styles.fieldLabel}>Spare part mapping</Text>
+              <View style={styles.chipWrap}>
+                {(context?.spareParts ?? []).slice(0, 12).map((spare) => (
+                  <Chip
+                    key={spare.sparePartId}
+                    label={spare.name}
+                    icon="cube-outline"
+                    selected={spare.sparePartId === sparePartId}
+                    onPress={() => setSparePartId(spare.sparePartId)}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+        </View>
+
+        <Pressable style={[styles.submitButton, saving && styles.submitButtonDisabled]} onPress={submit} disabled={saving}>
+          {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />}
+          <Text style={styles.submitText}>Create schedule</Text>
+        </Pressable>
+
       </ScrollView>
 
       <Modal visible={linePickerOpen} animationType="slide" transparent onRequestClose={() => setLinePickerOpen(false)}>
@@ -576,134 +614,6 @@ export function SchedulePlannerScreen() {
                 />
               ))}
               {!(context?.lines ?? []).length ? <Text style={styles.emptyInlineText}>No lines available for this account.</Text> : null}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={Boolean(selectedPlannedTask)} animationType="slide" onRequestClose={() => {
-        setSelectedPlannedTask(null);
-        setSelectedExecution(null);
-      }}>
-        <View style={[styles.assignmentScreen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-          <View style={styles.assignmentSheet}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalTitleWrap}>
-                <Text style={styles.modalTitle} numberOfLines={1}>{selectedPlannedTask?.taskName || "Planned schedule"}</Text>
-                <Text style={styles.modalSubtitle} numberOfLines={1}>
-                  {selectedPlannedTask?.lineName} • {selectedPlannedTask?.equipmentName}
-                </Text>
-              </View>
-              <Pressable style={styles.modalClose} onPress={() => {
-                setSelectedPlannedTask(null);
-                setSelectedExecution(null);
-              }}>
-                <Ionicons name="close-outline" size={24} color={colors.text} />
-              </Pressable>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.assignmentContent}>
-              <View style={styles.calendarHeader}>
-                <Pressable style={styles.calendarNavButton} onPress={() => setCalendarMonth((current) => addMonths(current, -1))}>
-                  <Ionicons name="chevron-back-outline" size={20} color={colors.primary} />
-                </Pressable>
-                <Text style={styles.calendarTitle}>{monthTitle(calendarMonth)}</Text>
-                <Pressable style={styles.calendarNavButton} onPress={() => setCalendarMonth((current) => addMonths(current, 1))}>
-                  <Ionicons name="chevron-forward-outline" size={20} color={colors.primary} />
-                </Pressable>
-              </View>
-
-              <View style={styles.calendarFrame}>
-                <View style={styles.calendarLegend}>
-                  <View style={styles.legendItem}><View style={[styles.legendDot, styles.legendAssigned]} /><Text style={styles.legendText}>Assigned due date</Text></View>
-                  <View style={styles.legendItem}><View style={[styles.legendDot, styles.legendOpen]} /><Text style={styles.legendText}>Unassigned due date</Text></View>
-                  <View style={styles.legendItem}><View style={styles.legendNormal} /><Text style={styles.legendText}>No due date</Text></View>
-                </View>
-
-                <View style={styles.weekdayRow}>
-                  {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
-                    <Text
-                      key={`${day}-${index}`}
-                      style={[
-                        styles.weekdayText,
-                        {
-                          width: calendarCellSize,
-                          marginRight: index % 7 === 6 ? 0 : calendarGap,
-                        },
-                      ]}
-                    >
-                      {day}
-                    </Text>
-                  ))}
-                </View>
-
-                <View style={styles.calendarGrid} onLayout={handleCalendarGridLayout}>
-                  {calendarCells.map((date, index) => {
-                  const execution = selectedEditableExecutions.find((item) => item.dueDate && sameDate(parseIsoDate(item.dueDate.slice(0, 10)), date));
-                  const selected = execution?.scheduleExecutionId === selectedExecution?.scheduleExecutionId;
-                  const inMonth = date.getMonth() === calendarMonth.getMonth();
-                  const assigned = Boolean(execution?.assigneeEmployeeId);
-                  return (
-                    <Pressable
-                      key={date.toISOString()}
-                      style={[
-                        styles.calendarCell,
-                        {
-                          width: calendarCellSize,
-                          height: Math.max(calendarCellSize * 1.12, 54),
-                          marginRight: index % 7 === 6 ? 0 : calendarGap,
-                          marginBottom: calendarGap,
-                        },
-                        !inMonth && styles.calendarCellMuted,
-                        execution && (assigned ? styles.calendarCellAssigned : styles.calendarCellOpen),
-                        selected && styles.calendarCellSelected,
-                      ]}
-                      disabled={!execution}
-                      onPress={() => execution && setSelectedExecution(execution)}
-                    >
-                      <Text style={[
-                        styles.calendarDayText,
-                        !inMonth && styles.calendarDayMuted,
-                        execution && styles.calendarDueText,
-                      ]}>
-                        {date.getDate()}
-                      </Text>
-                      {execution ? (
-                        <Text style={styles.calendarAssigneeText} numberOfLines={1}>
-                          {execution.assigneeName || "Open"}
-                        </Text>
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
-                </View>
-              </View>
-
-              {!selectedEditableExecutions.length ? (
-                <Text style={styles.emptyInlineText}>No editable due schedules for this task.</Text>
-              ) : null}
-
-              {selectedExecution ? (
-                <View style={styles.assignmentPanel}>
-                  <Text style={styles.fieldLabel}>
-                    {selectedExecution.assigneeEmployeeId ? "Reassign selected due date" : "Assign selected due date"}
-                  </Text>
-                  {assignmentEmployees.map((employee) => (
-                    <EmployeeCard
-                      key={employee.employeeId}
-                      employee={employee}
-                      selected={employee.employeeId === selectedExecution.assigneeEmployeeId}
-                      onPress={() => reassignExecution(employee.employeeId)}
-                    />
-                  ))}
-                  {!assignmentEmployees.length ? (
-                    <Text style={styles.emptyInlineText}>No other operators available for this schedule.</Text>
-                  ) : null}
-                  {reassigningExecutionId ? <ActivityIndicator size="small" color={colors.primary} /> : null}
-                </View>
-              ) : (
-                <Text style={styles.emptyInlineText}>Choose a due schedule above to reassign its operator.</Text>
-              )}
             </ScrollView>
           </View>
         </View>
@@ -913,7 +823,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   modalSheet: {
-    maxHeight: "88%",
+    maxHeight: "78%",
     backgroundColor: colors.surface,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
@@ -921,9 +831,6 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 24,
   },
-  assignmentScreen: { flex: 1, backgroundColor: colors.surface },
-  assignmentSheet: { flex: 1, paddingHorizontal: 16, paddingTop: 18 },
-  assignmentContent: { gap: 14, paddingBottom: 28 },
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   modalTitleWrap: { flex: 1, minWidth: 0, marginRight: 12 },
   modalTitle: { fontFamily: "Jost_600SemiBold", fontSize: 20, color: colors.text },
@@ -937,58 +844,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modalList: { gap: 10, paddingBottom: 10 },
-  calendarHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  calendarTitle: { fontFamily: "Jost_600SemiBold", fontSize: 22, color: colors.text },
-  calendarNavButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#DADDE8",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  calendarFrame: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#E1E4EF",
-    padding: 14,
-    width: "100%",
-    shadowColor: "#111827",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  calendarLegend: { flexDirection: "row", gap: 14, alignItems: "center", marginBottom: 14, flexWrap: "wrap" },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendAssigned: { backgroundColor: "#DBEAFE", borderWidth: 1, borderColor: "#2563EB" },
-  legendOpen: { backgroundColor: "#FEE2E2", borderWidth: 1, borderColor: "#EF4444" },
-  legendNormal: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB" },
-  legendText: { fontFamily: "Jost_400Regular", fontSize: 12, color: "#626781" },
-  weekdayRow: { flexDirection: "row", marginBottom: 10 },
-  weekdayText: { textAlign: "center", fontFamily: "Jost_600SemiBold", fontSize: 12, color: "#626781" },
-  calendarGrid: { flexDirection: "row", flexWrap: "wrap", width: "100%" },
-  calendarCell: {
-    borderRadius: 14,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    padding: 7,
-    justifyContent: "space-between",
-  },
-  calendarCellMuted: { opacity: 0.4 },
-  calendarCellAssigned: { backgroundColor: "#DBEAFE", borderColor: "#2563EB" },
-  calendarCellOpen: { backgroundColor: "#FEE2E2", borderColor: "#EF4444" },
-  calendarCellSelected: { borderColor: colors.primary, borderWidth: 2 },
-  calendarDayText: { fontFamily: "Jost_600SemiBold", fontSize: 14, color: colors.text },
-  calendarDayMuted: { color: "#8B90A4" },
-  calendarDueText: { color: colors.text },
-  calendarAssigneeText: { fontFamily: "Jost_600SemiBold", fontSize: 10, color: "#2F3448" },
-  assignmentPanel: { backgroundColor: "#FFFFFF", borderRadius: 18, borderWidth: 1, borderColor: "#E1E4EF", padding: 12 },
   executionRow: {
     minHeight: 64,
     flexDirection: "row",

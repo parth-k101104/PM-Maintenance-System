@@ -46,6 +46,7 @@ import { MmMetricTrendScreen } from "./src/screens/MmMetricTrendScreen";
 import { ConfigParamsScreen } from "./src/screens/ConfigParamsScreen";
 import { MaintenanceReportsScreen } from "./src/screens/MaintenanceReportsScreen";
 import { SchedulePlannerScreen } from "./src/screens/SchedulePlannerScreen";
+import { SchedulePlannerCreateScreen } from "./src/screens/SchedulePlannerCreateScreen";
 
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -79,6 +80,7 @@ function RootNavigator() {
           <Stack.Screen name="MaintenanceManagerDashboard" component={MaintenanceManagerDashboardScreen} />
           <Stack.Screen name="MaintenanceReports" component={MaintenanceReportsScreen} />
           <Stack.Screen name="SchedulePlanner" component={SchedulePlannerScreen} />
+          <Stack.Screen name="SchedulePlannerCreate" component={SchedulePlannerCreateScreen} />
           <Stack.Screen name="MmTaskStatusList" component={MmTaskStatusListScreen} />
           <Stack.Screen name="MmComplianceAnalytics" component={MmComplianceAnalyticsScreen} />
           <Stack.Screen name="MmEvidenceComplianceAnalytics" component={MmEvidenceComplianceAnalyticsScreen} />
@@ -105,6 +107,7 @@ function RootNavigator() {
         <Stack.Screen name="LineManagerFlags" component={LineManagerFlagsScreen} />
         <Stack.Screen name="LineManagerEquipments" component={LineManagerEquipmentsScreen} />
         <Stack.Screen name="SchedulePlanner" component={SchedulePlannerScreen} />
+        <Stack.Screen name="SchedulePlannerCreate" component={SchedulePlannerCreateScreen} />
         <Stack.Screen name="LineManagerAnalyticsDashboard" component={LineManagerAnalyticsDashboardScreen} />
         <Stack.Screen name="LineManagerPartAnalytics" component={LineManagerPartAnalyticsScreen} />
         <Stack.Screen name="BacklogTasks" component={BacklogTasksScreen} />

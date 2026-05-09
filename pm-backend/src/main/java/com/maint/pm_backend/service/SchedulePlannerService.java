@@ -87,8 +87,12 @@ public class SchedulePlannerService {
         TaskLocation location = resolveLocation(request.getElementId(), request.getPartId());
         validateLineScope(actor, location.lineId());
         updateSparePartMappingIfRequested(actor, location, request.getSparePartId());
-        Employee assignee = validateAssignee(actor, location.lineId(), request.getAssigneeEmployeeId(), request.getAssigneeRoleId());
-        Employee supervisor = validateSupervisor(actor, location.lineId(), request.getSupervisorId());
+        Employee assignee = request.getAssigneeEmployeeId() != null
+                ? validateAssignee(actor, location.lineId(), request.getAssigneeEmployeeId(), request.getAssigneeRoleId())
+                : null;
+        Employee supervisor = request.getSupervisorId() != null
+                ? validateSupervisor(actor, location.lineId(), request.getSupervisorId())
+                : null;
         long workflowId = request.getApprovalWorkflowId() != null ? request.getApprovalWorkflowId() : 1L;
         int workflowLevels = fetchWorkflowLevelCount(workflowId);
 
@@ -100,7 +104,7 @@ public class SchedulePlannerService {
         stdTask.setMaintenanceStrategy(request.getMaintenanceStrategy());
         stdTask.setMethod(request.getMethod());
         stdTask.setTools(request.getTools() != null ? request.getTools() : List.of());
-        stdTask.setAssigneeRoleId(request.getAssigneeRoleId() != null ? request.getAssigneeRoleId() : assignee.getRoleId());
+        stdTask.setAssigneeRoleId(request.getAssigneeRoleId() != null ? request.getAssigneeRoleId() : assignee != null ? assignee.getRoleId() : null);
         stdTask.setEstimatedReqTime(request.getEstimatedReqTime());
         stdTask.setMode(request.getMode());
         stdTask.setFrequency(normalizeFrequency(request.getFrequency()));
@@ -126,14 +130,16 @@ public class SchedulePlannerService {
             PmScheduleExecution execution = new PmScheduleExecution();
             execution.setTaskSchedule(schedule);
             execution.setEmployee(assignee);
-            execution.setAssignedDttm(LocalDateTime.now());
+            execution.setAssignedDttm(assignee != null ? LocalDateTime.now() : null);
             execution.setDueDate(dueDate.atStartOfDay());
             execution.setStatus(TaskExecutionStatus.ASSIGNED);
             execution.setDeviationFlag(false);
             execution.setRescheduleFlag(false);
             execution.setEvidenceRejectedFlag(false);
             execution = executionRepository.save(execution);
-            createApprovalRows(execution, workflowLevels, supervisor, actor, location.lineManagerId());
+            if (supervisor != null) {
+                createApprovalRows(execution, workflowLevels, supervisor, actor, location.lineManagerId());
+            }
             executions.add(execution);
         }
 
@@ -253,10 +259,6 @@ public class SchedulePlannerService {
 
     @Transactional
     public SchedulePlannerTaskResponse updateExecutionAssignment(Long actorId, Long scheduleExecutionId, UpdateScheduleAssignmentRequest request) {
-        if (request.getAssigneeEmployeeId() == null) {
-            throw new RuntimeException("assigneeEmployeeId is required");
-        }
-
         Employee actor = getPlanner(actorId);
         PmScheduleExecution execution = executionRepository.findById(scheduleExecutionId)
                 .orElseThrow(() -> new RuntimeException("Schedule execution not found: " + scheduleExecutionId));
@@ -269,15 +271,27 @@ public class SchedulePlannerService {
         TaskLocation location = resolveLocation(stdTask.getElementId(), stdTask.getPartId());
         validateLineScope(actor, location.lineId());
 
-        Employee assignee = validateAssignee(actor, location.lineId(), request.getAssigneeEmployeeId(), null);
+        Employee assignee = request.getAssigneeEmployeeId() != null
+                ? validateAssignee(actor, location.lineId(), request.getAssigneeEmployeeId(), null)
+                : execution.getEmployee();
+        if (assignee == null) {
+            throw new RuntimeException("assigneeEmployeeId is required");
+        }
         Employee supervisor = request.getSupervisorId() != null
                 ? validateSupervisor(actor, location.lineId(), request.getSupervisorId())
                 : findLevelOneSupervisorOrNull(execution);
+        if (supervisor == null) {
+            supervisor = findDefaultSupervisor(actor, location.lineId());
+        }
 
         execution.setEmployee(assignee);
+        execution.setAssignedDttm(LocalDateTime.now());
         executionRepository.save(execution);
 
-        if (request.getSupervisorId() != null) {
+        if (!hasApprovalRows(execution.getScheduleExecutionId())) {
+            long workflowId = stdTask.getApprovalWorkflowId() != null ? stdTask.getApprovalWorkflowId() : 1L;
+            createApprovalRows(execution, fetchWorkflowLevelCount(workflowId), supervisor, actor, location.lineManagerId());
+        } else if (request.getSupervisorId() != null) {
             PmScheduleApproval levelOne = approvalRepository
                     .findByScheduleExecution_ScheduleExecutionIdAndApprovalLevel(execution.getScheduleExecutionId(), 1)
                     .orElseThrow(() -> new RuntimeException("Missing supervisor approval row for execution: " + execution.getScheduleExecutionId()));
@@ -354,8 +368,6 @@ public class SchedulePlannerService {
 
     private void validateCreateRequest(CreatePmScheduleRequest request) {
         if (request.getElementId() == null) throw new RuntimeException("elementId is required");
-        if (request.getAssigneeEmployeeId() == null) throw new RuntimeException("assigneeEmployeeId is required");
-        if (request.getSupervisorId() == null) throw new RuntimeException("supervisorId is required");
         if (request.getMethod() == null || request.getMethod().isBlank()) throw new RuntimeException("method is required");
         if (request.getFrequency() == null || request.getFrequency().isBlank()) throw new RuntimeException("frequency is required");
         if (request.getStartDate() == null) throw new RuntimeException("startDate is required");
@@ -462,6 +474,40 @@ public class SchedulePlannerService {
                 .findByScheduleExecution_ScheduleExecutionIdAndApprovalLevel(execution.getScheduleExecutionId(), 1)
                 .map(PmScheduleApproval::getApprover)
                 .orElse(null);
+    }
+
+    private boolean hasApprovalRows(Long scheduleExecutionId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM pm_schedule_approval
+                WHERE schedule_execution_id = :scheduleExecutionId
+                """, new MapSqlParameterSource("scheduleExecutionId", scheduleExecutionId), Integer.class);
+        return count != null && count > 0;
+    }
+
+    private Employee findDefaultSupervisor(Employee actor, Long lineId) {
+        List<Long> ids = jdbcTemplate.queryForList("""
+                SELECT e.employee_id
+                FROM employees e
+                JOIN lines l ON l.line_id = :lineId
+                WHERE e.role_id = :supervisorRoleId
+                  AND (e.active IS NULL OR e.active = TRUE)
+                  AND (:plantId IS NULL OR e.plant_id = :plantId)
+                  AND (e.dept_id = l.dept_id OR e.dept_id = :actorDeptId OR e.dept_id IS NULL)
+                ORDER BY
+                  CASE WHEN e.dept_id = l.dept_id THEN 0 ELSE 1 END,
+                  e.performance_score DESC NULLS LAST,
+                  e.employee_id ASC
+                LIMIT 1
+                """, new MapSqlParameterSource()
+                .addValue("lineId", lineId, java.sql.Types.BIGINT)
+                .addValue("supervisorRoleId", SUPERVISOR_ROLE_ID, java.sql.Types.BIGINT)
+                .addValue("plantId", actor.getPlantId(), java.sql.Types.BIGINT)
+                .addValue("actorDeptId", actor.getDeptId(), java.sql.Types.BIGINT), Long.class);
+        if (ids.isEmpty()) {
+            throw new RuntimeException("No supervisor found for this line");
+        }
+        return employeeRepository.findById(ids.get(0))
+                .orElseThrow(() -> new RuntimeException("Supervisor not found"));
     }
 
     private TaskLocation resolveLocation(Long elementId, Long partId) {
@@ -721,8 +767,8 @@ public class SchedulePlannerService {
                 .elementName(location.elementName())
                 .partId(location.partId())
                 .partName(location.partName())
-                .assigneeEmployeeId(assignee.getEmployeeId())
-                .assigneeName(assignee.getFullName())
+                .assigneeEmployeeId(assignee != null ? assignee.getEmployeeId() : null)
+                .assigneeName(assignee != null ? assignee.getFullName() : null)
                 .supervisorId(supervisor != null ? supervisor.getEmployeeId() : null)
                 .supervisorName(supervisor != null ? supervisor.getFullName() : null)
                 .approvalWorkflowId(stdTask.getApprovalWorkflowId())

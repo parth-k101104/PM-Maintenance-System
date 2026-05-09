@@ -211,8 +211,8 @@ export type CreatePmScheduleRequest = {
   method: string;
   tools?: string[];
   assigneeRoleId?: number | null;
-  assigneeEmployeeId: number;
-  supervisorId: number;
+  assigneeEmployeeId?: number | null;
+  supervisorId?: number | null;
   estimatedReqTime?: number | null;
   mode?: string;
   frequency: "DAILY" | "WEEKLY" | "MONTHLY";
