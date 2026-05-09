@@ -17,6 +17,8 @@ public interface PmScheduleExecutionRepository extends JpaRepository<PmScheduleE
                         "WHERE e.employee.employeeId = :employeeId")
         List<PmScheduleExecution> findAllByEmployeeIdWithDetails(@Param("employeeId") Long employeeId);
 
+        List<PmScheduleExecution> findByTaskSchedule_TaskScheduleId(Long taskScheduleId);
+
         @Query(value = "SELECT " +
                         "  NULL AS scheduleApprovalId, " +
                         "  se.schedule_execution_id AS scheduleExecutionId, " +

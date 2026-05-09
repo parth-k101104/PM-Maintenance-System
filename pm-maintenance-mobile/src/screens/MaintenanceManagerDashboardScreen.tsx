@@ -789,6 +789,14 @@ export function MaintenanceManagerDashboardScreen() {
             <Pressable
               onPress={() => {
                 setMenuOpen(false);
+                navigation.push("SchedulePlanner");
+              }}
+            >
+              <Text style={s.drawerItemText}>Schedule planner</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setMenuOpen(false);
                 navigation.navigate("LineManagerAnalyticsDashboard", {});
               }}
             >

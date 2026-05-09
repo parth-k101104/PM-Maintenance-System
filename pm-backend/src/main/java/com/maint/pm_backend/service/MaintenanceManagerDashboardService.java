@@ -63,7 +63,7 @@ public class MaintenanceManagerDashboardService {
                 startDate,
                 endDate);
         int approvedCount = pmScheduleExecutionRepository
-                .countTasksByStatusesBetweenDates(List.of("APPROVED", "COMPLETED", "FLAGGED_AND_COMPLETED"),
+                .countTasksByStatusesBetweenDates(List.of("APPROVED", "COMPLETED", "FLAGGED_AND_COMPLETED", "COMPLETED_AND_FLAGGED"),
                         startDate, endDate);
         int overdueCount = pmScheduleExecutionRepository.countOverdueTasksBetweenDates(startDate, today);
 
@@ -100,6 +100,9 @@ public class MaintenanceManagerDashboardService {
         Double plantApprovalTurnaround = toDouble(plantLatest.get("turnaround"));
         Double plantEvidenceComplianceRate = toDouble(plantLatest.get("evidence"));
         Double plantEmployeeEfficiency = toDouble(plantLatest.get("employee_efficiency"));
+        if (plantPmCompliance == null) {
+            plantPmCompliance = computeOperationalCompliance(startDate, endDate, null);
+        }
 
         String lineHealthSql = """
                 SELECT
@@ -142,7 +145,9 @@ public class MaintenanceManagerDashboardService {
                             .lineName((String) row.get("line_name"))
                             .lineHealthScore(round1dp(toDouble(row.get("health_score"))))
                             .phmCoverageRate(round1dp(toDouble(row.get("pm_compliance_rate"))))
-                            .pmComplianceRate(round1dp(toDouble(row.get("pm_operational_compliance"))))
+                            .pmComplianceRate(round1dp(toDouble(row.get("pm_operational_compliance")) != null
+                                    ? toDouble(row.get("pm_operational_compliance"))
+                                    : computeOperationalCompliance(startDate, endDate, toLong(row.get("line_id")))))
                             .rejectionRate(round1dp(toDouble(row.get("task_rejection_rate"))))
                             .approvalTurnaroundTimeHours(round1dp(toDouble(row.get("approval_turnaround_time"))))
                             .evidenceComplianceRate(round1dp(toDouble(row.get("evidence_compliance_rate"))))
@@ -180,9 +185,38 @@ public class MaintenanceManagerDashboardService {
             case "REJECTED" ->
                 pmScheduleExecutionRepository.findTasksByStatusesBetweenDates(List.of("REJECTED"), startDate, endDate);
             case "APPROVED" -> pmScheduleExecutionRepository.findTasksByStatusesBetweenDates(
-                    List.of("APPROVED", "COMPLETED", "FLAGGED_AND_COMPLETED"), startDate, endDate);
+                    List.of("APPROVED", "COMPLETED", "FLAGGED_AND_COMPLETED", "COMPLETED_AND_FLAGGED"), startDate, endDate);
             default -> List.of();
         };
+    }
+
+    private Double computeOperationalCompliance(LocalDate startDate, LocalDate endDate, Long lineId) {
+        String lineFilter = lineId == null ? "" : " AND l.line_id = :lineId ";
+        String sql = """
+                SELECT
+                    SUM(CASE WHEN se.status IN ('APPROVED', 'COMPLETED', 'FLAGGED_AND_COMPLETED', 'COMPLETED_AND_FLAGGED') THEN 1 ELSE 0 END) AS approved_count,
+                    SUM(CASE WHEN se.status = 'REJECTED' THEN 1 ELSE 0 END) AS rejected_count
+                FROM pm_schedule_execution se
+                JOIN pm_task_schedules ts ON ts.task_schedule_id = se.task_schedule_id
+                JOIN pm_std_tasks st ON st.std_task_id = ts.std_task_id
+                LEFT JOIN equipment_element ee ON ee.element_id = st.element_id
+                LEFT JOIN equipments eq ON eq.equipment_id = ee.equipment_id
+                LEFT JOIN lines l ON l.line_id = eq.line_id
+                WHERE CAST(se.due_date AS DATE) >= :startDate
+                  AND CAST(se.due_date AS DATE) <= :endDate
+                """ + lineFilter;
+
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+        params.put("startDate", startDate);
+        params.put("endDate", endDate);
+        if (lineId != null) params.put("lineId", lineId);
+
+        Map<String, Object> row = jdbcTemplate.queryForMap(sql, params);
+        double approved = toDouble(row.get("approved_count")) != null ? toDouble(row.get("approved_count")) : 0.0;
+        double rejected = toDouble(row.get("rejected_count")) != null ? toDouble(row.get("rejected_count")) : 0.0;
+        double denominator = approved + rejected;
+        if (denominator <= 0) return null;
+        return (approved / denominator) * 100.0;
     }
 
     private LocalDate getWindowStartDate(int windowDays, LocalDate endDate) {
